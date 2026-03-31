@@ -8,7 +8,7 @@ class AppConstants {
   static const double cardRadius = 26;
   static const double chipRadius = 18;
   static const double avatarRadius = 24;
-  static const double blurSigma = 18;
+  static const double blurSigma = 10;
 
   static const EdgeInsets screenPadding = EdgeInsets.all(pagePadding);
   static const EdgeInsets cardPadding = EdgeInsets.all(18);

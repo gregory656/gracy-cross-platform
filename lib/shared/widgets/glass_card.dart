@@ -4,7 +4,6 @@ import 'package:flutter/material.dart';
 
 import '../../core/constants/app_constants.dart';
 import '../../core/theme/app_colors.dart';
-import '../../core/theme/app_gradients.dart';
 
 class GlassCard extends StatelessWidget {
   const GlassCard({
@@ -39,7 +38,8 @@ class GlassCard extends StatelessWidget {
             onTap: onTap,
             child: Ink(
               decoration: BoxDecoration(
-                gradient: gradient ?? AppGradients.card,
+                color: AppColors.surface.withValues(alpha: 0.88),
+                gradient: gradient,
                 borderRadius: radius,
                 border: Border.all(color: AppColors.outline),
               ),

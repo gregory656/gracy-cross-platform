@@ -10,6 +10,7 @@ class CustomTextField extends StatelessWidget {
     this.suffixIcon,
     this.keyboardType,
     this.readOnly = false,
+    this.height = 48,
   });
 
   final String hintText;
@@ -19,19 +20,31 @@ class CustomTextField extends StatelessWidget {
   final Widget? suffixIcon;
   final TextInputType? keyboardType;
   final bool readOnly;
+  final double height;
 
   @override
   Widget build(BuildContext context) {
-    return TextField(
-      controller: controller,
-      onChanged: onChanged,
-      keyboardType: keyboardType,
-      readOnly: readOnly,
-      style: Theme.of(context).textTheme.bodyMedium,
-      decoration: InputDecoration(
-        hintText: hintText,
-        prefixIcon: prefixIcon == null ? null : Icon(prefixIcon),
-        suffixIcon: suffixIcon,
+    return SizedBox(
+      height: height,
+      child: TextField(
+        controller: controller,
+        onChanged: onChanged,
+        keyboardType: keyboardType,
+        readOnly: readOnly,
+        style: Theme.of(context).textTheme.bodyMedium,
+        decoration: InputDecoration(
+          hintText: hintText,
+          isDense: true,
+          contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+          prefixIcon: prefixIcon == null
+              ? null
+              : Padding(
+                  padding: const EdgeInsetsDirectional.only(start: 16, end: 10),
+                  child: Icon(prefixIcon, size: 20),
+                ),
+          prefixIconConstraints: const BoxConstraints(minWidth: 0, minHeight: 0),
+          suffixIcon: suffixIcon,
+        ),
       ),
     );
   }

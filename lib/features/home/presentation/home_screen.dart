@@ -32,6 +32,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
   @override
   Widget build(BuildContext context) {
     final List<UserModel> users = ref.watch(mockUsersProvider);
+    final UserModel headerUser = users.first;
     final List<UserModel> filteredUsers = users.where((UserModel user) {
       final String query = _query.toLowerCase().trim();
       if (query.isEmpty) {
@@ -71,28 +72,31 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
               child: ListView(
                 padding: AppConstants.screenPadding,
                 children: <Widget>[
-                  const HomeHeader(),
-                  const SizedBox(height: 22),
+                  HomeHeader(user: headerUser),
+                  const SizedBox(height: 18),
                   CustomTextField(
                     controller: _searchController,
-                    hintText: 'Scan QR / Enter Join Code',
+                    hintText: 'Scan QR or enter join code',
                     prefixIcon: Icons.qr_code_scanner_rounded,
+                    height: 48,
                     onChanged: (String value) {
                       setState(() {
                         _query = value;
                       });
                     },
                   ),
-                  const SizedBox(height: 18),
+                  const SizedBox(height: 16),
                   _QuickStats(users.length),
-                  const SizedBox(height: 18),
+                  const SizedBox(height: 16),
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: <Widget>[
                       Text(
                         'Recommended Profiles',
                         style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                              fontSize: 17,
                               fontWeight: FontWeight.w800,
+                              letterSpacing: 0.2,
                             ),
                       ),
                       Text(
@@ -187,12 +191,7 @@ class _StatCard extends StatelessWidget {
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
         borderRadius: BorderRadius.circular(24),
-        gradient: LinearGradient(
-          colors: <Color>[
-            accent.withValues(alpha: 0.24),
-            AppColors.surface.withValues(alpha: 0.72),
-          ],
-        ),
+        color: AppColors.surface.withValues(alpha: 0.88),
         border: Border.all(color: AppColors.outline),
       ),
       child: Column(
@@ -210,6 +209,14 @@ class _StatCard extends StatelessWidget {
             style: Theme.of(context).textTheme.labelMedium?.copyWith(
                   color: AppColors.textSecondary,
                 ),
+          ),
+          const SizedBox(height: 12),
+          Container(
+            height: 3,
+            decoration: BoxDecoration(
+              color: accent.withValues(alpha: 0.85),
+              borderRadius: BorderRadius.circular(99),
+            ),
           ),
         ],
       ),
@@ -237,8 +244,8 @@ class _GlowBlob extends StatelessWidget {
         boxShadow: <BoxShadow>[
           BoxShadow(
             color: color,
-            blurRadius: 80,
-            spreadRadius: 20,
+            blurRadius: 36,
+            spreadRadius: 6,
           ),
         ],
       ),

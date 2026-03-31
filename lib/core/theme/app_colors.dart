@@ -7,7 +7,7 @@ class AppColors {
   static const Color backgroundAlt = Color(0xFF0D1728);
   static const Color surface = Color(0xFF121D31);
   static const Color surfaceElevated = Color(0xFF17253D);
-  static const Color outline = Color(0x2AFFFFFF);
+  static const Color outline = Color(0x1AFFFFFF);
   static const Color textPrimary = Color(0xFFF4F7FB);
   static const Color textSecondary = Color(0xFFA9B7CC);
   static const Color accentCyan = Color(0xFF5DE4C7);

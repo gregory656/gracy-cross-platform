@@ -85,11 +85,11 @@ class UserAvatar extends StatelessWidget {
           ),
         if (showOnlineIndicator)
           Positioned(
-            right: 2,
-            bottom: 2,
+            right: 1,
+            top: 1,
             child: Container(
-              width: size * 0.18,
-              height: size * 0.18,
+              width: size * 0.16,
+              height: size * 0.16,
               decoration: BoxDecoration(
                 color: user.isOnline ? AppColors.success : AppColors.warning,
                 shape: BoxShape.circle,
