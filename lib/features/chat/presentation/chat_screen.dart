@@ -1,4 +1,4 @@
-﻿import 'package:flutter/material.dart';
+import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
@@ -8,7 +8,9 @@ import '../../../core/theme/app_colors.dart';
 import '../../../shared/models/chat_model.dart';
 import '../../../shared/models/message_model.dart';
 import '../../../shared/models/user_model.dart';
+import '../../../shared/providers/auth_provider.dart';
 import '../../../shared/providers/mock_providers.dart';
+import '../../../shared/providers/profiles_provider.dart';
 import '../../../shared/widgets/chat_tile.dart';
 import '../../../shared/widgets/custom_text_field.dart';
 import '../../../shared/widgets/glass_card.dart';
@@ -19,9 +21,11 @@ class ChatScreen extends ConsumerStatefulWidget {
   const ChatScreen({
     super.key,
     this.chatId,
+    this.userId,
   });
 
   final String? chatId;
+  final String? userId;
 
   @override
   ConsumerState<ChatScreen> createState() => _ChatScreenState();
@@ -40,18 +44,18 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
     super.dispose();
   }
 
-  void _sendMessage(String chatId) {
+  void _sendMessage(String threadId) {
     final String text = _composerController.text.trim();
     if (text.isEmpty) {
       return;
     }
 
     setState(() {
-      final List<MessageModel> messages = _draftMessages.putIfAbsent(chatId, () => <MessageModel>[]);
+      final List<MessageModel> messages = _draftMessages.putIfAbsent(threadId, () => <MessageModel>[]);
       messages.add(
         MessageModel(
           id: 'draft-${DateTime.now().microsecondsSinceEpoch}',
-          chatId: chatId,
+          chatId: threadId,
           senderId: 'me',
           text: text,
           sentAt: DateTime.now(),
@@ -62,24 +66,46 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
     });
   }
 
+  ChatModel _syntheticChatForUser(UserModel user) {
+    return ChatModel(
+      id: 'live-${user.id}',
+      participantId: user.id,
+      lastMessage: user.gracyId != null ? 'Gracy code: ${user.gracyId}' : user.bio,
+      lastMessageAt: DateTime.now(),
+      unreadCount: 0,
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
-    final List<ChatModel> chats = ref.watch(mockChatsProvider);
-    final List<UserModel> users = ref.watch(mockUsersProvider);
+    final AsyncValue<List<UserModel>> profilesAsync = ref.watch(profilesDirectoryProvider);
+    final List<UserModel> fallbackUsers = ref.watch(mockUsersProvider);
+    final UserModel? currentUser = ref.watch(currentUserProvider);
+    final List<UserModel> directory = profilesAsync.when(
+      data: (List<UserModel> users) => users,
+      loading: () => fallbackUsers,
+      error: (Object error, StackTrace stackTrace) => fallbackUsers,
+    );
+    final List<UserModel> visibleDirectory = directory
+        .where((UserModel user) => currentUser == null || user.id != currentUser.id)
+        .toList();
     final String? selectedChatId = widget.chatId;
+    final String? selectedUserId = widget.userId;
 
-    if (selectedChatId == null) {
-      final List<ChatModel> filteredChats = chats.where((ChatModel chat) {
+    if (selectedChatId == null && selectedUserId == null) {
+      final List<UserModel> filteredUsers = visibleDirectory.where((UserModel user) {
         final String query = _query.toLowerCase().trim();
         if (query.isEmpty) {
           return true;
         }
-        final UserModel? participant = users.where((UserModel user) => user.id == chat.participantId).isNotEmpty
-            ? users.firstWhere((UserModel user) => user.id == chat.participantId)
-            : null;
-        final String name = participant?.fullName.toLowerCase() ?? '';
-        return name.contains(query) || chat.lastMessage.toLowerCase().contains(query);
+        return user.fullName.toLowerCase().contains(query) ||
+            user.username.toLowerCase().contains(query) ||
+            user.bio.toLowerCase().contains(query) ||
+            user.year.toLowerCase().contains(query) ||
+            (user.gracyId?.toLowerCase().contains(query) ?? false);
       }).toList();
+
+      final List<ChatModel> chats = filteredUsers.map(_syntheticChatForUser).toList();
 
       return Scaffold(
         body: DecoratedBox(
@@ -105,7 +131,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
                 ),
                 const SizedBox(height: 12),
                 Text(
-                  'Static mock messages now. Realtime wiring comes later.',
+                  'Everyone with a Gracy profile shows up here.',
                   style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                         color: AppColors.textSecondary,
                       ),
@@ -113,7 +139,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
                 const SizedBox(height: 18),
                 CustomTextField(
                   controller: _searchController,
-                  hintText: 'Search chats',
+                  hintText: 'Search by name or Gracy code',
                   prefixIcon: Icons.search_rounded,
                   onChanged: (String value) {
                     setState(() {
@@ -122,15 +148,15 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
                   },
                 ),
                 const SizedBox(height: 18),
-                ...filteredChats.map((ChatModel chat) {
-                  final UserModel user = users.firstWhere((UserModel entry) => entry.id == chat.participantId);
+                ...chats.map((ChatModel chat) {
+                  final UserModel user = filteredUsers.firstWhere((UserModel entry) => entry.id == chat.participantId);
                   return Padding(
                     padding: const EdgeInsets.only(bottom: 14),
                     child: ChatTile(
                       chat: chat,
                       user: user,
                       onTap: () {
-                        context.go('${AppRoutePaths.chat}?chatId=${chat.id}');
+                        context.go('${AppRoutePaths.chat}?userId=${user.id}');
                       },
                     ),
                   );
@@ -142,10 +168,20 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
       );
     }
 
-    final ChatModel chat = ref.watch(chatByIdProvider(selectedChatId)) ?? chats.firstWhere((ChatModel entry) => entry.id == selectedChatId);
-    final UserModel user = ref.watch(userByIdProvider(chat.participantId)) ?? users.firstWhere((UserModel entry) => entry.id == chat.participantId);
-    final List<MessageModel> baseMessages = ref.watch(messagesForChatProvider(chat.id));
-    final List<MessageModel> draftMessages = _draftMessages[chat.id] ?? <MessageModel>[];
+    final UserModel? selectedUser = selectedUserId == null
+        ? null
+        : visibleDirectory.where((UserModel user) => user.id == selectedUserId).isNotEmpty
+            ? visibleDirectory.firstWhere((UserModel user) => user.id == selectedUserId)
+            : null;
+    final ChatModel? mockChat = selectedChatId == null ? null : ref.watch(chatByIdProvider(selectedChatId));
+    final UserModel user = selectedUser ??
+        (mockChat == null
+            ? (visibleDirectory.isNotEmpty ? visibleDirectory.first : fallbackUsers.first)
+            : ref.watch(userByIdProvider(mockChat.participantId)) ??
+                fallbackUsers.firstWhere((UserModel entry) => entry.id == mockChat.participantId));
+    final String threadId = mockChat?.id ?? 'live-${user.id}';
+    final List<MessageModel> baseMessages = mockChat == null ? <MessageModel>[] : ref.watch(messagesForChatProvider(mockChat.id));
+    final List<MessageModel> draftMessages = _draftMessages[threadId] ?? <MessageModel>[];
     final List<MessageModel> messages = <MessageModel>[
       ...baseMessages,
       ...draftMessages,
@@ -172,15 +208,15 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
       body: LayoutBuilder(
         builder: (BuildContext context, BoxConstraints constraints) {
           if (constraints.maxWidth >= 900) {
-            final List<Widget> sidebarItems = chats
+            final List<Widget> sidebarItems = visibleDirectory
                 .map(
-                  (ChatModel entry) => Padding(
+                  (UserModel person) => Padding(
                     padding: const EdgeInsets.only(bottom: 12),
                     child: ChatTile(
-                      chat: entry,
-                      user: users.firstWhere((UserModel person) => person.id == entry.participantId),
+                      chat: _syntheticChatForUser(person),
+                      user: person,
                       onTap: () {
-                        context.go('${AppRoutePaths.chat}?chatId=${entry.id}');
+                        context.go('${AppRoutePaths.chat}?userId=${person.id}');
                       },
                     ),
                   ),
@@ -210,7 +246,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
                     user: user,
                     messages: messages,
                     composerController: _composerController,
-                    onSend: () => _sendMessage(chat.id),
+                    onSend: () => _sendMessage(threadId),
                   ),
                 ),
               ],
@@ -221,7 +257,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
             user: user,
             messages: messages,
             composerController: _composerController,
-            onSend: () => _sendMessage(chat.id),
+            onSend: () => _sendMessage(threadId),
           );
         },
       ),
@@ -267,7 +303,9 @@ class _ChatThread extends StatelessWidget {
                       ),
                       const SizedBox(height: 4),
                       Text(
-                        '${user.role.label} • ${user.location}',
+                        user.gracyId != null
+                            ? 'Gracy ID: ${user.gracyId!}'
+                            : '${user.role.label} • ${user.location}',
                         style: Theme.of(context).textTheme.bodySmall?.copyWith(
                               color: AppColors.textSecondary,
                             ),
@@ -353,4 +391,3 @@ class _ThreadAvatar extends StatelessWidget {
     );
   }
 }
-

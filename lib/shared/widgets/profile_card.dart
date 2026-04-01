@@ -64,9 +64,10 @@ class ProfileCard extends StatelessWidget {
                       spacing: 8,
                       runSpacing: 8,
                       children: <Widget>[
-                        _InfoChip(label: '${user.age} yrs'),
+                        if (user.age > 0) _InfoChip(label: '${user.age} yrs'),
                         _InfoChip(label: user.role.label),
                         _InfoChip(label: user.year),
+                        if (user.gracyId != null) _InfoChip(label: user.gracyId!),
                       ],
                     ),
                   ],

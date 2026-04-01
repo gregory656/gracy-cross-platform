@@ -5,9 +5,10 @@ import 'package:go_router/go_router.dart';
 import '../../../core/constants/app_constants.dart';
 import '../../../core/router/app_router.dart';
 import '../../../core/theme/app_colors.dart';
-import '../../../shared/models/chat_model.dart';
 import '../../../shared/models/user_model.dart';
+import '../../../shared/providers/auth_provider.dart';
 import '../../../shared/providers/mock_providers.dart';
+import '../../../shared/providers/profiles_provider.dart';
 import '../../../shared/widgets/custom_button.dart';
 import '../../../shared/widgets/glass_card.dart';
 import '../widgets/profile_banner.dart';
@@ -24,9 +25,20 @@ class ProfileScreen extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final List<UserModel> users = ref.watch(mockUsersProvider);
-    final UserModel user = userId == null
-        ? users.first
-        : ref.watch(userByIdProvider(userId!)) ?? users.first;
+    final UserModel? currentUser = ref.watch(currentUserProvider);
+    final AsyncValue<UserModel?> profileAsync = userId == null
+        ? const AsyncData<UserModel?>(null)
+        : ref.watch(profileByIdProvider(userId!));
+
+    final UserModel user = profileAsync.when(
+      data: (UserModel? profile) {
+        return userId == null
+            ? currentUser ?? users.first
+            : profile ?? (currentUser?.id == userId ? currentUser : null) ?? users.first;
+      },
+      loading: () => currentUser ?? users.first,
+      error: (Object error, StackTrace stackTrace) => currentUser ?? users.first,
+    );
 
     void showQuickActions() {
       showModalBottomSheet<void>(
@@ -231,13 +243,7 @@ class ProfileScreen extends ConsumerWidget {
 }
 
 void _openChat(BuildContext context, WidgetRef ref, UserModel user) {
-  final List<ChatModel> chats = ref.read(mockChatsProvider);
-  final ChatModel? chat = chats.where((ChatModel entry) => entry.participantId == user.id).isNotEmpty
-      ? chats.firstWhere((ChatModel entry) => entry.participantId == user.id)
-      : null;
-  if (chat != null) {
-    context.go('${AppRoutePaths.chat}?chatId=${chat.id}');
-  }
+  context.go('${AppRoutePaths.chat}?userId=${user.id}');
 }
 
 void _showSnackBar(BuildContext context, String message) {

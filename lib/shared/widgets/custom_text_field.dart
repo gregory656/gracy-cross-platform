@@ -10,6 +10,8 @@ class CustomTextField extends StatelessWidget {
     this.suffixIcon,
     this.keyboardType,
     this.readOnly = false,
+    this.obscureText = false,
+    this.maxLines = 1,
     this.height = 48,
   });
 
@@ -20,6 +22,8 @@ class CustomTextField extends StatelessWidget {
   final Widget? suffixIcon;
   final TextInputType? keyboardType;
   final bool readOnly;
+  final bool obscureText;
+  final int maxLines;
   final double height;
 
   @override
@@ -31,6 +35,8 @@ class CustomTextField extends StatelessWidget {
         onChanged: onChanged,
         keyboardType: keyboardType,
         readOnly: readOnly,
+        obscureText: obscureText,
+        maxLines: maxLines,
         style: Theme.of(context).textTheme.bodyMedium,
         decoration: InputDecoration(
           hintText: hintText,

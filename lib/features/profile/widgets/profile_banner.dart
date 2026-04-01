@@ -46,10 +46,11 @@ class ProfileBanner extends StatelessWidget {
                   spacing: 8,
                   runSpacing: 8,
                   children: <Widget>[
-                    _Tag(label: '${user.age} yrs'),
+                    if (user.age > 0) _Tag(label: '${user.age} yrs'),
                     _Tag(label: user.year),
                     _Tag(label: user.location),
                     _Tag(label: user.isOnline ? 'Online' : 'Offline'),
+                    if (user.gracyId != null) _Tag(label: user.gracyId!),
                   ],
                 ),
               ],

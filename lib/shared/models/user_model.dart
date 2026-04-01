@@ -24,6 +24,7 @@ class UserModel {
     required this.location,
     required this.avatarSeed,
     required this.year,
+    this.gracyId,
   });
 
   final String id;
@@ -37,6 +38,7 @@ class UserModel {
   final String location;
   final String avatarSeed;
   final String year;
+  final String? gracyId;
 
   String get initials {
     final List<String> parts = fullName.trim().split(RegExp(r'\s+'));
