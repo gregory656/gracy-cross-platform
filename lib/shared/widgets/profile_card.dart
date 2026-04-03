@@ -1,11 +1,13 @@
 ﻿import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../core/theme/app_colors.dart';
 import '../models/user_model.dart';
+import '../providers/social_providers.dart';
 import 'glass_card.dart';
 import 'user_avatar.dart';
 
-class ProfileCard extends StatelessWidget {
+class ProfileCard extends ConsumerWidget {
   const ProfileCard({
     super.key,
     required this.user,
@@ -18,8 +20,38 @@ class ProfileCard extends StatelessWidget {
   final VoidCallback onPrimaryAction;
 
   @override
-  Widget build(BuildContext context) {
-    final String ctaLabel = user.role == UserRole.alumni ? 'Connect' : 'Chat';
+  Widget build(BuildContext context, WidgetRef ref) {
+    final String? connectionStatus = ref.watch(connectionStatusProvider(user.id));
+    
+    String ctaLabel = 'Connect';
+    bool isDisabled = false;
+    VoidCallback? action = onPrimaryAction;
+
+    if (connectionStatus == 'connected') {
+      ctaLabel = 'Chat';
+    } else if (connectionStatus == 'pending') {
+      ctaLabel = 'Pending';
+      isDisabled = true;
+      action = null;
+    } else {
+      ctaLabel = 'Connect';
+      action = () async {
+        await ref.read(socialServiceProvider).sendConnectionRequest(user.id);
+        if (context.mounted) {
+           ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: Text('Connection request sent to ${user.fullName}'),
+                backgroundColor: AppColors.accentBlue,
+              ),
+            );
+        }
+      };
+    }
+
+    // fallback for the original UserRole check if it's alumni and no connection info
+    if (connectionStatus == null && user.role == UserRole.alumni) {
+       ctaLabel = 'Connect';
+    }
 
     return GlassCard(
       onTap: onTap,
@@ -98,8 +130,8 @@ class ProfileCard extends StatelessWidget {
               Expanded(
                 child: _CardAction(
                   label: ctaLabel,
-                  onTap: onPrimaryAction,
-                  filled: true,
+                  onTap: action ?? () {},
+                  filled: !isDisabled,
                 ),
               ),
               const SizedBox(width: 10),

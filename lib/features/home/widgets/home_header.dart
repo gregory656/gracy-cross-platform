@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../shared/models/user_model.dart';
 import '../../../shared/widgets/user_avatar.dart';
+import 'notification_bell.dart';
 
 class HomeHeader extends StatelessWidget {
   const HomeHeader({
@@ -44,11 +45,17 @@ class HomeHeader extends StatelessWidget {
         Column(
           crossAxisAlignment: CrossAxisAlignment.end,
           children: <Widget>[
-            UserAvatar(
-              user: user,
-              size: 48,
-              fontSize: 16,
-              showRing: true,
+            Row(
+              children: [
+                const NotificationBell(),
+                const SizedBox(width: 12),
+                UserAvatar(
+                  user: user,
+                  size: 48,
+                  fontSize: 16,
+                  showRing: true,
+                ),
+              ],
             ),
             const SizedBox(height: 10),
             Text(
