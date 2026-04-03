@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 
 import '../../features/chat/presentation/chat_screen.dart';
 import '../../features/home/presentation/home_screen.dart';
+import '../../features/onboarding/presentation/landing_screen.dart';
 import '../../features/onboarding/presentation/onboarding_screen.dart';
 import '../../features/profile/presentation/profile_screen.dart';
 import '../../features/settings/presentation/settings_screen.dart';
@@ -13,6 +14,7 @@ import 'app_shell.dart';
 class AppRoutePaths {
   const AppRoutePaths._();
 
+  static const String welcome = '/welcome';
   static const String onboarding = '/onboarding';
   static const String home = '/';
   static const String chat = '/chat';
@@ -24,26 +26,41 @@ final appRouterProvider = Provider<GoRouter>((ref) {
   AuthState readAuthState() => ref.read(authNotifierProvider);
 
   final GoRouter router = GoRouter(
-    initialLocation: readAuthState().isOnboardingComplete
-        ? AppRoutePaths.home
-        : AppRoutePaths.onboarding,
+    initialLocation: readAuthState().isAuthenticated 
+      ? (readAuthState().isOnboardingComplete ? AppRoutePaths.home : AppRoutePaths.onboarding)
+      : AppRoutePaths.welcome,
     redirect: (BuildContext context, GoRouterState state) {
       final AuthState authState = readAuthState();
-      final bool isOnboardingRoute =
-          state.matchedLocation == AppRoutePaths.onboarding;
+      final bool isWelcomeRoute = state.matchedLocation == AppRoutePaths.welcome;
+      final bool isOnboardingRoute = state.matchedLocation == AppRoutePaths.onboarding;
+      
+      final bool authenticated = authState.isAuthenticated;
       final bool completed = authState.isOnboardingComplete;
 
-      if (!completed && !isOnboardingRoute) {
+      // 1. Not Auth at all -> Must go to Welcome
+      if (!authenticated && !isWelcomeRoute) {
+        return AppRoutePaths.welcome;
+      }
+      
+      // 2. Auth but profile missing -> Must go to Onboarding
+      if (authenticated && !completed && !isOnboardingRoute) {
         return AppRoutePaths.onboarding;
       }
 
-      if (completed && isOnboardingRoute) {
+      // 3. Auth && Profile Complete -> Should skip onboarding/welcome
+      if (authenticated && completed && (isWelcomeRoute || isOnboardingRoute)) {
         return AppRoutePaths.home;
       }
 
       return null;
     },
     routes: <RouteBase>[
+      GoRoute(
+        path: AppRoutePaths.welcome,
+        builder: (BuildContext context, GoRouterState state) {
+          return const LandingScreen();
+        },
+      ),
       GoRoute(
         path: AppRoutePaths.onboarding,
         builder: (BuildContext context, GoRouterState state) {

@@ -132,9 +132,9 @@ class AuthNotifier extends Notifier<AuthState> {
 
       if (user == null) {
         state = state.copyWith(
-          isAuthenticated: onboardingComplete,
+          isAuthenticated: false,
           isLoading: false,
-          isOnboardingComplete: onboardingComplete,
+          isOnboardingComplete: false,
         );
         return;
       }
@@ -162,6 +162,11 @@ class AuthNotifier extends Notifier<AuthState> {
           gracyId = profile['gracy_id']?.toString();
           selectedTheme = profile['selected_theme']?.toString() ?? 'midnight';
           notificationsEnabled = profile['notifications_enabled'] == true;
+          
+          if (gracyId != null || fullName != null) {
+             onboardingComplete = true;
+             await DatabaseService.instance.setOnboardingComplete(true);
+          }
         }
       } catch (_) {
         // If the profile row is unavailable, fall back to auth metadata only.
@@ -283,6 +288,105 @@ class AuthNotifier extends Notifier<AuthState> {
         : cleaned;
     final String safeHandle = handle.replaceAll(RegExp(r'[^a-z0-9._-]'), '');
     return safeHandle.isEmpty ? 'gracyuser' : safeHandle;
+  }
+
+  Future<bool> signInWithEmail(String email, String password) async {
+    state = state.copyWith(isLoading: true, errorMessage: null);
+    try {
+      if (_client != null) {
+        final response = await _client!.auth.signInWithPassword(email: email, password: password);
+        return await _verifyAndLoadProfile(response.user);
+      }
+      return false;
+    } on AuthException catch (e) {
+      state = state.copyWith(isLoading: false, errorMessage: e.message);
+      return false;
+    } catch (e) {
+      state = state.copyWith(isLoading: false, errorMessage: e.toString());
+      return false;
+    }
+  }
+
+  Future<bool> signUpWithEmail(String email, String password) async {
+    state = state.copyWith(isLoading: true, errorMessage: null);
+    try {
+      if (_client != null) {
+        final response = await _client!.auth.signUp(email: email, password: password);
+        return await _verifyAndLoadProfile(response.user);
+      }
+      return false;
+    } on AuthException catch (e) {
+      state = state.copyWith(isLoading: false, errorMessage: e.message);
+      return false;
+    } catch (e) {
+      state = state.copyWith(isLoading: false, errorMessage: e.toString());
+      return false;
+    }
+  }
+
+  Future<bool> signInWithSocial(OAuthProvider provider) async {
+    state = state.copyWith(isLoading: true, errorMessage: null);
+    try {
+      if (_client != null) {
+        final success = await _client!.auth.signInWithOAuth(provider);
+        if (success) {
+           // Provide fallback UI update; deep link will handle the actual _bootstrap reload usually
+           return true; 
+        }
+      }
+      return false;
+    } on AuthException catch (e) {
+      state = state.copyWith(isLoading: false, errorMessage: e.message);
+      return false;
+    } catch (e) {
+      state = state.copyWith(isLoading: false, errorMessage: e.toString());
+      return false;
+    }
+  }
+
+  Future<bool> _verifyAndLoadProfile(User? user) async {
+    if (user == null) {
+       state = state.copyWith(isLoading: false, errorMessage: 'User null after auth');
+       return false;
+    }
+    
+    // Check if profile exists
+    bool onboardingComplete = false;
+    String? fullName, bio, yearOfStudy, gracyId;
+    String username = user.userMetadata?['username']?.toString() ?? 'gracyuser';
+
+    try {
+      final Map<String, dynamic>? profile = await _client!
+          .from('profiles')
+          .select()
+          .eq('id', user.id)
+          .maybeSingle();
+
+      if (profile != null && (profile['gracy_id'] != null || profile['full_name'] != null)) {
+        onboardingComplete = true;
+        fullName = profile['full_name']?.toString();
+        bio = profile['bio']?.toString();
+        yearOfStudy = profile['year_of_study']?.toString();
+        gracyId = profile['gracy_id']?.toString();
+        username = profile['username']?.toString() ?? username;
+        await DatabaseService.instance.setOnboardingComplete(true);
+      } else {
+        await DatabaseService.instance.setOnboardingComplete(false);
+      }
+    } catch (_) {}
+
+    state = state.copyWith(
+      isAuthenticated: true,
+      isLoading: false,
+      isOnboardingComplete: onboardingComplete,
+      userId: user.id,
+      username: username,
+      fullName: fullName,
+      bio: bio,
+      yearOfStudy: yearOfStudy,
+      gracyId: gracyId,
+    );
+    return true;
   }
 
   Future<void> updateProfile({

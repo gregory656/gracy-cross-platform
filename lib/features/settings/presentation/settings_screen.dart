@@ -2,6 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import 'package:supabase_flutter/supabase_flutter.dart';
+
+import '../../../core/constants.dart';
 import '../../../core/constants/app_constants.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../shared/models/user_model.dart';
@@ -23,12 +26,18 @@ class SettingsScreen extends ConsumerWidget {
     }
 
     final String activeTheme = ref.watch(themeProvider);
+    final bool isGuest = SupabaseConfig.isConfigured && 
+                         Supabase.instance.client.auth.currentUser?.isAnonymous == true;
 
     return Scaffold(
       appBar: AppBar(title: const Text('Settings'), scrolledUnderElevation: 0),
       body: ListView(
         padding: AppConstants.screenPadding,
         children: <Widget>[
+          if (isGuest) ...[
+            _buildGuestWarning(context),
+            const SizedBox(height: 16),
+          ],
           _buildProfileSection(context, currentUser),
           const SizedBox(height: 32),
           _buildThemeSection(context, ref, activeTheme),
@@ -37,6 +46,44 @@ class SettingsScreen extends ConsumerWidget {
           const SizedBox(height: 48),
           _buildDangerZone(context, ref),
           const SizedBox(height: 32),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildGuestWarning(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: AppColors.warning.withValues(alpha: 0.1),
+        border: Border.all(color: AppColors.warning),
+        borderRadius: BorderRadius.circular(16),
+      ),
+      child: Row(
+        children: [
+          const Icon(Icons.warning_amber_rounded, color: AppColors.warning),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Guest account',
+                  style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                    color: AppColors.warning,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  'Sign up to save your progress!',
+                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                    color: AppColors.textPrimary,
+                  ),
+                ),
+              ],
+            ),
+          ),
         ],
       ),
     );
