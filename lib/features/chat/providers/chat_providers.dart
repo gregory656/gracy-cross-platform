@@ -4,10 +4,14 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../../shared/models/chat_model.dart';
 import '../../../shared/models/message_model.dart';
 import '../../../shared/providers/auth_provider.dart';
+import '../../../shared/services/database_service.dart';
 import '../data/chat_repository.dart';
 
 final chatRepositoryProvider = Provider<ChatRepository>((ref) {
-  return ChatRepository(Supabase.instance.client);
+  return ChatRepository(
+    Supabase.instance.client,
+    databaseService: DatabaseService.instance,
+  );
 });
 
 final recentChatsProvider = FutureProvider<List<ChatModel>>((ref) async {

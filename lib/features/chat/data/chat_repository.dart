@@ -5,6 +5,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../../shared/models/chat_model.dart';
 import '../../../shared/models/message_model.dart';
 import '../../../shared/models/user_model.dart';
+import '../../../shared/services/database_service.dart';
 
 class ChatThread {
   const ChatThread({
@@ -19,7 +20,10 @@ class ChatThread {
 }
 
 class ChatRepository {
-  ChatRepository(this._client);
+  ChatRepository(
+    this._client, {
+    DatabaseService? databaseService,
+  }) : _databaseService = databaseService ?? DatabaseService.instance;
 
   static const String botUserId = 'd9660385-2c30-466d-8902-602868198f82';
   static const String botGracyCode = 'GRACY-BOT-99';
@@ -27,8 +31,10 @@ class ChatRepository {
   static const String _profilesTable = 'profiles';
   static const String _roomsTable = 'chat_rooms';
   static const String _messagesTable = 'messages';
+  static const String _chatMembersTable = 'chat_members';
 
   final SupabaseClient _client;
+  final DatabaseService _databaseService;
 
   String buildRoomHash(String myId, String friendId) {
     final List<String> ids = <String>[myId, friendId]..sort();
@@ -86,11 +92,21 @@ class ChatRepository {
         .select('id,room_hash')
         .single();
 
+    final String roomId = roomRow['id']?.toString() ?? '';
+    if (roomId.isEmpty) {
+      throw const ChatRepositoryException('Room creation failed.');
+    }
+
+    await _ensureRoomMembers(
+      roomId: roomId,
+      userIds: <String>[currentUserId, participantId],
+    );
+
     final UserModel resolvedParticipant =
         participant ?? await _fetchRequiredProfile(participantId);
 
     return ChatThread(
-      roomId: roomRow['id']?.toString() ?? '',
+      roomId: roomId,
       roomHash: roomRow['room_hash']?.toString() ?? roomHash,
       participant: resolvedParticipant,
     );
@@ -105,10 +121,15 @@ class ChatRepository {
       final Map<String, dynamic> roomRow =
           await _client.from(_roomsTable).select('id,room_hash').eq('id', roomId).single();
       final String roomHash = roomRow['room_hash']?.toString() ?? '';
-      final String participantId = roomHash
-          .split('_')
-          .where((String id) => id.isNotEmpty && id != currentUserId)
-          .first;
+      final String participantId = await _resolveParticipantId(
+        roomId: roomId,
+        currentUserId: currentUserId,
+        roomHash: roomHash,
+      );
+      await _ensureRoomMembers(
+        roomId: roomId,
+        userIds: <String>[currentUserId, participantId],
+      );
 
       return ChatThread(
         roomId: roomRow['id']?.toString() ?? roomId,
@@ -164,8 +185,24 @@ class ChatRepository {
           )
           .toList();
 
+      await _databaseService.cacheMessages(
+        roomId: roomId,
+        messages: messages,
+      );
+
       if (!controller.isClosed) {
         controller.add(messages);
+      }
+    }
+
+    Future<void> emitCachedMessages() async {
+      final List<MessageModel> cachedMessages = await _databaseService.getCachedMessages(
+        roomId: roomId,
+        currentUserId: currentUserId,
+      );
+
+      if (cachedMessages.isNotEmpty && !controller.isClosed) {
+        controller.add(cachedMessages);
       }
     }
 
@@ -177,8 +214,7 @@ class ChatRepository {
           .order('created_at');
 
       for (final dynamic row in rows) {
-        final Map<String, dynamic> parsedRow =
-            Map<String, dynamic>.from(row as Map);
+        final Map<String, dynamic> parsedRow = Map<String, dynamic>.from(row as Map);
         final String id = parsedRow['id']?.toString() ?? '';
         if (id.isNotEmpty) {
           messageRowsById[id] = parsedRow;
@@ -221,6 +257,7 @@ class ChatRepository {
 
     Future<void>(() async {
       try {
+        await emitCachedMessages();
         await hydrateInitialMessages();
       } catch (error, stackTrace) {
         if (!controller.isClosed) {
@@ -246,27 +283,22 @@ class ChatRepository {
       return;
     }
 
-    await _client.from(_messagesTable).insert(
-      <String, dynamic>{
-        'room_id': roomId,
-        'sender_id': senderId,
-        'content': trimmed,
+    final String resolvedSenderId = _client.auth.currentUser?.id ?? senderId;
+    await _ensureRoomMembers(
+      roomId: roomId,
+      userIds: <String>[resolvedSenderId],
+    );
+    await _client.rpc(
+      'send_message',
+      params: <String, dynamic>{
+        'p_room_id': roomId,
+        'p_content': trimmed,
       },
     );
   }
 
   Future<List<ChatModel>> fetchRecentChats(String currentUserId) async {
-    final List<dynamic> rawRoomRows = await _client
-        .from(_roomsTable)
-        .select('id,room_hash')
-        .ilike('room_hash', '%$currentUserId%');
-
-    final List<Map<String, dynamic>> roomRows = rawRoomRows
-        .map((dynamic row) => Map<String, dynamic>.from(row as Map))
-        .where((Map<String, dynamic> row) {
-      final String roomHash = row['room_hash']?.toString() ?? '';
-      return roomHash.split('_').contains(currentUserId);
-    }).toList();
+    final List<Map<String, dynamic>> roomRows = await _fetchRoomRowsForUser(currentUserId);
 
     if (roomRows.isEmpty) {
       return const <ChatModel>[];
@@ -276,13 +308,18 @@ class ChatRepository {
         .map((Map<String, dynamic> row) => row['id']?.toString() ?? '')
         .where((String id) => id.isNotEmpty)
         .toList();
-    final Set<String> participantIds = roomRows
-        .map((Map<String, dynamic> row) => _otherParticipantId(
-              roomHash: row['room_hash']?.toString() ?? '',
-              currentUserId: currentUserId,
-            ))
-        .where((String id) => id.isNotEmpty)
-        .toSet();
+    final Set<String> participantIds = <String>{};
+
+    for (final Map<String, dynamic> row in roomRows) {
+      final String participantId = await _resolveParticipantId(
+        roomId: row['id']?.toString() ?? '',
+        currentUserId: currentUserId,
+        roomHash: row['room_hash']?.toString() ?? '',
+      );
+      if (participantId.isNotEmpty) {
+        participantIds.add(participantId);
+      }
+    }
 
     final Map<String, UserModel> participants = await _fetchProfilesByIds(participantIds);
     final List<Map<String, dynamic>> messageRows = roomIds.isEmpty
@@ -302,31 +339,134 @@ class ChatRepository {
       latestByRoom.putIfAbsent(roomId, () => row);
     }
 
-    final List<ChatModel> chats = roomRows.map((Map<String, dynamic> row) {
+    final List<ChatModel> chats = <ChatModel>[];
+    for (final Map<String, dynamic> row in roomRows) {
       final String roomId = row['id']?.toString() ?? '';
       final String roomHash = row['room_hash']?.toString() ?? '';
-      final String participantId =
-          _otherParticipantId(roomHash: roomHash, currentUserId: currentUserId);
+      final String participantId = await _resolveParticipantId(
+        roomId: roomId,
+        currentUserId: currentUserId,
+        roomHash: roomHash,
+      );
       final UserModel? participant = participants[participantId];
       final Map<String, dynamic>? latest = latestByRoom[roomId];
 
-      return ChatModel(
-        id: roomId,
-        participantId: participantId,
-        lastMessage: latest?['content']?.toString() ??
-            (participant?.id == botUserId ? 'Official Gracy bot is ready.' : 'Start the conversation'),
-        lastMessageAt:
-            DateTime.tryParse(latest?['created_at']?.toString() ?? '') ?? DateTime.now(),
-        unreadCount: 0,
-        roomHash: roomHash,
-        isOfficial: participant?.id == botUserId,
-        gracyId: participant?.gracyId,
-        isOnline: participant?.isOnline ?? false,
-      );
-    }).toList()
-      ..sort((ChatModel a, ChatModel b) => b.lastMessageAt.compareTo(a.lastMessageAt));
+      if (participant == null) {
+        continue;
+      }
 
+      chats.add(
+        ChatModel(
+          id: roomId,
+          participantId: participantId,
+          lastMessage: latest?['content']?.toString() ??
+              (participant.id == botUserId ? 'Official Gracy bot is ready.' : 'Start the conversation'),
+          lastMessageAt:
+              DateTime.tryParse(latest?['created_at']?.toString() ?? '') ?? DateTime.now(),
+          unreadCount: 0,
+          roomHash: roomHash,
+          isOfficial: participant.id == botUserId,
+          gracyId: participant.gracyId,
+          isOnline: participant.isOnline,
+        ),
+      );
+    }
+
+    chats.sort((ChatModel a, ChatModel b) => b.lastMessageAt.compareTo(a.lastMessageAt));
     return chats;
+  }
+
+  Future<void> _ensureRoomMembers({
+    required String roomId,
+    required List<String> userIds,
+  }) async {
+    try {
+      await _client.from(_chatMembersTable).upsert(
+        userIds
+            .map(
+              (String userId) => <String, dynamic>{
+                'room_id': roomId,
+                'user_id': userId,
+              },
+            )
+            .toList(),
+        onConflict: 'room_id,user_id',
+      );
+    } catch (_) {
+      // Stay backward-compatible with deployments that still rely on room_hash only.
+    }
+  }
+
+  Future<List<Map<String, dynamic>>> _fetchRoomRowsForUser(String currentUserId) async {
+    try {
+      final List<dynamic> memberRows = await _client
+          .from(_chatMembersTable)
+          .select('room_id')
+          .eq('user_id', currentUserId);
+
+      final List<String> roomIds = memberRows
+          .map((dynamic row) => Map<String, dynamic>.from(row as Map)['room_id']?.toString() ?? '')
+          .where((String id) => id.isNotEmpty)
+          .toList();
+
+      if (roomIds.isEmpty) {
+        return const <Map<String, dynamic>>[];
+      }
+
+      final List<dynamic> roomRows = await _client
+          .from(_roomsTable)
+          .select('id,room_hash')
+          .inFilter('id', roomIds);
+
+      return roomRows
+          .map((dynamic row) => Map<String, dynamic>.from(row as Map))
+          .toList();
+    } catch (_) {
+      final List<dynamic> rawRoomRows = await _client
+          .from(_roomsTable)
+          .select('id,room_hash')
+          .ilike('room_hash', '%$currentUserId%');
+
+      return rawRoomRows
+          .map((dynamic row) => Map<String, dynamic>.from(row as Map))
+          .where((Map<String, dynamic> row) {
+        final String roomHash = row['room_hash']?.toString() ?? '';
+        return roomHash.split('_').contains(currentUserId);
+      }).toList();
+    }
+  }
+
+  Future<String> _resolveParticipantId({
+    required String roomId,
+    required String currentUserId,
+    required String roomHash,
+  }) async {
+    try {
+      final List<dynamic> memberRows = await _client
+          .from(_chatMembersTable)
+          .select('user_id')
+          .eq('room_id', roomId);
+      final List<String> memberIds = memberRows
+          .map((dynamic row) => Map<String, dynamic>.from(row as Map)['user_id']?.toString() ?? '')
+          .where((String id) => id.isNotEmpty)
+          .toList();
+
+      final String participantId = memberIds.firstWhere(
+        (String id) => id != currentUserId,
+        orElse: () => '',
+      );
+
+      if (participantId.isNotEmpty) {
+        return participantId;
+      }
+    } catch (_) {
+      // Fall back to room_hash parsing for older environments.
+    }
+
+    return _otherParticipantId(
+      roomHash: roomHash,
+      currentUserId: currentUserId,
+    );
   }
 
   Future<UserModel> _fetchRequiredProfile(String userId) async {
@@ -348,9 +488,8 @@ class ChatRepository {
         .select('id,username,gracy_id,full_name,avatar_url,is_online')
         .inFilter('id', userIds.toList());
 
-    final List<Map<String, dynamic>> rows = rawRows
-        .map((dynamic row) => Map<String, dynamic>.from(row as Map))
-        .toList();
+    final List<Map<String, dynamic>> rows =
+        rawRows.map((dynamic row) => Map<String, dynamic>.from(row as Map)).toList();
 
     return <String, UserModel>{
       for (final Map<String, dynamic> row in rows) row['id']?.toString() ?? '': _userFromProfile(row),
