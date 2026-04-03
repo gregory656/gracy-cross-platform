@@ -6,6 +6,7 @@ import '../../features/chat/presentation/chat_screen.dart';
 import '../../features/home/presentation/home_screen.dart';
 import '../../features/onboarding/presentation/onboarding_screen.dart';
 import '../../features/profile/presentation/profile_screen.dart';
+import '../../features/settings/presentation/settings_screen.dart';
 import '../../shared/providers/auth_provider.dart';
 import 'app_shell.dart';
 
@@ -16,6 +17,7 @@ class AppRoutePaths {
   static const String home = '/';
   static const String chat = '/chat';
   static const String profile = '/profile';
+  static const String settings = '/settings';
 }
 
 final appRouterProvider = Provider<GoRouter>((ref) {
@@ -71,9 +73,13 @@ final appRouterProvider = Provider<GoRouter>((ref) {
           GoRoute(
             path: AppRoutePaths.profile,
             builder: (BuildContext context, GoRouterState state) {
-              return ProfileScreen(
-                userId: state.uri.queryParameters['userId'],
-              );
+              return ProfileScreen(userId: state.uri.queryParameters['userId']);
+            },
+          ),
+          GoRoute(
+            path: AppRoutePaths.settings,
+            builder: (BuildContext context, GoRouterState state) {
+              return const SettingsScreen();
             },
           ),
         ],
@@ -81,7 +87,10 @@ final appRouterProvider = Provider<GoRouter>((ref) {
     ],
   );
 
-  ref.listen<AuthState>(authNotifierProvider, (AuthState? previous, AuthState next) {
+  ref.listen<AuthState>(authNotifierProvider, (
+    AuthState? previous,
+    AuthState next,
+  ) {
     router.refresh();
   });
 

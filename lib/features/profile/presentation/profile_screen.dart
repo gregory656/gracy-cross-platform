@@ -1,4 +1,4 @@
-﻿import 'package:flutter/material.dart';
+import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
@@ -15,10 +15,7 @@ import '../widgets/profile_banner.dart';
 import '../widgets/profile_quick_actions.dart';
 
 class ProfileScreen extends ConsumerWidget {
-  const ProfileScreen({
-    super.key,
-    this.userId,
-  });
+  const ProfileScreen({super.key, this.userId});
 
   final String? userId;
 
@@ -34,10 +31,13 @@ class ProfileScreen extends ConsumerWidget {
       data: (UserModel? profile) {
         return userId == null
             ? currentUser ?? users.first
-            : profile ?? (currentUser?.id == userId ? currentUser : null) ?? users.first;
+            : profile ??
+                  (currentUser?.id == userId ? currentUser : null) ??
+                  users.first;
       },
       loading: () => currentUser ?? users.first,
-      error: (Object error, StackTrace stackTrace) => currentUser ?? users.first,
+      error: (Object error, StackTrace stackTrace) =>
+          currentUser ?? users.first,
     );
 
     void showQuickActions() {
@@ -54,11 +54,17 @@ class ProfileScreen extends ConsumerWidget {
             },
             onConnect: () {
               Navigator.of(sheetContext).pop();
-              _showSnackBar(context, 'Connection request prepared for ${user.fullName}.');
+              _showSnackBar(
+                context,
+                'Connection request prepared for ${user.fullName}.',
+              );
             },
             onShare: () {
               Navigator.of(sheetContext).pop();
-              _showSnackBar(context, 'Profile link copied for ${user.fullName}.');
+              _showSnackBar(
+                context,
+                'Profile link copied for ${user.fullName}.',
+              );
             },
             onSave: () {
               Navigator.of(sheetContext).pop();
@@ -74,7 +80,10 @@ class ProfileScreen extends ConsumerWidget {
     }
 
     void handleConnect() {
-      _showSnackBar(context, 'Connection request prepared for ${user.fullName}.');
+      _showSnackBar(
+        context,
+        'Connection request prepared for ${user.fullName}.',
+      );
     }
 
     void handleShare() {
@@ -108,10 +117,7 @@ class ProfileScreen extends ConsumerWidget {
           gradient: LinearGradient(
             begin: Alignment.topLeft,
             end: Alignment.bottomRight,
-            colors: <Color>[
-              AppColors.background,
-              AppColors.backgroundAlt,
-            ],
+            colors: <Color>[AppColors.background, AppColors.backgroundAlt],
           ),
         ),
         child: LayoutBuilder(
@@ -130,16 +136,16 @@ class ProfileScreen extends ConsumerWidget {
                       Text(
                         'Bio',
                         style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                              fontWeight: FontWeight.w800,
-                            ),
+                          fontWeight: FontWeight.w800,
+                        ),
                       ),
                       const SizedBox(height: 10),
                       Text(
                         user.bio,
                         style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                              color: AppColors.textSecondary,
-                              height: 1.45,
-                            ),
+                          color: AppColors.textSecondary,
+                          height: 1.45,
+                        ),
                       ),
                     ],
                   ),
@@ -152,8 +158,8 @@ class ProfileScreen extends ConsumerWidget {
                       Text(
                         'Courses',
                         style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                              fontWeight: FontWeight.w800,
-                            ),
+                          fontWeight: FontWeight.w800,
+                        ),
                       ),
                       const SizedBox(height: 12),
                       Wrap(
@@ -212,10 +218,7 @@ class ProfileScreen extends ConsumerWidget {
             return Row(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: <Widget>[
-                Expanded(
-                  flex: 5,
-                  child: primaryColumn,
-                ),
+                Expanded(flex: 5, child: primaryColumn),
                 const SizedBox(width: 20),
                 SizedBox(
                   width: 360,
@@ -250,10 +253,7 @@ void _showSnackBar(BuildContext context, String message) {
   ScaffoldMessenger.of(context)
     ..clearSnackBars()
     ..showSnackBar(
-      SnackBar(
-        content: Text(message),
-        behavior: SnackBarBehavior.floating,
-      ),
+      SnackBar(content: Text(message), behavior: SnackBarBehavior.floating),
     );
 }
 
@@ -274,9 +274,9 @@ class _CourseChip extends StatelessWidget {
       child: Text(
         label,
         style: Theme.of(context).textTheme.labelMedium?.copyWith(
-              color: AppColors.textPrimary,
-              fontWeight: FontWeight.w700,
-            ),
+          color: AppColors.textPrimary,
+          fontWeight: FontWeight.w700,
+        ),
       ),
     );
   }

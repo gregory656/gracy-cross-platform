@@ -25,7 +25,9 @@ class NotificationModel {
       type: map['type'] as String,
       content: map['content'] as String?,
       isRead: map['is_read'] as bool? ?? false,
-      createdAt: DateTime.tryParse(map['created_at']?.toString() ?? '') ?? DateTime.now(),
+      createdAt:
+          DateTime.tryParse(map['created_at']?.toString() ?? '') ??
+          DateTime.now(),
     );
   }
 }

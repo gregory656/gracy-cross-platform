@@ -1,4 +1,4 @@
-﻿import '../models/message_model.dart';
+import '../models/message_model.dart';
 
 // REPLACE WITH API DATA SOURCE
 // REPLACE WITH API DATA SOURCE
@@ -7,7 +7,8 @@ final List<MessageModel> mockMessages = <MessageModel>[
     id: 'm1',
     chatId: 'c1',
     senderId: 'u2',
-    text: 'Your portfolio flow is very close. The spacing just needs breathing room.',
+    text:
+        'Your portfolio flow is very close. The spacing just needs breathing room.',
     sentAt: DateTime(2026, 3, 31, 16, 40),
     isMe: false,
   ),
@@ -92,4 +93,3 @@ final List<MessageModel> mockMessages = <MessageModel>[
     isMe: true,
   ),
 ];
-

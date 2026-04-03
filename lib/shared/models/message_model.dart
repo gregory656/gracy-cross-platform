@@ -33,7 +33,9 @@ class MessageModel {
       chatId: row['room_id']?.toString() ?? '',
       senderId: row['sender_id']?.toString() ?? '',
       text: row['content']?.toString() ?? '',
-      sentAt: DateTime.tryParse(row['created_at']?.toString() ?? '') ?? DateTime.now(),
+      sentAt:
+          DateTime.tryParse(row['created_at']?.toString() ?? '') ??
+          DateTime.now(),
       isMe: row['sender_id']?.toString() == currentUserId,
       senderName: senderName,
       senderUsername: senderUsername,

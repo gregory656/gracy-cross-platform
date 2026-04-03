@@ -18,6 +18,8 @@ class AuthState {
     this.yearOfStudy,
     this.gracyId,
     this.errorMessage,
+    this.selectedTheme = 'midnight',
+    this.notificationsEnabled = true,
   });
 
   final bool isAuthenticated;
@@ -30,13 +32,15 @@ class AuthState {
   final String? yearOfStudy;
   final String? gracyId;
   final String? errorMessage;
+  final String selectedTheme;
+  final bool notificationsEnabled;
 
   factory AuthState.initial() {
     return const AuthState(
       isAuthenticated: false,
       isLoading: false,
       isOnboardingComplete: false,
-      );
+    );
   }
 
   AuthState copyWith({
@@ -50,6 +54,8 @@ class AuthState {
     String? yearOfStudy,
     String? gracyId,
     String? errorMessage,
+    String? selectedTheme,
+    bool? notificationsEnabled,
   }) {
     return AuthState(
       isAuthenticated: isAuthenticated ?? this.isAuthenticated,
@@ -62,6 +68,8 @@ class AuthState {
       yearOfStudy: yearOfStudy ?? this.yearOfStudy,
       gracyId: gracyId ?? this.gracyId,
       errorMessage: errorMessage,
+      selectedTheme: selectedTheme ?? this.selectedTheme,
+      notificationsEnabled: notificationsEnabled ?? this.notificationsEnabled,
     );
   }
 }
@@ -94,7 +102,8 @@ class AuthNotifier extends Notifier<AuthState> {
       bool onboardingComplete = false;
 
       try {
-        onboardingComplete = await DatabaseService.instance.isOnboardingComplete();
+        onboardingComplete = await DatabaseService.instance
+            .isOnboardingComplete();
       } catch (_) {
         onboardingComplete = false;
       }
@@ -134,11 +143,15 @@ class AuthNotifier extends Notifier<AuthState> {
       String? bio;
       String? yearOfStudy;
       String? gracyId;
+      String selectedTheme = 'midnight';
+      bool notificationsEnabled = true;
 
       try {
         final Map<String, dynamic>? profile = await client
             .from('profiles')
-            .select('full_name,bio,year_of_study,gracy_id,username')
+            .select(
+              'full_name,bio,year_of_study,gracy_id,username,selected_theme,notifications_enabled',
+            )
             .eq('id', user.id)
             .maybeSingle();
 
@@ -147,6 +160,8 @@ class AuthNotifier extends Notifier<AuthState> {
           bio = profile['bio']?.toString();
           yearOfStudy = profile['year_of_study']?.toString();
           gracyId = profile['gracy_id']?.toString();
+          selectedTheme = profile['selected_theme']?.toString() ?? 'midnight';
+          notificationsEnabled = profile['notifications_enabled'] == true;
         }
       } catch (_) {
         // If the profile row is unavailable, fall back to auth metadata only.
@@ -162,6 +177,8 @@ class AuthNotifier extends Notifier<AuthState> {
         bio: bio,
         yearOfStudy: yearOfStudy,
         gracyId: gracyId,
+        selectedTheme: selectedTheme,
+        notificationsEnabled: notificationsEnabled,
       );
       debugPrint(
         'Auth bootstrap: session=true onboardingComplete=$onboardingComplete userId=${user.id}',
@@ -221,24 +238,19 @@ class AuthNotifier extends Notifier<AuthState> {
       }
 
       final AuthResponse response = await client.auth.signInAnonymously(
-        data: <String, dynamic>{
-          'username': normalizedUsername,
-        },
+        data: <String, dynamic>{'username': normalizedUsername},
       );
 
       final User? user = response.user ?? client.auth.currentUser;
       final String userId = user?.id ?? normalizedUsername;
-      await client.from('profiles').upsert(
-        <String, dynamic>{
-          'id': userId,
-          'username': normalizedUsername,
-          'full_name': fullName.trim(),
-          'bio': bio.trim(),
-          'year_of_study': yearOfStudy.trim(),
-          'gracy_id': gracyId,
-        },
-        onConflict: 'id',
-      );
+      await client.from('profiles').upsert(<String, dynamic>{
+        'id': userId,
+        'username': normalizedUsername,
+        'full_name': fullName.trim(),
+        'bio': bio.trim(),
+        'year_of_study': yearOfStudy.trim(),
+        'gracy_id': gracyId,
+      }, onConflict: 'id');
 
       await DatabaseService.instance.setOnboardingComplete(true);
 
@@ -256,25 +268,47 @@ class AuthNotifier extends Notifier<AuthState> {
       debugPrint('Auth complete: authenticated=true userId=$userId');
       return true;
     } on AuthException catch (error) {
-      state = state.copyWith(
-        isLoading: false,
-        errorMessage: error.message,
-      );
+      state = state.copyWith(isLoading: false, errorMessage: error.message);
       return false;
     } catch (error) {
-      state = state.copyWith(
-        isLoading: false,
-        errorMessage: error.toString(),
-      );
+      state = state.copyWith(isLoading: false, errorMessage: error.toString());
       return false;
     }
   }
 
   String _normalizeUsername(String username) {
     final String cleaned = username.trim().toLowerCase();
-    final String handle = cleaned.startsWith('@') ? cleaned.substring(1) : cleaned;
+    final String handle = cleaned.startsWith('@')
+        ? cleaned.substring(1)
+        : cleaned;
     final String safeHandle = handle.replaceAll(RegExp(r'[^a-z0-9._-]'), '');
     return safeHandle.isEmpty ? 'gracyuser' : safeHandle;
+  }
+
+  Future<void> updateProfile({
+    required String fullName,
+    required String bio,
+  }) async {
+    final SupabaseClient? client = _client;
+    final String? userId = state.userId;
+    if (client == null || userId == null) return;
+
+    state = state.copyWith(fullName: fullName, bio: bio);
+
+    try {
+      await client
+          .from('profiles')
+          .update(<String, dynamic>{'full_name': fullName, 'bio': bio})
+          .eq('id', userId);
+    } catch (_) {}
+  }
+
+  Future<void> logout() async {
+    final SupabaseClient? client = _client;
+    if (client != null) {
+      await client.auth.signOut();
+    }
+    state = AuthState.initial();
   }
 }
 
@@ -307,5 +341,7 @@ final currentUserProvider = Provider<UserModel?>((ref) {
         ? authState.yearOfStudy!.trim()
         : 'Not set',
     gracyId: authState.gracyId,
+    selectedTheme: authState.selectedTheme,
+    notificationsEnabled: authState.notificationsEnabled,
   );
 });

@@ -50,9 +50,8 @@ class ChatTile extends StatelessWidget {
                             child: Text(
                               user.fullName,
                               overflow: TextOverflow.ellipsis,
-                              style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                                    fontWeight: FontWeight.w800,
-                                  ),
+                              style: Theme.of(context).textTheme.titleMedium
+                                  ?.copyWith(fontWeight: FontWeight.w800),
                             ),
                           ),
                           if (chat.isOfficial) ...<Widget>[
@@ -66,9 +65,9 @@ class ChatTile extends StatelessWidget {
                     Text(
                       DateFormatters.chatPreviewTime.format(chat.lastMessageAt),
                       style: Theme.of(context).textTheme.labelMedium?.copyWith(
-                            color: AppColors.textSecondary,
-                            fontWeight: FontWeight.w600,
-                          ),
+                        color: AppColors.textSecondary,
+                        fontWeight: FontWeight.w600,
+                      ),
                     ),
                   ],
                 ),
@@ -78,10 +77,11 @@ class ChatTile extends StatelessWidget {
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                   style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                        color: AppColors.textSecondary,
-                      ),
+                    color: AppColors.textSecondary,
+                  ),
                 ),
-                if (chat.gracyId != null && chat.gracyId!.isNotEmpty) ...<Widget>[
+                if (chat.gracyId != null &&
+                    chat.gracyId!.isNotEmpty) ...<Widget>[
                   const SizedBox(height: 10),
                   _CodePill(code: chat.gracyId!),
                 ],
@@ -115,10 +115,10 @@ class _CodePill extends StatelessWidget {
       child: Text(
         code,
         style: Theme.of(context).textTheme.labelMedium?.copyWith(
-              color: AppColors.accentBlue,
-              fontWeight: FontWeight.w700,
-              letterSpacing: 0.3,
-            ),
+          color: AppColors.accentBlue,
+          fontWeight: FontWeight.w700,
+          letterSpacing: 0.3,
+        ),
       ),
     );
   }
@@ -134,14 +134,16 @@ class _VerifiedPill extends StatelessWidget {
       decoration: BoxDecoration(
         color: AppColors.accentAmber.withValues(alpha: 0.16),
         borderRadius: BorderRadius.circular(999),
-        border: Border.all(color: AppColors.accentAmber.withValues(alpha: 0.45)),
+        border: Border.all(
+          color: AppColors.accentAmber.withValues(alpha: 0.45),
+        ),
       ),
       child: Text(
         'Verified',
         style: Theme.of(context).textTheme.labelSmall?.copyWith(
-              color: AppColors.accentAmber,
-              fontWeight: FontWeight.w800,
-            ),
+          color: AppColors.accentAmber,
+          fontWeight: FontWeight.w800,
+        ),
       ),
     );
   }
@@ -159,10 +161,7 @@ class _UnreadBadge extends StatelessWidget {
       padding: const EdgeInsets.symmetric(horizontal: 8),
       decoration: BoxDecoration(
         gradient: LinearGradient(
-          colors: <Color>[
-            AppColors.accentBlue,
-            AppColors.accentCyan,
-          ],
+          colors: <Color>[AppColors.accentBlue, AppColors.accentCyan],
         ),
         borderRadius: BorderRadius.circular(999),
       ),
@@ -170,9 +169,9 @@ class _UnreadBadge extends StatelessWidget {
       child: Text(
         '$count',
         style: Theme.of(context).textTheme.labelSmall?.copyWith(
-              color: AppColors.background,
-              fontWeight: FontWeight.w900,
-            ),
+          color: AppColors.background,
+          fontWeight: FontWeight.w900,
+        ),
       ),
     );
   }

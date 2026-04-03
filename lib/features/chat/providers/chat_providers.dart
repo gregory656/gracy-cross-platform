@@ -23,31 +23,38 @@ final recentChatsProvider = FutureProvider<List<ChatModel>>((ref) async {
   return ref.watch(chatRepositoryProvider).fetchRecentChats(currentUserId);
 });
 
-final messagesProvider = StreamProvider.family<List<MessageModel>, String>((ref, String roomId) {
+final messagesProvider = StreamProvider.family<List<MessageModel>, String>((
+  ref,
+  String roomId,
+) {
   final String? currentUserId = ref.watch(authNotifierProvider).userId;
   if (currentUserId == null) {
     return Stream<List<MessageModel>>.value(const <MessageModel>[]);
   }
 
-  return ref.watch(chatRepositoryProvider).watchMessages(
-        roomId: roomId,
-        currentUserId: currentUserId,
-      );
+  return ref
+      .watch(chatRepositoryProvider)
+      .watchMessages(roomId: roomId, currentUserId: currentUserId);
 });
 
 final chatThreadProvider =
-    FutureProvider.family<ChatThread?, ChatThreadRequest>((ref, ChatThreadRequest request) async {
-  final String? currentUserId = ref.watch(authNotifierProvider).userId;
-  if (currentUserId == null) {
-    return null;
-  }
+    FutureProvider.family<ChatThread?, ChatThreadRequest>((
+      ref,
+      ChatThreadRequest request,
+    ) async {
+      final String? currentUserId = ref.watch(authNotifierProvider).userId;
+      if (currentUserId == null) {
+        return null;
+      }
 
-  return ref.watch(chatRepositoryProvider).resolveThread(
-        currentUserId: currentUserId,
-        roomId: request.roomId,
-        userId: request.userId,
-      );
-});
+      return ref
+          .watch(chatRepositoryProvider)
+          .resolveThread(
+            currentUserId: currentUserId,
+            roomId: request.roomId,
+            userId: request.userId,
+          );
+    });
 
 final startChatControllerProvider =
     AsyncNotifierProvider<StartChatController, void>(StartChatController.new);
@@ -59,13 +66,17 @@ class StartChatController extends AsyncNotifier<void> {
   Future<ChatThread> startByCode(String gracyCode) async {
     final String? currentUserId = ref.read(authNotifierProvider).userId;
     if (currentUserId == null) {
-      throw const ChatRepositoryException('You need to complete onboarding first.');
+      throw const ChatRepositoryException(
+        'You need to complete onboarding first.',
+      );
     }
 
     state = const AsyncLoading<void>();
 
     try {
-      final ChatThread thread = await ref.read(chatRepositoryProvider).findOrCreateRoomByCode(
+      final ChatThread thread = await ref
+          .read(chatRepositoryProvider)
+          .findOrCreateRoomByCode(
             currentUserId: currentUserId,
             gracyId: gracyCode,
           );
@@ -80,10 +91,7 @@ class StartChatController extends AsyncNotifier<void> {
 }
 
 class ChatThreadRequest {
-  const ChatThreadRequest({
-    this.roomId,
-    this.userId,
-  });
+  const ChatThreadRequest({this.roomId, this.userId});
 
   final String? roomId;
   final String? userId;

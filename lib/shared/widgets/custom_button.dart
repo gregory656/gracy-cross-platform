@@ -1,4 +1,4 @@
-﻿import 'package:flutter/material.dart';
+import 'package:flutter/material.dart';
 
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_gradients.dart';
@@ -44,7 +44,9 @@ class CustomButton extends StatelessWidget {
                 if (icon != null) ...<Widget>[
                   Icon(
                     icon,
-                    color: filled ? AppColors.background : AppColors.textPrimary,
+                    color: filled
+                        ? AppColors.background
+                        : AppColors.textPrimary,
                     size: 18,
                   ),
                   const SizedBox(width: 8),
@@ -52,7 +54,9 @@ class CustomButton extends StatelessWidget {
                 Text(
                   label,
                   style: TextStyle(
-                    color: filled ? AppColors.background : AppColors.textPrimary,
+                    color: filled
+                        ? AppColors.background
+                        : AppColors.textPrimary,
                     fontWeight: FontWeight.w700,
                   ),
                 ),
@@ -70,4 +74,3 @@ class CustomButton extends StatelessWidget {
     return SizedBox(width: double.infinity, child: content);
   }
 }
-

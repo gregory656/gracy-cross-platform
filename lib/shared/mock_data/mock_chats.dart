@@ -1,4 +1,4 @@
-﻿import '../models/chat_model.dart';
+import '../models/chat_model.dart';
 
 // REPLACE WITH API DATA SOURCE
 final List<ChatModel> mockChats = <ChatModel>[
@@ -31,4 +31,3 @@ final List<ChatModel> mockChats = <ChatModel>[
     unreadCount: 0,
   ),
 ];
-

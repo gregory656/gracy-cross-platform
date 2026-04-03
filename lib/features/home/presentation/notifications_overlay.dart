@@ -29,8 +29,10 @@ class NotificationsOverlay extends ConsumerWidget {
               data: (notifications) {
                 if (notifications.isEmpty) {
                   return const Center(
-                    child: Text('No new notifications.', 
-                      style: TextStyle(color: AppColors.textSecondary)),
+                    child: Text(
+                      'No new notifications.',
+                      style: TextStyle(color: AppColors.textSecondary),
+                    ),
                   );
                 }
 
@@ -62,7 +64,7 @@ class NotificationsOverlay extends ConsumerWidget {
           const Text(
             'Notifications',
             style: TextStyle(
-              fontSize: 20, 
+              fontSize: 20,
               fontWeight: FontWeight.bold,
               color: AppColors.textPrimary,
             ),
@@ -90,20 +92,25 @@ class _NotificationTile extends ConsumerWidget {
       margin: const EdgeInsets.only(bottom: 12),
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
-        color: notif.isRead 
-            ? AppColors.surface.withValues(alpha: 0.4) 
+        color: notif.isRead
+            ? AppColors.surface.withValues(alpha: 0.4)
             : AppColors.accentCyan.withValues(alpha: 0.1),
         borderRadius: BorderRadius.circular(16),
         border: Border.all(
-          color: notif.isRead ? AppColors.outline : AppColors.accentCyan.withValues(alpha: 0.3),
+          color: notif.isRead
+              ? AppColors.outline
+              : AppColors.accentCyan.withValues(alpha: 0.3),
         ),
       ),
       child: senderAsync.when(
-        loading: () => const SizedBox(height: 60, child: Center(child: CircularProgressIndicator())),
+        loading: () => const SizedBox(
+          height: 60,
+          child: Center(child: CircularProgressIndicator()),
+        ),
         error: (_, __) => const Text('Error loading sender info'),
         data: (sender) {
           if (sender == null) return const SizedBox.shrink();
-          
+
           return Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
@@ -114,7 +121,10 @@ class _NotificationTile extends ConsumerWidget {
                   Expanded(
                     child: RichText(
                       text: TextSpan(
-                        style: const TextStyle(color: AppColors.textPrimary, fontSize: 14),
+                        style: const TextStyle(
+                          color: AppColors.textPrimary,
+                          fontSize: 14,
+                        ),
                         children: [
                           TextSpan(
                             text: sender.fullName,
@@ -134,7 +144,9 @@ class _NotificationTile extends ConsumerWidget {
                   children: [
                     TextButton(
                       onPressed: () async {
-                        await ref.read(socialServiceProvider).declineConnection(notif);
+                        await ref
+                            .read(socialServiceProvider)
+                            .declineConnection(notif);
                       },
                       style: TextButton.styleFrom(
                         foregroundColor: AppColors.textSecondary,
@@ -151,17 +163,24 @@ class _NotificationTile extends ConsumerWidget {
                         ),
                       ),
                       onPressed: () async {
-                        await ref.read(socialServiceProvider).acceptConnection(notif);
+                        await ref
+                            .read(socialServiceProvider)
+                            .acceptConnection(notif);
                         if (context.mounted) {
                           ScaffoldMessenger.of(context).showSnackBar(
                             SnackBar(
-                              content: Text('You are now connected with ${sender.fullName}!'),
+                              content: Text(
+                                'You are now connected with ${sender.fullName}!',
+                              ),
                               backgroundColor: AppColors.success,
                             ),
                           );
                         }
                       },
-                      child: const Text('Accept', style: TextStyle(fontWeight: FontWeight.bold)),
+                      child: const Text(
+                        'Accept',
+                        style: TextStyle(fontWeight: FontWeight.bold),
+                      ),
                     ),
                   ],
                 ),

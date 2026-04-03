@@ -48,9 +48,12 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final AsyncValue<List<UserModel>> profilesAsync = ref.watch(profilesDirectoryProvider);
+    final AsyncValue<List<UserModel>> profilesAsync = ref.watch(
+      profilesDirectoryProvider,
+    );
     final List<UserModel> fallbackUsers = ref.watch(mockUsersProvider);
-    final UserModel headerUser = ref.watch(currentUserProvider) ?? fallbackUsers.first;
+    final UserModel headerUser =
+        ref.watch(currentUserProvider) ?? fallbackUsers.first;
     final String query = _query.toLowerCase().trim();
 
     return Scaffold(
@@ -71,12 +74,17 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
             Positioned(
               top: -60,
               right: -30,
-              child: _GlowBlob(color: AppColors.accentBlue.withValues(alpha: 0.20)),
+              child: _GlowBlob(
+                color: AppColors.accentBlue.withValues(alpha: 0.20),
+              ),
             ),
             Positioned(
               top: 90,
               left: -20,
-              child: _GlowBlob(color: AppColors.accentCyan.withValues(alpha: 0.16), size: 150),
+              child: _GlowBlob(
+                color: AppColors.accentCyan.withValues(alpha: 0.16),
+                size: 150,
+              ),
             ),
             SafeArea(
               child: profilesAsync.when(
@@ -102,18 +110,10 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                     const Center(child: CircularProgressIndicator()),
                   ],
                 ),
-                error: (Object error, StackTrace stackTrace) => _buildDirectory(
-                  context,
-                  fallbackUsers,
-                  headerUser,
-                  query,
-                ),
-                data: (List<UserModel> users) => _buildDirectory(
-                  context,
-                  users,
-                  headerUser,
-                  query,
-                ),
+                error: (Object error, StackTrace stackTrace) =>
+                    _buildDirectory(context, fallbackUsers, headerUser, query),
+                data: (List<UserModel> users) =>
+                    _buildDirectory(context, users, headerUser, query),
               ),
             ),
           ],
@@ -137,7 +137,9 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
           user.bio.toLowerCase().contains(query) ||
           user.year.toLowerCase().contains(query) ||
           (user.gracyId?.toLowerCase().contains(query) ?? false) ||
-          user.courses.any((String course) => course.toLowerCase().contains(query));
+          user.courses.any(
+            (String course) => course.toLowerCase().contains(query),
+          );
     }).toList();
 
     return ListView(
@@ -165,16 +167,16 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
             Text(
               'All Profiles',
               style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                    fontSize: 17,
-                    fontWeight: FontWeight.w800,
-                    letterSpacing: 0.2,
-                  ),
+                fontSize: 17,
+                fontWeight: FontWeight.w800,
+                letterSpacing: 0.2,
+              ),
             ),
             Text(
               '${filteredUsers.length} matches',
-              style: Theme.of(context).textTheme.labelMedium?.copyWith(
-                    color: AppColors.textSecondary,
-                  ),
+              style: Theme.of(
+                context,
+              ).textTheme.labelMedium?.copyWith(color: AppColors.textSecondary),
             ),
           ],
         ),
@@ -185,9 +187,9 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
             child: Text(
               'No profiles found yet.',
               textAlign: TextAlign.center,
-              style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                    color: AppColors.textSecondary,
-                  ),
+              style: Theme.of(
+                context,
+              ).textTheme.bodyMedium?.copyWith(color: AppColors.textSecondary),
             ),
           )
         else
@@ -264,16 +266,16 @@ class _StatCard extends StatelessWidget {
         children: <Widget>[
           Text(
             value,
-            style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-                  fontWeight: FontWeight.w900,
-                ),
+            style: Theme.of(
+              context,
+            ).textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.w900),
           ),
           const SizedBox(height: 4),
           Text(
             label,
-            style: Theme.of(context).textTheme.labelMedium?.copyWith(
-                  color: AppColors.textSecondary,
-                ),
+            style: Theme.of(
+              context,
+            ).textTheme.labelMedium?.copyWith(color: AppColors.textSecondary),
           ),
           const SizedBox(height: 12),
           Container(
@@ -290,10 +292,7 @@ class _StatCard extends StatelessWidget {
 }
 
 class _GlowBlob extends StatelessWidget {
-  const _GlowBlob({
-    required this.color,
-    this.size = 180,
-  });
+  const _GlowBlob({required this.color, this.size = 180});
 
   final Color color;
   final double size;
@@ -307,11 +306,7 @@ class _GlowBlob extends StatelessWidget {
         shape: BoxShape.circle,
         color: color,
         boxShadow: <BoxShadow>[
-          BoxShadow(
-            color: color,
-            blurRadius: 36,
-            spreadRadius: 6,
-          ),
+          BoxShadow(color: color, blurRadius: 36, spreadRadius: 6),
         ],
       ),
     );

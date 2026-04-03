@@ -72,14 +72,10 @@ class DatabaseService {
 
   Future<void> setOnboardingComplete(bool value) async {
     final Database db = await database;
-    await db.insert(
-      _appMetaTable,
-      <String, Object?>{
-        'key': 'onboarding_complete',
-        'value': value.toString(),
-      },
-      conflictAlgorithm: ConflictAlgorithm.replace,
-    );
+    await db.insert(_appMetaTable, <String, Object?>{
+      'key': 'onboarding_complete',
+      'value': value.toString(),
+    }, conflictAlgorithm: ConflictAlgorithm.replace);
   }
 
   Future<List<MessageModel>> getCachedMessages({
@@ -101,7 +97,9 @@ class DatabaseService {
         chatId: row['room_id']?.toString() ?? roomId,
         senderId: senderId,
         text: row['content']?.toString() ?? '',
-        sentAt: DateTime.tryParse(row['created_at']?.toString() ?? '') ?? DateTime.now(),
+        sentAt:
+            DateTime.tryParse(row['created_at']?.toString() ?? '') ??
+            DateTime.now(),
         isMe: senderId == currentUserId,
         senderName: row['sender_name']?.toString() ?? 'Gracy User',
         senderUsername: row['sender_username']?.toString(),
@@ -118,21 +116,17 @@ class DatabaseService {
     final Batch batch = db.batch();
 
     for (final MessageModel message in messages) {
-      batch.insert(
-        _chatCacheTable,
-        <String, Object?>{
-          'message_id': message.id,
-          'room_id': roomId,
-          'sender_id': message.senderId,
-          'sender_name': message.senderName,
-          'sender_username': message.senderUsername,
-          'content': message.text,
-          'created_at': message.sentAt.toIso8601String(),
-          'is_official': message.isOfficial ? 1 : 0,
-          'cached_at': DateTime.now().toIso8601String(),
-        },
-        conflictAlgorithm: ConflictAlgorithm.replace,
-      );
+      batch.insert(_chatCacheTable, <String, Object?>{
+        'message_id': message.id,
+        'room_id': roomId,
+        'sender_id': message.senderId,
+        'sender_name': message.senderName,
+        'sender_username': message.senderUsername,
+        'content': message.text,
+        'created_at': message.sentAt.toIso8601String(),
+        'is_official': message.isOfficial ? 1 : 0,
+        'cached_at': DateTime.now().toIso8601String(),
+      }, conflictAlgorithm: ConflictAlgorithm.replace);
     }
 
     await batch.commit(noResult: true);

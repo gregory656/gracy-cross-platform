@@ -1,4 +1,4 @@
-﻿enum UserRole { student, alumni }
+enum UserRole { student, alumni }
 
 extension UserRoleLabel on UserRole {
   String get label {
@@ -25,6 +25,8 @@ class UserModel {
     required this.avatarSeed,
     required this.year,
     this.gracyId,
+    this.selectedTheme = 'midnight',
+    this.notificationsEnabled = true,
   });
 
   final String id;
@@ -39,6 +41,8 @@ class UserModel {
   final String avatarSeed;
   final String year;
   final String? gracyId;
+  final String selectedTheme;
+  final bool notificationsEnabled;
 
   String get initials {
     final List<String> parts = fullName.trim().split(RegExp(r'\s+'));
@@ -46,8 +50,9 @@ class UserModel {
       return '';
     }
     final String first = parts.first.isNotEmpty ? parts.first[0] : '';
-    final String last = parts.length > 1 && parts.last.isNotEmpty ? parts.last[0] : '';
+    final String last = parts.length > 1 && parts.last.isNotEmpty
+        ? parts.last[0]
+        : '';
     return (first + last).toUpperCase();
   }
 }
-

@@ -1,4 +1,4 @@
-﻿import 'package:flutter/material.dart';
+import 'package:flutter/material.dart';
 
 class AppColors {
   const AppColors._();
@@ -16,4 +16,3 @@ class AppColors {
   static const Color success = Color(0xFF53E0A4);
   static const Color warning = Color(0xFFF6B93B);
 }
-

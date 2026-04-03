@@ -1,4 +1,4 @@
-﻿import 'package:flutter/material.dart';
+import 'package:flutter/material.dart';
 
 import '../../../core/theme/app_colors.dart';
 import '../../../shared/models/user_model.dart';
@@ -33,21 +33,24 @@ class ProfileQuickActionsPanel extends StatelessWidget {
             children: <Widget>[
               Text(
                 'Quick Actions',
-                style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                      fontWeight: FontWeight.w800,
-                    ),
+                style: Theme.of(
+                  context,
+                ).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w800),
               ),
               const Spacer(),
-              _MiniStatus(label: user.isOnline ? 'Online' : 'Offline', online: user.isOnline),
+              _MiniStatus(
+                label: user.isOnline ? 'Online' : 'Offline',
+                online: user.isOnline,
+              ),
             ],
           ),
           const SizedBox(height: 12),
           Text(
             'Start a conversation or manage this profile without leaving the page.',
             style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                  color: AppColors.textSecondary,
-                  height: 1.4,
-                ),
+              color: AppColors.textSecondary,
+              height: 1.4,
+            ),
           ),
           const SizedBox(height: 16),
           _ActionTile(
@@ -140,16 +143,14 @@ class ProfileQuickActionsSheet extends StatelessWidget {
                       children: <Widget>[
                         Text(
                           user.fullName,
-                          style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                                fontWeight: FontWeight.w800,
-                              ),
+                          style: Theme.of(context).textTheme.titleMedium
+                              ?.copyWith(fontWeight: FontWeight.w800),
                         ),
                         const SizedBox(height: 3),
                         Text(
                           user.username,
-                          style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                                color: AppColors.textSecondary,
-                              ),
+                          style: Theme.of(context).textTheme.bodySmall
+                              ?.copyWith(color: AppColors.textSecondary),
                         ),
                       ],
                     ),
@@ -217,7 +218,9 @@ class _ActionTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final Color foreground = danger ? const Color(0xFFFF8585) : AppColors.textPrimary;
+    final Color foreground = danger
+        ? const Color(0xFFFF8585)
+        : AppColors.textPrimary;
     final Color background = danger
         ? const Color(0x33FF8585)
         : AppColors.surface.withValues(alpha: 0.62);
@@ -253,17 +256,17 @@ class _ActionTile extends StatelessWidget {
                     Text(
                       label,
                       style: Theme.of(context).textTheme.titleSmall?.copyWith(
-                            color: foreground,
-                            fontWeight: FontWeight.w800,
-                          ),
+                        color: foreground,
+                        fontWeight: FontWeight.w800,
+                      ),
                     ),
                     const SizedBox(height: 3),
                     Text(
                       description,
                       style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                            color: AppColors.textSecondary,
-                            height: 1.3,
-                          ),
+                        color: AppColors.textSecondary,
+                        height: 1.3,
+                      ),
                     ),
                   ],
                 ),
@@ -292,15 +295,17 @@ class _MiniStatus extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
       decoration: BoxDecoration(
-        color: (online ? AppColors.success : AppColors.warning).withValues(alpha: 0.16),
+        color: (online ? AppColors.success : AppColors.warning).withValues(
+          alpha: 0.16,
+        ),
         borderRadius: BorderRadius.circular(999),
       ),
       child: Text(
         label,
         style: Theme.of(context).textTheme.labelSmall?.copyWith(
-              color: online ? AppColors.success : AppColors.warning,
-              fontWeight: FontWeight.w700,
-            ),
+          color: online ? AppColors.success : AppColors.warning,
+          fontWeight: FontWeight.w700,
+        ),
       ),
     );
   }

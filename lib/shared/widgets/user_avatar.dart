@@ -1,4 +1,4 @@
-﻿import 'package:flutter/material.dart';
+import 'package:flutter/material.dart';
 
 import '../../core/theme/app_colors.dart';
 import '../../core/utils/avatar_palette.dart';
@@ -22,7 +22,9 @@ class UserAvatar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final AvatarPalette palette = SeededAvatarPalette.paletteFor(user.avatarSeed);
+    final AvatarPalette palette = SeededAvatarPalette.paletteFor(
+      user.avatarSeed,
+    );
 
     return Stack(
       clipBehavior: Clip.none,
@@ -50,22 +52,28 @@ class UserAvatar extends StatelessWidget {
               Positioned(
                 left: size * 0.15,
                 top: size * 0.18,
-                child: _Orb(color: palette.accent.withValues(alpha: 0.22), diameter: size * 0.28),
+                child: _Orb(
+                  color: palette.accent.withValues(alpha: 0.22),
+                  diameter: size * 0.28,
+                ),
               ),
               Positioned(
                 right: size * 0.10,
                 bottom: size * 0.16,
-                child: _Orb(color: Colors.white.withValues(alpha: 0.18), diameter: size * 0.18),
+                child: _Orb(
+                  color: Colors.white.withValues(alpha: 0.18),
+                  diameter: size * 0.18,
+                ),
               ),
               Center(
                 child: Text(
                   user.initials,
                   style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                        fontSize: fontSize,
-                        fontWeight: FontWeight.w900,
-                        color: AppColors.background,
-                        letterSpacing: 1.1,
-                      ),
+                    fontSize: fontSize,
+                    fontWeight: FontWeight.w900,
+                    color: AppColors.background,
+                    letterSpacing: 1.1,
+                  ),
                 ),
               ),
             ],
@@ -103,10 +111,7 @@ class UserAvatar extends StatelessWidget {
 }
 
 class _Orb extends StatelessWidget {
-  const _Orb({
-    required this.color,
-    required this.diameter,
-  });
+  const _Orb({required this.color, required this.diameter});
 
   final Color color;
   final double diameter;
@@ -116,10 +121,7 @@ class _Orb extends StatelessWidget {
     return Container(
       width: diameter,
       height: diameter,
-      decoration: BoxDecoration(
-        shape: BoxShape.circle,
-        color: color,
-      ),
+      decoration: BoxDecoration(shape: BoxShape.circle, color: color),
     );
   }
 }

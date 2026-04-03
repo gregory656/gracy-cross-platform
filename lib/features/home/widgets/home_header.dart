@@ -6,10 +6,7 @@ import '../../../shared/widgets/user_avatar.dart';
 import 'notification_bell.dart';
 
 class HomeHeader extends StatelessWidget {
-  const HomeHeader({
-    super.key,
-    required this.user,
-  });
+  const HomeHeader({super.key, required this.user});
 
   final UserModel user;
 
@@ -25,18 +22,18 @@ class HomeHeader extends StatelessWidget {
               Text(
                 'GRACY',
                 style: Theme.of(context).textTheme.headlineLarge?.copyWith(
-                      fontSize: 34,
-                      fontWeight: FontWeight.w900,
-                      letterSpacing: 2.0,
-                    ),
+                  fontSize: 34,
+                  fontWeight: FontWeight.w900,
+                  letterSpacing: 2.0,
+                ),
               ),
               const SizedBox(height: 8),
               Text(
                 'A private academic network for students and alumni.',
                 style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                      color: AppColors.textSecondary,
-                      height: 1.4,
-                    ),
+                  color: AppColors.textSecondary,
+                  height: 1.4,
+                ),
               ),
             ],
           ),
@@ -49,22 +46,19 @@ class HomeHeader extends StatelessWidget {
               children: [
                 const NotificationBell(),
                 const SizedBox(width: 12),
-                UserAvatar(
-                  user: user,
-                  size: 48,
-                  fontSize: 16,
-                  showRing: true,
-                ),
+                UserAvatar(user: user, size: 48, fontSize: 16, showRing: true),
               ],
             ),
             const SizedBox(height: 10),
             Text(
               user.isOnline ? 'Online now' : 'Away',
               style: Theme.of(context).textTheme.labelMedium?.copyWith(
-                    color: user.isOnline ? AppColors.success : AppColors.textSecondary,
-                    fontWeight: FontWeight.w700,
-                    letterSpacing: 0.2,
-                  ),
+                color: user.isOnline
+                    ? AppColors.success
+                    : AppColors.textSecondary,
+                fontWeight: FontWeight.w700,
+                letterSpacing: 0.2,
+              ),
             ),
           ],
         ),

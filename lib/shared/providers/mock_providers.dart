@@ -14,39 +14,47 @@ final mockUsersProvider = Provider<List<UserModel>>((ref) => mockUsers);
 
 final mockChatsProvider = Provider<List<ChatModel>>((ref) => mockChats);
 
-final mockMessagesProvider = Provider<List<MessageModel>>((ref) => mockMessages);
+final mockMessagesProvider = Provider<List<MessageModel>>(
+  (ref) => mockMessages,
+);
 
-final userByIdProvider = Provider.family<UserModel?, String>(
-  (ref, String userId) {
-    final List<UserModel> users = ref.watch(mockUsersProvider);
-    for (final UserModel user in users) {
-      if (user.id == userId) {
-        return user;
-      }
+final userByIdProvider = Provider.family<UserModel?, String>((
+  ref,
+  String userId,
+) {
+  final List<UserModel> users = ref.watch(mockUsersProvider);
+  for (final UserModel user in users) {
+    if (user.id == userId) {
+      return user;
     }
-    return null;
-  },
-);
+  }
+  return null;
+});
 
-final chatByIdProvider = Provider.family<ChatModel?, String>(
-  (ref, String chatId) {
-    final List<ChatModel> chats = ref.watch(mockChatsProvider);
-    for (final ChatModel chat in chats) {
-      if (chat.id == chatId) {
-        return chat;
-      }
+final chatByIdProvider = Provider.family<ChatModel?, String>((
+  ref,
+  String chatId,
+) {
+  final List<ChatModel> chats = ref.watch(mockChatsProvider);
+  for (final ChatModel chat in chats) {
+    if (chat.id == chatId) {
+      return chat;
     }
-    return null;
-  },
-);
+  }
+  return null;
+});
 
-final messagesForChatProvider = Provider.family<List<MessageModel>, String>(
-  (ref, String chatId) {
-    final List<MessageModel> messages = ref.watch(mockMessagesProvider);
-    final List<MessageModel> filtered = messages
-        .where((MessageModel message) => message.chatId == chatId)
-        .toList()
-      ..sort((MessageModel a, MessageModel b) => a.sentAt.compareTo(b.sentAt));
-    return filtered;
-  },
-);
+final messagesForChatProvider = Provider.family<List<MessageModel>, String>((
+  ref,
+  String chatId,
+) {
+  final List<MessageModel> messages = ref.watch(mockMessagesProvider);
+  final List<MessageModel> filtered =
+      messages
+          .where((MessageModel message) => message.chatId == chatId)
+          .toList()
+        ..sort(
+          (MessageModel a, MessageModel b) => a.sentAt.compareTo(b.sentAt),
+        );
+  return filtered;
+});

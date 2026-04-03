@@ -1,4 +1,4 @@
-﻿import 'package:flutter/material.dart';
+import 'package:flutter/material.dart';
 
 class AppConstants {
   const AppConstants._();
@@ -17,4 +17,3 @@ class AppConstants {
     vertical: 10,
   );
 }
-

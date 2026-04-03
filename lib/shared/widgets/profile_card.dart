@@ -1,4 +1,4 @@
-﻿import 'package:flutter/material.dart';
+import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../core/theme/app_colors.dart';
@@ -23,8 +23,10 @@ class ProfileCard extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final String? myId = ref.watch(authNotifierProvider).userId;
-    final String? connectionStatus = ref.watch(connectionStatusProvider(user.id));
-    
+    final String? connectionStatus = ref.watch(
+      connectionStatusProvider(user.id),
+    );
+
     String ctaLabel = 'Connect';
     bool isDisabled = false;
     VoidCallback? action = onPrimaryAction;
@@ -40,19 +42,19 @@ class ProfileCard extends ConsumerWidget {
       action = () async {
         await ref.read(socialServiceProvider).sendConnectionRequest(user.id);
         if (context.mounted) {
-           ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(
-                content: Text('Connection request sent to ${user.fullName}'),
-                backgroundColor: AppColors.accentBlue,
-              ),
-            );
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('Connection request sent to ${user.fullName}'),
+              backgroundColor: AppColors.accentBlue,
+            ),
+          );
         }
       };
     }
 
     // fallback for the original UserRole check if it's alumni and no connection info
     if (connectionStatus == null && user.role == UserRole.alumni) {
-       ctaLabel = 'Connect';
+      ctaLabel = 'Connect';
     }
 
     return GlassCard(
@@ -74,7 +76,8 @@ class ProfileCard extends ConsumerWidget {
                         Expanded(
                           child: Text(
                             user.fullName,
-                            style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                            style: Theme.of(context).textTheme.titleLarge
+                                ?.copyWith(
                                   fontSize: 18,
                                   fontWeight: FontWeight.w800,
                                 ),
@@ -90,8 +93,8 @@ class ProfileCard extends ConsumerWidget {
                     Text(
                       user.username,
                       style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                            color: AppColors.textSecondary,
-                          ),
+                        color: AppColors.textSecondary,
+                      ),
                     ),
                     const SizedBox(height: 8),
                     Wrap(
@@ -101,7 +104,8 @@ class ProfileCard extends ConsumerWidget {
                         if (user.age > 0) _InfoChip(label: '${user.age} yrs'),
                         _InfoChip(label: user.role.label),
                         _InfoChip(label: user.year),
-                        if (user.gracyId != null) _InfoChip(label: user.gracyId!),
+                        if (user.gracyId != null)
+                          _InfoChip(label: user.gracyId!),
                       ],
                     ),
                   ],
@@ -113,9 +117,9 @@ class ProfileCard extends ConsumerWidget {
           Text(
             user.bio,
             style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                  color: AppColors.textSecondary,
-                  height: 1.35,
-                ),
+              color: AppColors.textSecondary,
+              height: 1.35,
+            ),
           ),
           const SizedBox(height: 14),
           Wrap(
@@ -165,15 +169,17 @@ class _StatusPill extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
       decoration: BoxDecoration(
-        color: (online ? AppColors.success : AppColors.warning).withValues(alpha: 0.16),
+        color: (online ? AppColors.success : AppColors.warning).withValues(
+          alpha: 0.16,
+        ),
         borderRadius: BorderRadius.circular(999),
       ),
       child: Text(
         label,
         style: Theme.of(context).textTheme.labelSmall?.copyWith(
-              color: online ? AppColors.success : AppColors.warning,
-              fontWeight: FontWeight.w700,
-            ),
+          color: online ? AppColors.success : AppColors.warning,
+          fontWeight: FontWeight.w700,
+        ),
       ),
     );
   }
@@ -196,9 +202,9 @@ class _InfoChip extends StatelessWidget {
       child: Text(
         label,
         style: Theme.of(context).textTheme.labelSmall?.copyWith(
-              color: AppColors.textSecondary,
-              fontWeight: FontWeight.w600,
-            ),
+          color: AppColors.textSecondary,
+          fontWeight: FontWeight.w600,
+        ),
       ),
     );
   }
@@ -225,17 +231,21 @@ class _CardAction extends StatelessWidget {
         child: Container(
           padding: const EdgeInsets.symmetric(vertical: 12),
           decoration: BoxDecoration(
-            color: filled ? AppColors.accentCyan : AppColors.surface.withValues(alpha: 0.6),
+            color: filled
+                ? AppColors.accentCyan
+                : AppColors.surface.withValues(alpha: 0.6),
             borderRadius: BorderRadius.circular(18),
-            border: Border.all(color: filled ? Colors.transparent : AppColors.outline),
+            border: Border.all(
+              color: filled ? Colors.transparent : AppColors.outline,
+            ),
           ),
           alignment: Alignment.center,
           child: Text(
             label,
             style: Theme.of(context).textTheme.labelLarge?.copyWith(
-                  color: filled ? AppColors.background : AppColors.textPrimary,
-                  fontWeight: FontWeight.w800,
-                ),
+              color: filled ? AppColors.background : AppColors.textPrimary,
+              fontWeight: FontWeight.w800,
+            ),
           ),
         ),
       ),

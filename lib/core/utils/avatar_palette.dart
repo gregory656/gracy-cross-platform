@@ -1,4 +1,4 @@
-﻿import 'package:flutter/material.dart';
+import 'package:flutter/material.dart';
 
 class AvatarPalette {
   const AvatarPalette(this.start, this.end, this.accent);

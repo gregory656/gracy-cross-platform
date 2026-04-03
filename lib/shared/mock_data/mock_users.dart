@@ -1,4 +1,4 @@
-﻿import '../models/user_model.dart';
+import '../models/user_model.dart';
 
 // REPLACE WITH API DATA SOURCE
 final List<UserModel> mockUsers = <UserModel>[
@@ -48,7 +48,8 @@ final List<UserModel> mockUsers = <UserModel>[
     age: 29,
     role: UserRole.alumni,
     courses: <String>['Cybersecurity', 'Network Systems'],
-    bio: 'Helping students land internships and build portfolio-ready projects.',
+    bio:
+        'Helping students land internships and build portfolio-ready projects.',
     isOnline: false,
     location: 'Nakuru, Kenya',
     avatarSeed: 'KM',
@@ -81,4 +82,3 @@ final List<UserModel> mockUsers = <UserModel>[
     year: 'Alumni',
   ),
 ];
-

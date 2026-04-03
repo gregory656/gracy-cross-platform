@@ -5,10 +5,7 @@ import '../../core/utils/date_formatters.dart';
 import '../models/message_model.dart';
 
 class MessageBubble extends StatelessWidget {
-  const MessageBubble({
-    super.key,
-    required this.message,
-  });
+  const MessageBubble({super.key, required this.message});
 
   final MessageModel message;
 
@@ -75,10 +72,10 @@ class MessageBubble extends StatelessWidget {
                         message.senderName,
                         overflow: TextOverflow.ellipsis,
                         style: Theme.of(context).textTheme.labelLarge?.copyWith(
-                              color: AppColors.textPrimary,
-                              fontWeight: FontWeight.w800,
-                              letterSpacing: 0.2,
-                            ),
+                          color: AppColors.textPrimary,
+                          fontWeight: FontWeight.w800,
+                          letterSpacing: 0.2,
+                        ),
                       ),
                     ),
                     if (message.isOfficial) ...<Widget>[
@@ -92,20 +89,20 @@ class MessageBubble extends StatelessWidget {
               Text(
                 message.text,
                 style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                      color: isMe ? AppColors.background : AppColors.textPrimary,
-                      height: 1.45,
-                      fontWeight: FontWeight.w500,
-                    ),
+                  color: isMe ? AppColors.background : AppColors.textPrimary,
+                  height: 1.45,
+                  fontWeight: FontWeight.w500,
+                ),
               ),
               const SizedBox(height: 10),
               Text(
                 DateFormatters.chatPreviewTime.format(message.sentAt),
                 style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                      color: isMe
-                          ? AppColors.background.withValues(alpha: 0.72)
-                          : AppColors.textSecondary,
-                      fontWeight: FontWeight.w600,
-                    ),
+                  color: isMe
+                      ? AppColors.background.withValues(alpha: 0.72)
+                      : AppColors.textSecondary,
+                  fontWeight: FontWeight.w600,
+                ),
               ),
             ],
           ),
@@ -125,17 +122,15 @@ class _OfficialBadge extends StatelessWidget {
       decoration: BoxDecoration(
         color: AppColors.accentAmber.withValues(alpha: 0.18),
         borderRadius: BorderRadius.circular(999),
-        border: Border.all(
-          color: AppColors.accentAmber.withValues(alpha: 0.5),
-        ),
+        border: Border.all(color: AppColors.accentAmber.withValues(alpha: 0.5)),
       ),
       child: Text(
         'Official',
         style: Theme.of(context).textTheme.labelSmall?.copyWith(
-              color: AppColors.accentAmber,
-              fontWeight: FontWeight.w800,
-              letterSpacing: 0.2,
-            ),
+          color: AppColors.accentAmber,
+          fontWeight: FontWeight.w800,
+          letterSpacing: 0.2,
+        ),
       ),
     );
   }

@@ -1,4 +1,4 @@
-﻿import 'dart:ui';
+import 'dart:ui';
 
 import 'package:flutter/material.dart';
 
@@ -43,10 +43,7 @@ class GlassCard extends StatelessWidget {
                 borderRadius: radius,
                 border: Border.all(color: AppColors.outline),
               ),
-              child: Padding(
-                padding: padding,
-                child: child,
-              ),
+              child: Padding(padding: padding, child: child),
             ),
           ),
         ),
@@ -54,4 +51,3 @@ class GlassCard extends StatelessWidget {
     );
   }
 }
-

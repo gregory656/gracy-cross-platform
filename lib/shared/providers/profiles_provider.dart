@@ -17,10 +17,16 @@ final profilesDirectoryProvider = FutureProvider<List<UserModel>>((ref) async {
     return mockUsers;
   }
 
-  final List<dynamic> rows = await client.from('profiles').select().order('username');
+  final List<dynamic> rows = await client
+      .from('profiles')
+      .select()
+      .order('username');
 
   final List<UserModel> profiles = rows
-      .map((dynamic row) => _userFromProfile(Map<String, dynamic>.from(row as Map)))
+      .map(
+        (dynamic row) =>
+            _userFromProfile(Map<String, dynamic>.from(row as Map)),
+      )
       .toList();
 
   if (profiles.isEmpty) {
@@ -30,8 +36,13 @@ final profilesDirectoryProvider = FutureProvider<List<UserModel>>((ref) async {
   return profiles;
 });
 
-final profileByIdProvider = FutureProvider.family<UserModel?, String>((ref, String userId) async {
-  final List<UserModel> profiles = await ref.watch(profilesDirectoryProvider.future);
+final profileByIdProvider = FutureProvider.family<UserModel?, String>((
+  ref,
+  String userId,
+) async {
+  final List<UserModel> profiles = await ref.watch(
+    profilesDirectoryProvider.future,
+  );
   for (final UserModel profile in profiles) {
     if (profile.id == userId) {
       return profile;
@@ -55,6 +66,8 @@ UserModel _userFromProfile(Map<String, dynamic> row) {
   final String? gracyId = row['gracy_id']?.toString().trim().isNotEmpty == true
       ? row['gracy_id'].toString()
       : null;
+  final String selectedTheme = row['selected_theme']?.toString() ?? 'midnight';
+  final bool notificationsEnabled = row['notifications_enabled'] == true;
 
   return UserModel(
     id: id,
@@ -62,12 +75,16 @@ UserModel _userFromProfile(Map<String, dynamic> row) {
     username: username.startsWith('@') ? username : '@$username',
     age: 0,
     role: UserRole.student,
-    courses: gracyId == null ? const <String>['Gracy member'] : <String>[gracyId],
+    courses: gracyId == null
+        ? const <String>['Gracy member']
+        : <String>[gracyId],
     bio: bio,
     isOnline: true,
     location: 'Gracy network',
     avatarSeed: username,
     year: year,
     gracyId: gracyId,
+    selectedTheme: selectedTheme,
+    notificationsEnabled: notificationsEnabled,
   );
 }

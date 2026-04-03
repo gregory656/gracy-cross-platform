@@ -93,7 +93,8 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
   Future<void> _shareId() async {
     await SharePlus.instance.share(
       ShareParams(
-        text: "You've been invited to the ghost realm. Find me: $_gracyId. "
+        text:
+            "You've been invited to the ghost realm. Find me: $_gracyId. "
             "Try not to wake the mortals.",
       ),
     );
@@ -131,7 +132,8 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
     }
 
     final String message =
-        ref.read(authNotifierProvider).errorMessage ?? 'Sign up failed. Try again.';
+        ref.read(authNotifierProvider).errorMessage ??
+        'Sign up failed. Try again.';
     _showSnackBar(message);
   }
 
@@ -139,10 +141,7 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
     ScaffoldMessenger.of(context)
       ..clearSnackBars()
       ..showSnackBar(
-        SnackBar(
-          content: Text(message),
-          behavior: SnackBarBehavior.floating,
-        ),
+        SnackBar(content: Text(message), behavior: SnackBarBehavior.floating),
       );
   }
 
@@ -168,7 +167,9 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
             Positioned(
               top: -50,
               right: -30,
-              child: _GlowBlob(color: AppColors.accentCyan.withValues(alpha: 0.18)),
+              child: _GlowBlob(
+                color: AppColors.accentCyan.withValues(alpha: 0.18),
+              ),
             ),
             Positioned(
               top: 140,
@@ -186,7 +187,8 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
                   children: <Widget>[
                     Text(
                       'GRACY',
-                      style: Theme.of(context).textTheme.headlineLarge?.copyWith(
+                      style: Theme.of(context).textTheme.headlineLarge
+                          ?.copyWith(
                             fontSize: 34,
                             fontWeight: FontWeight.w900,
                             letterSpacing: 2.0,
@@ -196,9 +198,9 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
                     Text(
                       'Private identity first. Everything else follows.',
                       style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                            color: AppColors.textSecondary,
-                            height: 1.4,
-                          ),
+                        color: AppColors.textSecondary,
+                        height: 1.4,
+                      ),
                     ),
                     const SizedBox(height: 18),
                     _StepDots(currentPage: _currentPage),
@@ -228,7 +230,8 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
                                 const SizedBox(height: 18),
                                 Text(
                                   'This uses anonymous Supabase auth. Your username is stored as profile metadata only.',
-                                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                                  style: Theme.of(context).textTheme.bodySmall
+                                      ?.copyWith(
                                         color: AppColors.textSecondary,
                                       ),
                                 ),
@@ -237,7 +240,8 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
                           ),
                           _AuthStepCard(
                             title: 'The Persona',
-                            subtitle: 'Optional details that make your profile feel alive.',
+                            subtitle:
+                                'Optional details that make your profile feel alive.',
                             child: Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: <Widget>[
@@ -267,7 +271,8 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
                                 const SizedBox(height: 18),
                                 Text(
                                   'Skip anything you want. The only required part is the lock on screen one.',
-                                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                                  style: Theme.of(context).textTheme.bodySmall
+                                      ?.copyWith(
                                         color: AppColors.textSecondary,
                                       ),
                                 ),
@@ -285,22 +290,32 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
                                   padding: const EdgeInsets.all(18),
                                   decoration: BoxDecoration(
                                     borderRadius: BorderRadius.circular(22),
-                                    border: Border.all(color: AppColors.outline),
+                                    border: Border.all(
+                                      color: AppColors.outline,
+                                    ),
                                     gradient: LinearGradient(
                                       begin: Alignment.topLeft,
                                       end: Alignment.bottomRight,
                                       colors: <Color>[
-                                        AppColors.accentCyan.withValues(alpha: 0.20),
-                                        AppColors.accentBlue.withValues(alpha: 0.12),
+                                        AppColors.accentCyan.withValues(
+                                          alpha: 0.20,
+                                        ),
+                                        AppColors.accentBlue.withValues(
+                                          alpha: 0.12,
+                                        ),
                                       ],
                                     ),
                                   ),
                                   child: Column(
-                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.start,
                                     children: <Widget>[
                                       Text(
                                         'Gracy ID',
-                                        style: Theme.of(context).textTheme.labelLarge?.copyWith(
+                                        style: Theme.of(context)
+                                            .textTheme
+                                            .labelLarge
+                                            ?.copyWith(
                                               color: AppColors.textSecondary,
                                               letterSpacing: 1.2,
                                             ),
@@ -308,7 +323,10 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
                                       const SizedBox(height: 10),
                                       Text(
                                         _gracyId,
-                                        style: Theme.of(context).textTheme.headlineMedium?.copyWith(
+                                        style: Theme.of(context)
+                                            .textTheme
+                                            .headlineMedium
+                                            ?.copyWith(
                                               fontSize: 30,
                                               fontWeight: FontWeight.w900,
                                               letterSpacing: 1.8,
@@ -317,7 +335,10 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
                                       const SizedBox(height: 8),
                                       Text(
                                         'This code is the mask. Keep it close.',
-                                        style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                                        style: Theme.of(context)
+                                            .textTheme
+                                            .bodySmall
+                                            ?.copyWith(
                                               color: AppColors.textSecondary,
                                             ),
                                       ),
@@ -349,7 +370,8 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
                                 const SizedBox(height: 14),
                                 Text(
                                   'Want the funny version? Your invite is already tuned for ghost-mode sharing.',
-                                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                                  style: Theme.of(context).textTheme.bodySmall
+                                      ?.copyWith(
                                         color: AppColors.textSecondary,
                                       ),
                                 ),
@@ -380,11 +402,15 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
                                   onPressed: () => _goToPage(_currentPage + 1),
                                 )
                               : CustomButton(
-                                  label: authState.isLoading ? 'Entering...' : 'Enter Gracy',
+                                  label: authState.isLoading
+                                      ? 'Entering...'
+                                      : 'Enter Gracy',
                                   icon: authState.isLoading
                                       ? Icons.hourglass_top_rounded
                                       : Icons.login_rounded,
-                                  onPressed: authState.isLoading ? () {} : _enterGracy,
+                                  onPressed: authState.isLoading
+                                      ? () {}
+                                      : _enterGracy,
                                 ),
                         ),
                       ],
@@ -423,15 +449,15 @@ class _AuthStepCard extends StatelessWidget {
               Text(
                 title,
                 style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-                      fontWeight: FontWeight.w900,
-                    ),
+                  fontWeight: FontWeight.w900,
+                ),
               ),
               const SizedBox(height: 8),
               Text(
                 subtitle,
                 style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                      color: AppColors.textSecondary,
-                    ),
+                  color: AppColors.textSecondary,
+                ),
               ),
               const SizedBox(height: 18),
               child,
@@ -457,15 +483,17 @@ class _OptionalBadge extends StatelessWidget {
         decoration: BoxDecoration(
           color: AppColors.accentCyan.withValues(alpha: 0.14),
           borderRadius: BorderRadius.circular(99),
-          border: Border.all(color: AppColors.accentCyan.withValues(alpha: 0.35)),
+          border: Border.all(
+            color: AppColors.accentCyan.withValues(alpha: 0.35),
+          ),
         ),
         child: Text(
           label,
           style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                color: AppColors.accentCyan,
-                fontWeight: FontWeight.w800,
-                letterSpacing: 0.6,
-              ),
+            color: AppColors.accentCyan,
+            fontWeight: FontWeight.w800,
+            letterSpacing: 0.6,
+          ),
         ),
       ),
     );
@@ -500,10 +528,7 @@ class _StepDots extends StatelessWidget {
 }
 
 class _GlowBlob extends StatelessWidget {
-  const _GlowBlob({
-    required this.color,
-    this.size = 180,
-  });
+  const _GlowBlob({required this.color, this.size = 180});
 
   final Color color;
   final double size;
@@ -517,11 +542,7 @@ class _GlowBlob extends StatelessWidget {
         shape: BoxShape.circle,
         color: color,
         boxShadow: <BoxShadow>[
-          BoxShadow(
-            color: color,
-            blurRadius: 36,
-            spreadRadius: 6,
-          ),
+          BoxShadow(color: color, blurRadius: 36, spreadRadius: 6),
         ],
       ),
     );

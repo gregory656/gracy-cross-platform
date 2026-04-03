@@ -23,11 +23,7 @@ import '../providers/chat_providers.dart';
 import '../widgets/chat_composer.dart';
 
 class ChatScreen extends ConsumerStatefulWidget {
-  const ChatScreen({
-    super.key,
-    this.chatId,
-    this.userId,
-  });
+  const ChatScreen({super.key, this.chatId, this.userId});
 
   final String? chatId;
   final String? userId;
@@ -62,8 +58,9 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
     }
 
     try {
-      final ChatThread thread =
-          await ref.read(startChatControllerProvider.notifier).startByCode(code);
+      final ChatThread thread = await ref
+          .read(startChatControllerProvider.notifier)
+          .startByCode(code);
       if (!mounted) {
         return;
       }
@@ -82,7 +79,9 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
     }
 
     try {
-      await ref.read(chatRepositoryProvider).sendMessage(
+      await ref
+          .read(chatRepositoryProvider)
+          .sendMessage(
             roomId: thread.roomId,
             senderId: currentUserId,
             content: content,
@@ -136,9 +135,9 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
     if (!mounted) {
       return;
     }
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text(message)),
-    );
+    ScaffoldMessenger.of(
+      context,
+    ).showSnackBar(SnackBar(content: Text(message)));
   }
 
   @override
@@ -147,11 +146,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
     final String? currentUserId = authState.userId;
 
     if (currentUserId == null) {
-      return const Scaffold(
-        body: Center(
-          child: CircularProgressIndicator(),
-        ),
-      );
+      return const Scaffold(body: Center(child: CircularProgressIndicator()));
     }
 
     final ChatThreadRequest request = ChatThreadRequest(
@@ -159,7 +154,9 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
       userId: widget.userId,
     );
     final bool showThread = request.roomId != null || request.userId != null;
-    final AsyncValue<List<ChatModel>> recentChatsAsync = ref.watch(recentChatsProvider);
+    final AsyncValue<List<ChatModel>> recentChatsAsync = ref.watch(
+      recentChatsProvider,
+    );
 
     if (!showThread) {
       return Scaffold(
@@ -173,7 +170,9 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
       );
     }
 
-    final AsyncValue<ChatThread?> threadAsync = ref.watch(chatThreadProvider(request));
+    final AsyncValue<ChatThread?> threadAsync = ref.watch(
+      chatThreadProvider(request),
+    );
 
     return Scaffold(
       body: LayoutBuilder(
@@ -213,23 +212,28 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
                         if (thread == null) {
                           return const _CenteredMessage(
                             title: 'Chat unavailable',
-                            subtitle: 'The selected conversation could not be loaded.',
+                            subtitle:
+                                'The selected conversation could not be loaded.',
                           );
                         }
 
-                        final AsyncValue<List<MessageModel>> messagesAsync =
-                            ref.watch(messagesProvider(thread.roomId));
+                        final AsyncValue<List<MessageModel>> messagesAsync = ref
+                            .watch(messagesProvider(thread.roomId));
 
                         return messagesAsync.when(
                           data: (List<MessageModel> messages) {
-                            _maybeScrollToBottom(messages.length + (_isBotTyping ? 1 : 0));
+                            _maybeScrollToBottom(
+                              messages.length + (_isBotTyping ? 1 : 0),
+                            );
                             return _ThreadView(
                               thread: thread,
                               messages: messages,
                               composerController: _composerController,
                               scrollController: _scrollController,
-                              isBotTyping: _isBotTyping &&
-                                  thread.participant.id == ChatRepository.botUserId,
+                              isBotTyping:
+                                  _isBotTyping &&
+                                  thread.participant.id ==
+                                      ChatRepository.botUserId,
                               onBack: showSidebar
                                   ? null
                                   : () {
@@ -243,7 +247,8 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
                               },
                             );
                           },
-                          loading: () => const Center(child: CircularProgressIndicator()),
+                          loading: () =>
+                              const Center(child: CircularProgressIndicator()),
                           error: (Object error, StackTrace stackTrace) {
                             return _CenteredMessage(
                               title: 'Messages failed to load',
@@ -252,7 +257,8 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
                           },
                         );
                       },
-                      loading: () => const Center(child: CircularProgressIndicator()),
+                      loading: () =>
+                          const Center(child: CircularProgressIndicator()),
                       error: (Object error, StackTrace stackTrace) {
                         return _CenteredMessage(
                           title: 'Chat unavailable',
@@ -291,8 +297,11 @@ class _ChatShell extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final bool isStarting = ref.watch(startChatControllerProvider).isLoading;
-    final AsyncValue<List<UserModel>> profilesAsync = ref.watch(profilesDirectoryProvider);
-    final List<UserModel> profiles = profilesAsync.asData?.value ?? const <UserModel>[];
+    final AsyncValue<List<UserModel>> profilesAsync = ref.watch(
+      profilesDirectoryProvider,
+    );
+    final List<UserModel> profiles =
+        profilesAsync.asData?.value ?? const <UserModel>[];
     final Map<String, UserModel> profilesById = <String, UserModel>{
       for (final UserModel profile in profiles) profile.id: profile,
     };
@@ -316,17 +325,17 @@ class _ChatShell extends ConsumerWidget {
             Text(
               'Direct line',
               style: Theme.of(context).textTheme.headlineMedium?.copyWith(
-                    fontWeight: FontWeight.w900,
-                    letterSpacing: -0.8,
-                  ),
+                fontWeight: FontWeight.w900,
+                letterSpacing: -0.8,
+              ),
             ),
             const SizedBox(height: 10),
             Text(
               'Start one-on-one chats by Gracy code. Rooms are stable, so the bot and real users land in the same recent chats flow.',
               style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                    color: AppColors.textSecondary,
-                    height: 1.45,
-                  ),
+                color: AppColors.textSecondary,
+                height: 1.45,
+              ),
             ),
             const SizedBox(height: 22),
             GlassCard(
@@ -350,18 +359,16 @@ class _ChatShell extends ConsumerWidget {
                           children: <Widget>[
                             Text(
                               currentUserName,
-                              style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                                    fontWeight: FontWeight.w800,
-                                  ),
+                              style: Theme.of(context).textTheme.titleLarge
+                                  ?.copyWith(fontWeight: FontWeight.w800),
                             ),
                             const SizedBox(height: 6),
                             Text(
                               currentUserCode == null
                                   ? 'Your Gracy code will appear here after onboarding.'
                                   : 'Your code: $currentUserCode',
-                              style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                                    color: AppColors.textSecondary,
-                                  ),
+                              style: Theme.of(context).textTheme.bodyMedium
+                                  ?.copyWith(color: AppColors.textSecondary),
                             ),
                           ],
                         ),
@@ -385,7 +392,8 @@ class _ChatShell extends ConsumerWidget {
                   const SizedBox(height: 18),
                   CustomTextField(
                     controller: startChatController,
-                    hintText: 'Paste a Gracy code, e.g. ${ChatRepository.botGracyCode}',
+                    hintText:
+                        'Paste a Gracy code, e.g. ${ChatRepository.botGracyCode}',
                     prefixIcon: Icons.alternate_email_rounded,
                   ),
                   const SizedBox(height: 14),
@@ -409,13 +417,16 @@ class _ChatShell extends ConsumerWidget {
               children: <Widget>[
                 Text(
                   'Recent chats',
-                  style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                        fontWeight: FontWeight.w800,
-                      ),
+                  style: Theme.of(
+                    context,
+                  ).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w800),
                 ),
                 const Spacer(),
                 Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 10,
+                    vertical: 6,
+                  ),
                   decoration: BoxDecoration(
                     color: AppColors.surfaceElevated.withValues(alpha: 0.72),
                     borderRadius: BorderRadius.circular(999),
@@ -424,9 +435,9 @@ class _ChatShell extends ConsumerWidget {
                   child: Text(
                     'Live',
                     style: Theme.of(context).textTheme.labelMedium?.copyWith(
-                          color: AppColors.accentCyan,
-                          fontWeight: FontWeight.w700,
-                        ),
+                      color: AppColors.accentCyan,
+                      fontWeight: FontWeight.w700,
+                    ),
                   ),
                 ),
               ],
@@ -437,7 +448,8 @@ class _ChatShell extends ConsumerWidget {
                 if (chats.isEmpty) {
                   return const _CenteredMessage(
                     title: 'No chats yet',
-                    subtitle: 'Use a Gracy code above to create the first room.',
+                    subtitle:
+                        'Use a Gracy code above to create the first room.',
                   );
                 }
 
@@ -530,21 +542,22 @@ class _ThreadView extends StatelessWidget {
                 controller: scrollController,
                 padding: const EdgeInsets.fromLTRB(18, 18, 18, 22),
                 children: <Widget>[
-                  ...messages.map((MessageModel message) => MessageBubble(message: message)),
+                  ...messages.map(
+                    (MessageModel message) => MessageBubble(message: message),
+                  ),
                   if (isBotTyping)
                     Padding(
                       padding: const EdgeInsets.only(top: 8),
-                      child: _TypingIndicator(name: thread.participant.fullName),
+                      child: _TypingIndicator(
+                        name: thread.participant.fullName,
+                      ),
                     ),
                 ],
               ),
             ),
           ),
           const SizedBox(height: 16),
-          ChatComposer(
-            controller: composerController,
-            onSend: onSend,
-          ),
+          ChatComposer(controller: composerController, onSend: onSend),
         ],
       ),
     );
@@ -598,24 +611,30 @@ class _ThreadHeader extends StatelessWidget {
                         participant.fullName,
                         overflow: TextOverflow.ellipsis,
                         style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                              fontWeight: FontWeight.w900,
-                            ),
+                          fontWeight: FontWeight.w900,
+                        ),
                       ),
                     ),
                     if (isOfficial) ...<Widget>[
                       const SizedBox(width: 10),
                       Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 10,
+                          vertical: 6,
+                        ),
                         decoration: BoxDecoration(
                           color: AppColors.accentAmber.withValues(alpha: 0.16),
                           borderRadius: BorderRadius.circular(999),
                           border: Border.all(
-                            color: AppColors.accentAmber.withValues(alpha: 0.48),
+                            color: AppColors.accentAmber.withValues(
+                              alpha: 0.48,
+                            ),
                           ),
                         ),
                         child: Text(
                           'Verified',
-                          style: Theme.of(context).textTheme.labelMedium?.copyWith(
+                          style: Theme.of(context).textTheme.labelMedium
+                              ?.copyWith(
                                 color: AppColors.accentAmber,
                                 fontWeight: FontWeight.w800,
                               ),
@@ -630,8 +649,8 @@ class _ThreadHeader extends StatelessWidget {
                       ? participant.username
                       : '${participant.gracyId}  |  ${participant.username}',
                   style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                        color: AppColors.textSecondary,
-                      ),
+                    color: AppColors.textSecondary,
+                  ),
                 ),
               ],
             ),
@@ -693,9 +712,9 @@ class _TypingIndicatorState extends State<_TypingIndicator>
             Text(
               '${widget.name} is typing',
               style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                    color: AppColors.textSecondary,
-                    fontWeight: FontWeight.w600,
-                  ),
+                color: AppColors.textSecondary,
+                fontWeight: FontWeight.w600,
+              ),
             ),
             const SizedBox(width: 12),
             AnimatedBuilder(
@@ -703,15 +722,19 @@ class _TypingIndicatorState extends State<_TypingIndicator>
               builder: (BuildContext context, Widget? child) {
                 return Row(
                   children: List<Widget>.generate(3, (int index) {
-                    final double phase = (_controller.value - (index * 0.18)).clamp(0.0, 1.0);
-                    final double opacity = 0.25 + ((1 - (phase - 0.5).abs() * 2) * 0.75);
+                    final double phase = (_controller.value - (index * 0.18))
+                        .clamp(0.0, 1.0);
+                    final double opacity =
+                        0.25 + ((1 - (phase - 0.5).abs() * 2) * 0.75);
                     return Padding(
                       padding: EdgeInsets.only(right: index == 2 ? 0 : 6),
                       child: Container(
                         width: 8,
                         height: 8,
                         decoration: BoxDecoration(
-                          color: AppColors.accentCyan.withValues(alpha: opacity),
+                          color: AppColors.accentCyan.withValues(
+                            alpha: opacity,
+                          ),
                           shape: BoxShape.circle,
                         ),
                       ),
@@ -728,10 +751,7 @@ class _TypingIndicatorState extends State<_TypingIndicator>
 }
 
 class _CenteredMessage extends StatelessWidget {
-  const _CenteredMessage({
-    required this.title,
-    required this.subtitle,
-  });
+  const _CenteredMessage({required this.title, required this.subtitle});
 
   final String title;
   final String subtitle;
@@ -748,18 +768,18 @@ class _CenteredMessage extends StatelessWidget {
             Text(
               title,
               textAlign: TextAlign.center,
-              style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                    fontWeight: FontWeight.w800,
-                  ),
+              style: Theme.of(
+                context,
+              ).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w800),
             ),
             const SizedBox(height: 10),
             Text(
               subtitle,
               textAlign: TextAlign.center,
               style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                    color: AppColors.textSecondary,
-                    height: 1.45,
-                  ),
+                color: AppColors.textSecondary,
+                height: 1.45,
+              ),
             ),
           ],
         ),

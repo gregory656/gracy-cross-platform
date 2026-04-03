@@ -1,14 +1,11 @@
-﻿import 'package:flutter/material.dart';
+import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 
 import '../theme/app_colors.dart';
 import 'app_router.dart';
 
 class AppShellScaffold extends StatelessWidget {
-  const AppShellScaffold({
-    super.key,
-    required this.child,
-  });
+  const AppShellScaffold({super.key, required this.child});
 
   final Widget child;
 
@@ -19,6 +16,9 @@ class AppShellScaffold extends StatelessWidget {
     }
     if (path.startsWith(AppRoutePaths.profile)) {
       return 2;
+    }
+    if (path.startsWith(AppRoutePaths.settings)) {
+      return 3;
     }
     return 0;
   }
@@ -33,6 +33,9 @@ class AppShellScaffold extends StatelessWidget {
         return;
       case 2:
         context.go(AppRoutePaths.profile);
+        return;
+      case 3:
+        context.go(AppRoutePaths.settings);
         return;
     }
   }
@@ -60,7 +63,8 @@ class AppShellScaffold extends StatelessWidget {
         ),
         child: NavigationBar(
           selectedIndex: _selectedIndex(context),
-          onDestinationSelected: (int index) => _onDestinationSelected(context, index),
+          onDestinationSelected: (int index) =>
+              _onDestinationSelected(context, index),
           destinations: const <NavigationDestination>[
             NavigationDestination(
               icon: Icon(Icons.home_rounded),
@@ -73,6 +77,10 @@ class AppShellScaffold extends StatelessWidget {
             NavigationDestination(
               icon: Icon(Icons.person_rounded),
               label: 'Profile',
+            ),
+            NavigationDestination(
+              icon: Icon(Icons.settings_rounded),
+              label: 'Settings',
             ),
           ],
         ),

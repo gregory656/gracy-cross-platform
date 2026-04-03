@@ -11,9 +11,11 @@ final socialServiceProvider = Provider<SocialService>((ref) {
   return SocialService(ref);
 });
 
-final notificationsStreamProvider = StreamProvider<List<NotificationModel>>((ref) {
+final notificationsStreamProvider = StreamProvider<List<NotificationModel>>((
+  ref,
+) {
   if (!SupabaseConfig.isConfigured) return Stream.value([]);
-  
+
   final authState = ref.watch(authNotifierProvider);
   if (authState.userId == null) return Stream.value([]);
 
@@ -39,7 +41,7 @@ final unreadNotificationsCountProvider = Provider<int>((ref) {
 
 final connectionsStreamProvider = StreamProvider<List<ConnectionModel>>((ref) {
   if (!SupabaseConfig.isConfigured) return Stream.value([]);
-  
+
   final authState = ref.watch(authNotifierProvider);
   if (authState.userId == null) return Stream.value([]);
 
@@ -49,7 +51,7 @@ final connectionsStreamProvider = StreamProvider<List<ConnectionModel>>((ref) {
         .from('connections')
         .stream(primaryKey: ['user_id', 'contact_id'])
         .eq('user_id', userId);
-        
+
     final stream2 = Supabase.instance.client
         .from('connections')
         .stream(primaryKey: ['user_id', 'contact_id'])
@@ -68,7 +70,7 @@ final connectionsStreamProvider = StreamProvider<List<ConnectionModel>>((ref) {
       data1 = data;
       emit();
     });
-    
+
     final sub2 = stream2.listen((data) {
       data2 = data;
       emit();
@@ -86,7 +88,10 @@ final connectionsStreamProvider = StreamProvider<List<ConnectionModel>>((ref) {
   }
 });
 
-final connectionStatusProvider = Provider.family<String?, String>((ref, contactId) {
+final connectionStatusProvider = Provider.family<String?, String>((
+  ref,
+  contactId,
+) {
   final authState = ref.watch(authNotifierProvider);
   final myId = authState.userId;
   if (myId == null || myId == contactId) return null;
@@ -133,7 +138,7 @@ class SocialService {
           .from('connections')
           .update({'status': 'connected'})
           .match({'user_id': notif.senderId, 'contact_id': notif.receiverId});
-          
+
       // Mark notification as read (can optionally update type to 'request_accepted' if we notify the other way around)
       await Supabase.instance.client
           .from('notifications')
@@ -145,11 +150,11 @@ class SocialService {
   Future<void> declineConnection(NotificationModel notif) async {
     if (!SupabaseConfig.isConfigured) return;
     try {
-       await Supabase.instance.client
-          .from('connections')
-          .delete()
-          .match({'user_id': notif.senderId, 'contact_id': notif.receiverId});
-          
+      await Supabase.instance.client.from('connections').delete().match({
+        'user_id': notif.senderId,
+        'contact_id': notif.receiverId,
+      });
+
       // Delete the notification
       await Supabase.instance.client
           .from('notifications')
