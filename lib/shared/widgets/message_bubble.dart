@@ -1,6 +1,5 @@
-﻿import 'package:flutter/material.dart';
+import 'package:flutter/material.dart';
 
-import '../../core/constants/app_constants.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/utils/date_formatters.dart';
 import '../models/message_model.dart';
@@ -16,48 +15,128 @@ class MessageBubble extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final bool isMe = message.isMe;
+    final BorderRadius radius = BorderRadius.only(
+      topLeft: const Radius.circular(24),
+      topRight: const Radius.circular(24),
+      bottomLeft: Radius.circular(isMe ? 24 : 10),
+      bottomRight: Radius.circular(isMe ? 10 : 24),
+    );
 
     return Align(
       alignment: isMe ? Alignment.centerRight : Alignment.centerLeft,
       child: Container(
-        margin: const EdgeInsets.symmetric(vertical: 6),
-        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+        margin: const EdgeInsets.symmetric(vertical: 7),
         constraints: BoxConstraints(
           maxWidth: MediaQuery.of(context).size.width * 0.78,
         ),
         decoration: BoxDecoration(
-          color: isMe
-              ? AppColors.accentCyan.withValues(alpha: 0.18)
-              : AppColors.surfaceElevated.withValues(alpha: 0.82),
-          borderRadius: BorderRadius.only(
-            topLeft: const Radius.circular(AppConstants.cardRadius),
-            topRight: const Radius.circular(AppConstants.cardRadius),
-            bottomLeft: Radius.circular(isMe ? AppConstants.cardRadius : 8),
-            bottomRight: Radius.circular(isMe ? 8 : AppConstants.cardRadius),
+          gradient: isMe
+              ? LinearGradient(
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                  colors: <Color>[
+                    AppColors.accentBlue.withValues(alpha: 0.95),
+                    AppColors.accentCyan.withValues(alpha: 0.92),
+                  ],
+                )
+              : LinearGradient(
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                  colors: <Color>[
+                    const Color(0xFF14243B).withValues(alpha: 0.96),
+                    const Color(0xFF101C31).withValues(alpha: 0.96),
+                  ],
+                ),
+          borderRadius: radius,
+          border: Border.all(
+            color: isMe
+                ? Colors.white.withValues(alpha: 0.10)
+                : AppColors.outline.withValues(alpha: 0.8),
           ),
-          border: Border.all(color: AppColors.outline),
-        ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: <Widget>[
-            Text(
-              message.text,
-              style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                    color: AppColors.textPrimary,
-                    height: 1.35,
-                  ),
-            ),
-            const SizedBox(height: 8),
-            Text(
-              DateFormatters.chatPreviewTime.format(message.sentAt),
-              style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                    color: AppColors.textSecondary,
-                  ),
+          boxShadow: <BoxShadow>[
+            BoxShadow(
+              color: Colors.black.withValues(alpha: isMe ? 0.18 : 0.14),
+              blurRadius: 24,
+              offset: const Offset(0, 14),
             ),
           ],
+        ),
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(16, 14, 16, 12),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: <Widget>[
+              if (!isMe) ...<Widget>[
+                Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: <Widget>[
+                    Flexible(
+                      child: Text(
+                        message.senderName,
+                        overflow: TextOverflow.ellipsis,
+                        style: Theme.of(context).textTheme.labelLarge?.copyWith(
+                              color: AppColors.textPrimary,
+                              fontWeight: FontWeight.w800,
+                              letterSpacing: 0.2,
+                            ),
+                      ),
+                    ),
+                    if (message.isOfficial) ...<Widget>[
+                      const SizedBox(width: 8),
+                      const _OfficialBadge(),
+                    ],
+                  ],
+                ),
+                const SizedBox(height: 8),
+              ],
+              Text(
+                message.text,
+                style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                      color: isMe ? AppColors.background : AppColors.textPrimary,
+                      height: 1.45,
+                      fontWeight: FontWeight.w500,
+                    ),
+              ),
+              const SizedBox(height: 10),
+              Text(
+                DateFormatters.chatPreviewTime.format(message.sentAt),
+                style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                      color: isMe
+                          ? AppColors.background.withValues(alpha: 0.72)
+                          : AppColors.textSecondary,
+                      fontWeight: FontWeight.w600,
+                    ),
+              ),
+            ],
+          ),
         ),
       ),
     );
   }
 }
 
+class _OfficialBadge extends StatelessWidget {
+  const _OfficialBadge();
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+      decoration: BoxDecoration(
+        color: AppColors.accentAmber.withValues(alpha: 0.18),
+        borderRadius: BorderRadius.circular(999),
+        border: Border.all(
+          color: AppColors.accentAmber.withValues(alpha: 0.5),
+        ),
+      ),
+      child: Text(
+        'Official',
+        style: Theme.of(context).textTheme.labelSmall?.copyWith(
+              color: AppColors.accentAmber,
+              fontWeight: FontWeight.w800,
+              letterSpacing: 0.2,
+            ),
+      ),
+    );
+  }
+}

@@ -1,10 +1,14 @@
-﻿class ChatModel {
+class ChatModel {
   const ChatModel({
     required this.id,
     required this.participantId,
     required this.lastMessage,
     required this.lastMessageAt,
     required this.unreadCount,
+    this.roomHash,
+    this.isOfficial = false,
+    this.gracyId,
+    this.isOnline = false,
   });
 
   final String id;
@@ -12,5 +16,8 @@
   final String lastMessage;
   final DateTime lastMessageAt;
   final int unreadCount;
+  final String? roomHash;
+  final bool isOfficial;
+  final String? gracyId;
+  final bool isOnline;
 }
-
