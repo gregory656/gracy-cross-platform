@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../core/theme/app_colors.dart';
 import '../models/user_model.dart';
+import '../providers/auth_provider.dart';
 import '../providers/social_providers.dart';
 import 'glass_card.dart';
 import 'user_avatar.dart';
@@ -21,6 +22,7 @@ class ProfileCard extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final String? myId = ref.watch(authNotifierProvider).userId;
     final String? connectionStatus = ref.watch(connectionStatusProvider(user.id));
     
     String ctaLabel = 'Connect';
@@ -28,9 +30,9 @@ class ProfileCard extends ConsumerWidget {
     VoidCallback? action = onPrimaryAction;
 
     if (connectionStatus == 'connected') {
-      ctaLabel = 'Chat';
+      ctaLabel = 'Connected ✅';
     } else if (connectionStatus == 'pending') {
-      ctaLabel = 'Pending';
+      ctaLabel = 'Pending...';
       isDisabled = true;
       action = null;
     } else {
@@ -127,14 +129,16 @@ class ProfileCard extends ConsumerWidget {
           const SizedBox(height: 16),
           Row(
             children: <Widget>[
-              Expanded(
-                child: _CardAction(
-                  label: ctaLabel,
-                  onTap: action ?? () {},
-                  filled: !isDisabled,
+              if (myId != user.id) ...[
+                Expanded(
+                  child: _CardAction(
+                    label: ctaLabel,
+                    onTap: action ?? () {},
+                    filled: !isDisabled,
+                  ),
                 ),
-              ),
-              const SizedBox(width: 10),
+                const SizedBox(width: 10),
+              ],
               Expanded(
                 child: _CardAction(
                   label: 'Profile',
