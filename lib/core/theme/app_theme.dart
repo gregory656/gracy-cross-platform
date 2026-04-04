@@ -4,201 +4,157 @@ import 'package:flutter/services.dart';
 import 'app_colors.dart';
 
 class AppTheme {
-  static ThemeData darkTheme() {
+  // Industrial Elite Theme - Single high-contrast theme
+  static ThemeData eliteTheme() {
     return ThemeData(
       brightness: Brightness.dark,
       useMaterial3: true,
-      scaffoldBackgroundColor: const Color(0xFF000000),
+      scaffoldBackgroundColor: AppColors.onyx,
       colorScheme: const ColorScheme.dark(
-        primary: AppColors.accentCyan,
-        secondary: AppColors.accentMagenta,
-        surface: Color(0xFF1A1A1A),
-        onSurface: Color(0xFFFFFFFF),
-        onSurfaceVariant: Color(0xFFB0B0B0),
-        error: AppColors.errorRed,
-        onError: Color(0xFFFFFFFF),
+        primary: AppColors.electricBlue,
+        secondary: AppColors.electricBlue,
+        surface: AppColors.onyx,
+        onSurface: AppColors.pureWhite,
+        onSurfaceVariant: AppColors.lightGray,
+        error: AppColors.error,
+        onError: AppColors.pureWhite,
       ),
       appBarTheme: const AppBarTheme(
-        backgroundColor: Color(0xFF000000),
-        foregroundColor: Color(0xFFFFFFFF),
+        backgroundColor: AppColors.onyx,
+        foregroundColor: AppColors.pureWhite,
         elevation: 0,
         systemOverlayStyle: SystemUiOverlayStyle.light,
+        titleTextStyle: TextStyle(
+          color: AppColors.pureWhite,
+          fontSize: 18,
+          fontWeight: FontWeight.w600,
+          letterSpacing: -0.5,
+        ),
       ),
       cardTheme: CardThemeData(
-        color: const Color(0xFF1A1A1A),
+        color: AppColors.onyx,
         elevation: 0,
         shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(12),
+          borderRadius: BorderRadius.circular(4), // Max 4px radius for industrial look
           side: const BorderSide(
-            color: AppColors.outline,
+            color: AppColors.borderGray,
             width: 1,
           ),
         ),
       ),
       elevatedButtonTheme: ElevatedButtonThemeData(
         style: ElevatedButton.styleFrom(
-          backgroundColor: AppColors.accentCyan,
-          foregroundColor: const Color(0xFF000000),
+          backgroundColor: AppColors.electricBlue,
+          foregroundColor: AppColors.pureWhite,
           elevation: 0,
           shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(10),
+            borderRadius: BorderRadius.circular(4),
           ),
+          padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
         ),
       ),
       outlinedButtonTheme: OutlinedButtonThemeData(
         style: OutlinedButton.styleFrom(
-          foregroundColor: AppColors.accentCyan,
-          side: const BorderSide(color: AppColors.accentCyan),
+          foregroundColor: AppColors.electricBlue,
+          side: const BorderSide(color: AppColors.electricBlue, width: 1),
           shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(10),
+            borderRadius: BorderRadius.circular(4),
           ),
+          padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
         ),
       ),
       textButtonTheme: TextButtonThemeData(
         style: TextButton.styleFrom(
-          foregroundColor: AppColors.accentCyan,
+          foregroundColor: AppColors.electricBlue,
           shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(10),
+            borderRadius: BorderRadius.circular(4),
           ),
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
         ),
       ),
       inputDecorationTheme: InputDecorationTheme(
         filled: true,
-        fillColor: const Color(0xFF1A1A1A),
+        fillColor: AppColors.onyx,
         border: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(10),
-          borderSide: const BorderSide(color: AppColors.outline),
+          borderRadius: BorderRadius.circular(4),
+          borderSide: const BorderSide(color: AppColors.borderGray),
         ),
         enabledBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(10),
-          borderSide: const BorderSide(color: AppColors.outline),
+          borderRadius: BorderRadius.circular(4),
+          borderSide: const BorderSide(color: AppColors.borderGray),
         ),
         focusedBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(10),
-          borderSide: const BorderSide(color: AppColors.accentCyan),
+          borderRadius: BorderRadius.circular(4),
+          borderSide: const BorderSide(color: AppColors.electricBlue, width: 2),
         ),
         errorBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(10),
-          borderSide: const BorderSide(color: AppColors.errorRed),
+          borderRadius: BorderRadius.circular(4),
+          borderSide: const BorderSide(color: AppColors.error),
         ),
+        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
       ),
       dividerTheme: const DividerThemeData(
-        color: AppColors.outline,
+        color: AppColors.borderGray,
         thickness: 1,
+        space: 1,
       ),
       switchTheme: SwitchThemeData(
         thumbColor: WidgetStateProperty.resolveWith((states) {
           if (states.contains(WidgetState.selected)) {
-            return AppColors.accentCyan;
+            return AppColors.electricBlue;
           }
-          return const Color(0xFF666666);
+          return AppColors.lightGray;
         }),
         trackColor: WidgetStateProperty.resolveWith((states) {
           if (states.contains(WidgetState.selected)) {
-            return AppColors.accentCyan.withValues(alpha: 0.3);
+            return AppColors.electricBlue.withValues(alpha: 0.3);
           }
-          return const Color(0xFF333333);
+          return AppColors.industrialGray;
         }),
+      ),
+      textTheme: const TextTheme(
+        headlineLarge: TextStyle(
+          color: AppColors.pureWhite,
+          fontSize: 32,
+          fontWeight: FontWeight.w700,
+          letterSpacing: -1,
+        ),
+        headlineMedium: TextStyle(
+          color: AppColors.pureWhite,
+          fontSize: 24,
+          fontWeight: FontWeight.w600,
+          letterSpacing: -0.5,
+        ),
+        bodyLarge: TextStyle(
+          color: AppColors.pureWhite,
+          fontSize: 16,
+          fontWeight: FontWeight.w400,
+          letterSpacing: -0.2,
+        ),
+        bodyMedium: TextStyle(
+          color: AppColors.pureWhite,
+          fontSize: 14,
+          fontWeight: FontWeight.w400,
+        ),
+        labelLarge: TextStyle(
+          color: AppColors.pureWhite,
+          fontSize: 14,
+          fontWeight: FontWeight.w600,
+          letterSpacing: 0.5,
+        ),
+      ),
+      iconTheme: const IconThemeData(
+        color: AppColors.pureWhite,
+        size: 24,
+      ),
+      listTileTheme: const ListTileThemeData(
+        iconColor: AppColors.electricBlue,
+        textColor: AppColors.pureWhite,
       ),
     );
   }
 
-  static ThemeData lightTheme() {
-    return ThemeData(
-      brightness: Brightness.light,
-      useMaterial3: true,
-      scaffoldBackgroundColor: const Color(0xFFFFFFFF),
-      colorScheme: const ColorScheme.light(
-        primary: AppColors.accentCyan,
-        secondary: AppColors.accentMagenta,
-        surface: Color(0xFFF5F5F5),
-        onSurface: Color(0xFF000000),
-        onSurfaceVariant: Color(0xFF666666),
-        error: AppColors.errorRed,
-        onError: Color(0xFFFFFFFF),
-      ),
-      appBarTheme: const AppBarTheme(
-        backgroundColor: Color(0xFFFFFFFF),
-        foregroundColor: Color(0xFF000000),
-        elevation: 0,
-        systemOverlayStyle: SystemUiOverlayStyle.dark,
-      ),
-      cardTheme: CardThemeData(
-        color: const Color(0xFFFFFFFF),
-        elevation: 0,
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(12),
-          side: const BorderSide(
-            color: AppColors.outline,
-            width: 1,
-          ),
-        ),
-      ),
-      elevatedButtonTheme: ElevatedButtonThemeData(
-        style: ElevatedButton.styleFrom(
-          backgroundColor: AppColors.accentCyan,
-          foregroundColor: const Color(0xFFFFFFFF),
-          elevation: 0,
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(10),
-          ),
-        ),
-      ),
-      outlinedButtonTheme: OutlinedButtonThemeData(
-        style: OutlinedButton.styleFrom(
-          foregroundColor: AppColors.accentCyan,
-          side: const BorderSide(color: AppColors.accentCyan),
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(10),
-          ),
-        ),
-      ),
-      textButtonTheme: TextButtonThemeData(
-        style: TextButton.styleFrom(
-          foregroundColor: AppColors.accentCyan,
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(10),
-          ),
-        ),
-      ),
-      inputDecorationTheme: InputDecorationTheme(
-        filled: true,
-        fillColor: const Color(0xFFF5F5F5),
-        border: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(10),
-          borderSide: const BorderSide(color: AppColors.outline),
-        ),
-        enabledBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(10),
-          borderSide: const BorderSide(color: AppColors.outline),
-        ),
-        focusedBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(10),
-          borderSide: const BorderSide(color: AppColors.accentCyan),
-        ),
-        errorBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(10),
-          borderSide: const BorderSide(color: AppColors.errorRed),
-        ),
-      ),
-      dividerTheme: const DividerThemeData(
-        color: AppColors.outline,
-        thickness: 1,
-      ),
-      switchTheme: SwitchThemeData(
-        thumbColor: WidgetStateProperty.resolveWith((states) {
-          if (states.contains(WidgetState.selected)) {
-            return AppColors.accentCyan;
-          }
-          return const Color(0xFFCCCCCC);
-        }),
-        trackColor: WidgetStateProperty.resolveWith((states) {
-          if (states.contains(WidgetState.selected)) {
-            return AppColors.accentCyan.withValues(alpha: 0.3);
-          }
-          return const Color(0xFFE0E0E0);
-        }),
-      ),
-    );
-  }
+  // Legacy support - map to elite theme
+  static ThemeData darkTheme() => eliteTheme();
+  static ThemeData lightTheme() => eliteTheme();
 }

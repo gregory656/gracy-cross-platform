@@ -1,3 +1,5 @@
+import 'package:flutter/material.dart';
+
 enum MessageStatus { sent, delivered, read }
 
 class MessageModel {
@@ -14,6 +16,7 @@ class MessageModel {
     this.status = MessageStatus.sent,
     this.deliveredAt,
     this.readAt,
+    this.replyToId,
   });
 
   final String id;
@@ -28,6 +31,7 @@ class MessageModel {
   final MessageStatus status;
   final DateTime? deliveredAt;
   final DateTime? readAt;
+  final String? replyToId;
 
   factory MessageModel.fromDatabase({
     required Map<String, dynamic> row,
@@ -70,6 +74,7 @@ class MessageModel {
       readAt: row['read_at'] != null 
           ? DateTime.tryParse(row['read_at'].toString())
           : null,
+      replyToId: row['reply_to_id']?.toString(),
     );
   }
 
@@ -86,6 +91,7 @@ class MessageModel {
     MessageStatus? status,
     DateTime? deliveredAt,
     DateTime? readAt,
+    String? replyToId,
   }) {
     return MessageModel(
       id: id ?? this.id,
@@ -100,6 +106,35 @@ class MessageModel {
       status: status ?? this.status,
       deliveredAt: deliveredAt ?? this.deliveredAt,
       readAt: readAt ?? this.readAt,
+      replyToId: replyToId ?? this.replyToId,
     );
+  }
+
+  // Get status tick icons for display
+  List<IconData> get statusTicks {
+    if (!isMe) return [];
+    
+    switch (status) {
+      case MessageStatus.sent:
+        return [Icons.done];
+      case MessageStatus.delivered:
+        return [Icons.done_all];
+      case MessageStatus.read:
+        return [Icons.done_all];
+    }
+  }
+
+  // Get status color
+  String get statusColorHex {
+    if (!isMe) return '';
+    
+    switch (status) {
+      case MessageStatus.sent:
+        return '#8E8E93'; // Gray
+      case MessageStatus.delivered:
+        return '#8E8E93'; // Gray
+      case MessageStatus.read:
+        return '#30D158'; // Green/Cyan
+    }
   }
 }

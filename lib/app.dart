@@ -3,7 +3,6 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'core/router/app_router.dart';
 import 'core/theme/app_theme.dart';
-import 'shared/providers/theme_provider.dart';
 
 class GracyApp extends ConsumerWidget {
   const GracyApp({super.key});
@@ -11,12 +10,11 @@ class GracyApp extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final router = ref.watch(appRouterProvider);
-    final themeName = ref.watch(themeProvider);
 
     return MaterialApp.router(
       debugShowCheckedModeBanner: false,
       title: 'Gracy',
-      theme: themeName.toLowerCase() == 'light' ? AppTheme.lightTheme() : AppTheme.darkTheme(),
+      theme: AppTheme.eliteTheme(), // Single elite theme
       routerConfig: router,
     );
   }
