@@ -4,7 +4,7 @@ import 'package:flutter/services.dart';
 import 'app_colors.dart';
 
 class AppTheme {
-  // Industrial Elite Theme - Single high-contrast theme
+  // Industrial Elite Theme - Dark mode
   static ThemeData eliteTheme() {
     return ThemeData(
       brightness: Brightness.dark,
@@ -154,7 +154,157 @@ class AppTheme {
     );
   }
 
-  // Legacy support - map to elite theme
+  // Industrial Elite Theme - Light mode
+  static ThemeData eliteLightTheme() {
+    return ThemeData(
+      brightness: Brightness.light,
+      useMaterial3: true,
+      scaffoldBackgroundColor: AppColors.pureWhite,
+      colorScheme: const ColorScheme.light(
+        primary: AppColors.electricBlue,
+        secondary: AppColors.electricBlue,
+        surface: AppColors.pureWhite,
+        onSurface: AppColors.onyx,
+        onSurfaceVariant: AppColors.industrialGray,
+        error: AppColors.error,
+        onError: AppColors.pureWhite,
+      ),
+      appBarTheme: const AppBarTheme(
+        backgroundColor: AppColors.pureWhite,
+        foregroundColor: AppColors.onyx,
+        elevation: 0,
+        systemOverlayStyle: SystemUiOverlayStyle.dark,
+        titleTextStyle: TextStyle(
+          color: AppColors.onyx,
+          fontSize: 18,
+          fontWeight: FontWeight.w600,
+          letterSpacing: -0.5,
+        ),
+      ),
+      cardTheme: CardThemeData(
+        color: AppColors.pureWhite,
+        elevation: 0,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(4), // Max 4px radius for industrial look
+          side: const BorderSide(
+            color: AppColors.borderGray,
+            width: 1,
+          ),
+        ),
+      ),
+      elevatedButtonTheme: ElevatedButtonThemeData(
+        style: ElevatedButton.styleFrom(
+          backgroundColor: AppColors.electricBlue,
+          foregroundColor: AppColors.pureWhite,
+          elevation: 0,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(4),
+          ),
+          padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+        ),
+      ),
+      outlinedButtonTheme: OutlinedButtonThemeData(
+        style: OutlinedButton.styleFrom(
+          foregroundColor: AppColors.electricBlue,
+          side: const BorderSide(color: AppColors.electricBlue, width: 1),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(4),
+          ),
+          padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+        ),
+      ),
+      textButtonTheme: TextButtonThemeData(
+        style: TextButton.styleFrom(
+          foregroundColor: AppColors.electricBlue,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(4),
+          ),
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+        ),
+      ),
+      inputDecorationTheme: InputDecorationTheme(
+        filled: true,
+        fillColor: AppColors.pureWhite,
+        border: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(4),
+          borderSide: const BorderSide(color: AppColors.borderGray),
+        ),
+        enabledBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(4),
+          borderSide: const BorderSide(color: AppColors.borderGray),
+        ),
+        focusedBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(4),
+          borderSide: const BorderSide(color: AppColors.electricBlue, width: 2),
+        ),
+        errorBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(4),
+          borderSide: const BorderSide(color: AppColors.error),
+        ),
+        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+      ),
+      dividerTheme: const DividerThemeData(
+        color: AppColors.borderGray,
+        thickness: 1,
+        space: 1,
+      ),
+      switchTheme: SwitchThemeData(
+        thumbColor: WidgetStateProperty.resolveWith((states) {
+          if (states.contains(WidgetState.selected)) {
+            return AppColors.electricBlue;
+          }
+          return AppColors.lightGray;
+        }),
+        trackColor: WidgetStateProperty.resolveWith((states) {
+          if (states.contains(WidgetState.selected)) {
+            return AppColors.electricBlue.withValues(alpha: 0.3);
+          }
+          return AppColors.industrialGray;
+        }),
+      ),
+      textTheme: const TextTheme(
+        headlineLarge: TextStyle(
+          color: AppColors.onyx,
+          fontSize: 32,
+          fontWeight: FontWeight.w700,
+          letterSpacing: -1,
+        ),
+        headlineMedium: TextStyle(
+          color: AppColors.onyx,
+          fontSize: 24,
+          fontWeight: FontWeight.w600,
+          letterSpacing: -0.5,
+        ),
+        bodyLarge: TextStyle(
+          color: AppColors.onyx,
+          fontSize: 16,
+          fontWeight: FontWeight.w400,
+          letterSpacing: -0.2,
+        ),
+        bodyMedium: TextStyle(
+          color: AppColors.onyx,
+          fontSize: 14,
+          fontWeight: FontWeight.w400,
+        ),
+        labelLarge: TextStyle(
+          color: AppColors.onyx,
+          fontSize: 14,
+          fontWeight: FontWeight.w600,
+          letterSpacing: 0.5,
+        ),
+      ),
+      iconTheme: const IconThemeData(
+        color: AppColors.onyx,
+        size: 24,
+      ),
+      listTileTheme: const ListTileThemeData(
+        iconColor: AppColors.electricBlue,
+        textColor: AppColors.onyx,
+      ),
+    );
+  }
+
+  // Legacy support - map to elite themes
   static ThemeData darkTheme() => eliteTheme();
-  static ThemeData lightTheme() => eliteTheme();
+  static ThemeData lightTheme() => eliteLightTheme();
 }
