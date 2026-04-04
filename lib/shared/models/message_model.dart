@@ -1,3 +1,5 @@
+enum MessageStatus { sent, delivered, read }
+
 class MessageModel {
   const MessageModel({
     required this.id,
@@ -9,6 +11,9 @@ class MessageModel {
     this.senderName = 'Unknown',
     this.senderUsername,
     this.isOfficial = false,
+    this.status = MessageStatus.sent,
+    this.deliveredAt,
+    this.readAt,
   });
 
   final String id;
@@ -20,6 +25,9 @@ class MessageModel {
   final String senderName;
   final String? senderUsername;
   final bool isOfficial;
+  final MessageStatus status;
+  final DateTime? deliveredAt;
+  final DateTime? readAt;
 
   factory MessageModel.fromDatabase({
     required Map<String, dynamic> row,
@@ -28,6 +36,21 @@ class MessageModel {
     required String? senderUsername,
     required bool isOfficial,
   }) {
+    final String statusStr = row['status']?.toString() ?? 'sent';
+    MessageStatus status = MessageStatus.sent;
+    switch (statusStr) {
+      case 'delivered':
+        status = MessageStatus.delivered;
+        break;
+      case 'read':
+        status = MessageStatus.read;
+        break;
+      case 'sent':
+      default:
+        status = MessageStatus.sent;
+        break;
+    }
+
     return MessageModel(
       id: row['id']?.toString() ?? '',
       chatId: row['room_id']?.toString() ?? '',
@@ -40,6 +63,43 @@ class MessageModel {
       senderName: senderName,
       senderUsername: senderUsername,
       isOfficial: isOfficial,
+      status: status,
+      deliveredAt: row['delivered_at'] != null 
+          ? DateTime.tryParse(row['delivered_at'].toString())
+          : null,
+      readAt: row['read_at'] != null 
+          ? DateTime.tryParse(row['read_at'].toString())
+          : null,
+    );
+  }
+
+  MessageModel copyWith({
+    String? id,
+    String? chatId,
+    String? senderId,
+    String? text,
+    DateTime? sentAt,
+    bool? isMe,
+    String? senderName,
+    String? senderUsername,
+    bool? isOfficial,
+    MessageStatus? status,
+    DateTime? deliveredAt,
+    DateTime? readAt,
+  }) {
+    return MessageModel(
+      id: id ?? this.id,
+      chatId: chatId ?? this.chatId,
+      senderId: senderId ?? this.senderId,
+      text: text ?? this.text,
+      sentAt: sentAt ?? this.sentAt,
+      isMe: isMe ?? this.isMe,
+      senderName: senderName ?? this.senderName,
+      senderUsername: senderUsername ?? this.senderUsername,
+      isOfficial: isOfficial ?? this.isOfficial,
+      status: status ?? this.status,
+      deliveredAt: deliveredAt ?? this.deliveredAt,
+      readAt: readAt ?? this.readAt,
     );
   }
 }

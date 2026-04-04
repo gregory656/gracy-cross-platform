@@ -6,6 +6,7 @@ import '../../../shared/models/chat_model.dart';
 import '../../../shared/models/message_model.dart';
 import '../../../shared/models/user_model.dart';
 import '../../../shared/services/database_service.dart';
+import '../../../shared/services/timezone_service.dart';
 
 class ChatThread {
   const ChatThread({
@@ -21,7 +22,9 @@ class ChatThread {
 
 class ChatRepository {
   ChatRepository(this._client, {DatabaseService? databaseService})
-    : _databaseService = databaseService ?? DatabaseService.instance;
+    : _databaseService = databaseService ?? DatabaseService.instance {
+    TimezoneService.initialize();
+  }
 
   static const String botUserId = 'd9660385-2c30-466d-8902-602868198f82';
   static const String botGracyCode = 'GRACY-BOT-99';
@@ -215,7 +218,7 @@ class ChatRepository {
     Future<void> hydrateInitialMessages() async {
       final List<dynamic> rows = await _client
           .from(_messagesTable)
-          .select('id,room_id,sender_id,content,created_at')
+          .select('id,room_id,sender_id,content,created_at,status,delivered_at,read_at')
           .eq('room_id', roomId)
           .order('created_at');
 
@@ -336,7 +339,7 @@ class ChatRepository {
         ? const <Map<String, dynamic>>[]
         : ((await _client
                       .from(_messagesTable)
-                      .select('id,room_id,sender_id,content,created_at')
+                      .select('id,room_id,sender_id,content,created_at,status,delivered_at,read_at')
                       .inFilter('room_id', roomIds)
                       .order('created_at', ascending: false))
                   as List<dynamic>)
@@ -391,6 +394,36 @@ class ChatRepository {
       (ChatModel a, ChatModel b) => b.lastMessageAt.compareTo(a.lastMessageAt),
     );
     return chats;
+  }
+
+  Future<void> markMessagesAsRead({
+    required String roomId,
+    required String userId,
+  }) async {
+    await _client
+        .from(_messagesTable)
+        .update({
+          'status': 'read',
+          'read_at': DateTime.now().toIso8601String(),
+        })
+        .eq('room_id', roomId)
+        .eq('sender_id', userId)
+        .neq('status', 'read');
+  }
+
+  Future<void> markMessagesAsDelivered({
+    required String roomId,
+    required String userId,
+  }) async {
+    await _client
+        .from(_messagesTable)
+        .update({
+          'status': 'delivered',
+          'delivered_at': DateTime.now().toIso8601String(),
+        })
+        .eq('room_id', roomId)
+        .eq('sender_id', userId)
+        .eq('status', 'sent');
   }
 
   Future<void> _ensureRoomMembers({
