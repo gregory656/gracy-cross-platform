@@ -33,6 +33,7 @@ migrate_working_dir/
 /build/
 /coverage/
 lib/core/constants_local.dart
+lib/core/secrets.dart
 
 # Symbolication related
 app.*.symbols

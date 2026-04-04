@@ -8,6 +8,9 @@ class NairobiTimezoneService {
   NairobiTimezoneService._();
 
   late tz.Location _nairobiLocation;
+  
+  // Getter for nairobi location
+  tz.Location get nairobiLocation => _nairobiLocation;
 
   Future<void> initialize() async {
     tz.initializeTimeZones();
@@ -15,7 +18,7 @@ class NairobiTimezoneService {
   }
 
   // Convert any DateTime to Nairobi time
-  DateTime toNairobiTime(DateTime dateTime) {
+  DateTime convertToNairobi(DateTime dateTime) {
     return tz.TZDateTime.from(dateTime, _nairobiLocation);
   }
 
@@ -24,7 +27,7 @@ class NairobiTimezoneService {
 
   // Format time for display in Nairobi timezone
   String formatTime(DateTime dateTime) {
-    final nairobiTime = toNairobiTime(dateTime);
+    final nairobiTime = convertToNairobi(dateTime);
     final hour = nairobiTime.hour.toString().padLeft(2, '0');
     final minute = nairobiTime.minute.toString().padLeft(2, '0');
     return '$hour:$minute';
@@ -32,7 +35,7 @@ class NairobiTimezoneService {
 
   // Format date for display in Nairobi timezone
   String formatDate(DateTime dateTime) {
-    final nairobiTime = toNairobiTime(dateTime);
+    final nairobiTime = convertToNairobi(dateTime);
     final now = this.now;
     final today = DateTime(now.year, now.month, now.day);
     final messageDate = DateTime(nairobiTime.year, nairobiTime.month, nairobiTime.day);
@@ -52,7 +55,7 @@ class NairobiTimezoneService {
 
   // Format full date and time
   String formatFullDateTime(DateTime dateTime) {
-    final nairobiTime = toNairobiTime(dateTime);
+    final nairobiTime = convertToNairobi(dateTime);
     return '${formatDate(dateTime)} at ${formatTime(dateTime)} EAT';
   }
 
@@ -71,8 +74,8 @@ class NairobiTimezoneService {
 
   // Check if date is same day in Nairobi time
   bool isSameDay(DateTime date1, DateTime date2) {
-    final nairobi1 = toNairobiTime(date1);
-    final nairobi2 = toNairobiTime(date2);
+    final nairobi1 = convertToNairobi(date1);
+    final nairobi2 = convertToNairobi(date2);
     return nairobi1.year == nairobi2.year &&
            nairobi1.month == nairobi2.month &&
            nairobi1.day == nairobi2.day;
