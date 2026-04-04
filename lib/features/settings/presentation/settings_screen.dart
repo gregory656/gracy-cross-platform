@@ -10,8 +10,8 @@ import '../../../core/theme/app_colors.dart';
 import '../../../shared/models/user_model.dart';
 import '../../../shared/providers/auth_provider.dart';
 import '../../../shared/providers/theme_provider.dart';
+import '../../../shared/services/premium_service.dart';
 import '../../../shared/widgets/custom_button.dart';
-import '../../../shared/widgets/glass_card.dart';
 import '../../../shared/widgets/user_avatar.dart';
 import 'edit_profile_screen.dart';
 
@@ -90,91 +90,102 @@ class SettingsScreen extends ConsumerWidget {
   }
 
   Widget _buildProfileSection(BuildContext context, UserModel user) {
-    return GlassCard(
-      child: Row(
-        children: <Widget>[
-          UserAvatar(user: user, size: 60, fontSize: 18),
-          const SizedBox(width: 16),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: <Widget>[
-                Text(
-                  user.fullName,
-                  style: Theme.of(
-                    context,
-                  ).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w800),
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                ),
-                const SizedBox(height: 2),
-                Text(
-                  user.username,
-                  style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                    color: AppColors.textSecondary,
+    return Card(
+      elevation: 0,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(12),
+        side: BorderSide(
+          color: Theme.of(context).dividerTheme.color ?? Colors.grey,
+          width: 1,
+        ),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Row(
+          children: <Widget>[
+            UserAvatar(user: user, size: 60, fontSize: 18),
+            const SizedBox(width: 16),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: <Widget>[
+                  Text(
+                    user.fullName,
+                    style: Theme.of(
+                      context,
+                    ).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w800),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
                   ),
-                ),
-                if (user.gracyId != null) ...<Widget>[
-                  const SizedBox(height: 8),
-                  InkWell(
-                    onTap: () async {
-                      await Clipboard.setData(
-                        ClipboardData(text: user.gracyId!),
-                      );
-                      if (context.mounted) {
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(
-                            content: Text('Gracy ID copied to clipboard!'),
-                            behavior: SnackBarBehavior.floating,
-                            backgroundColor: AppColors.success,
-                          ),
-                        );
-                      }
-                    },
-                    borderRadius: BorderRadius.circular(8),
-                    child: Padding(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 4,
-                        vertical: 2,
-                      ),
-                      child: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: <Widget>[
-                          const Icon(
-                            Icons.copy_rounded,
-                            size: 14,
-                            color: AppColors.accentCyan,
-                          ),
-                          const SizedBox(width: 6),
-                          Text(
-                            user.gracyId!,
-                            style: Theme.of(context).textTheme.labelSmall
-                                ?.copyWith(
-                                  color: AppColors.accentCyan,
-                                  fontWeight: FontWeight.bold,
-                                ),
-                          ),
-                        ],
-                      ),
+                  const SizedBox(height: 2),
+                  Text(
+                    user.username,
+                    style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                      color: AppColors.textSecondary,
                     ),
                   ),
+                  if (user.gracyId != null) ...<Widget>[
+                    const SizedBox(height: 8),
+                    InkWell(
+                      onTap: () async {
+                        await Clipboard.setData(
+                          ClipboardData(text: user.gracyId!),
+                        );
+                        if (context.mounted) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(
+                              content: Text('Gracy ID copied to clipboard!'),
+                              behavior: SnackBarBehavior.floating,
+                              backgroundColor: AppColors.success,
+                            ),
+                          );
+                        }
+                      },
+                      borderRadius: BorderRadius.circular(8),
+                      child: Padding(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 4,
+                          vertical: 2,
+                        ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: <Widget>[
+                            const Icon(
+                              Icons.copy_rounded,
+                              size: 14,
+                              color: AppColors.accentCyan,
+                            ),
+                            const SizedBox(width: 6),
+                            Text(
+                              user.gracyId!,
+                              style: Theme.of(context).textTheme.labelSmall
+                                  ?.copyWith(
+                                    color: AppColors.accentCyan,
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ],
                 ],
-              ],
+              ),
             ),
-          ),
-          IconButton(
-            icon: const Icon(Icons.edit_rounded, color: AppColors.textPrimary),
-            onPressed: () {
-              Navigator.of(context).push(
-                MaterialPageRoute<void>(
-                  builder: (BuildContext context) =>
-                      EditProfileScreen(user: user),
-                ),
-              );
-            },
-            tooltip: 'Edit Profile',
-          ),
-        ],
+            IconButton(
+              icon: const Icon(Icons.edit_rounded, color: AppColors.textPrimary),
+              onPressed: () {
+                Navigator.of(context).push(
+                  MaterialPageRoute<void>(
+                    builder: (BuildContext context) =>
+                        EditProfileScreen(user: user),
+                  ),
+                );
+              },
+              tooltip: 'Edit Profile',
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -250,53 +261,215 @@ class SettingsScreen extends ConsumerWidget {
     WidgetRef ref,
     UserModel user,
   ) {
+    final bool isGhostMode = ref.watch(ghostModeProvider);
+    
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: <Widget>[
         Text(
-          'Preferences',
+          'Settings',
           style: Theme.of(
             context,
           ).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w700),
         ),
         const SizedBox(height: 16),
-        GlassCard(
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+        Card(
+          elevation: 0,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(12),
+            side: BorderSide(
+              color: Theme.of(context).dividerTheme.color ?? Colors.grey,
+              width: 1,
+            ),
+          ),
           child: Column(
             children: <Widget>[
-              SwitchListTile(
-                contentPadding: EdgeInsets.zero,
-                title: const Text('Notifications'),
-                subtitle: const Text('Push alerts & messages'),
-                activeColor: Theme.of(context).colorScheme.primary,
-                value: user.notificationsEnabled,
-                onChanged: (bool val) {
-                  ref.read(themeProvider.notifier).updateNotifications(val);
+              _settingItem(
+                context,
+                icon: Icons.notifications_rounded,
+                iconColor: Colors.red,
+                title: 'Notifications',
+                subtitle: 'Push alerts & messages',
+                trailing: Switch(
+                  value: user.notificationsEnabled,
+                  activeThumbColor: Theme.of(context).colorScheme.primary,
+                  onChanged: (bool val) {
+                    ref.read(themeProvider.notifier).updateNotifications(val);
+                  },
+                ),
+                onTap: null,
+              ),
+              const Divider(height: 1),
+              _settingItem(
+                context,
+                icon: Icons.visibility_rounded,
+                iconColor: Colors.blue,
+                title: 'Ghost Mode',
+                subtitle: 'Hide your online status from others',
+                trailing: Row(
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                      decoration: BoxDecoration(
+                        color: Colors.amber,
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: const Text(
+                        'PRO',
+                        style: TextStyle(
+                          color: Colors.black,
+                          fontSize: 10,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    Switch(
+                      value: isGhostMode,
+                      activeThumbColor: Theme.of(context).colorScheme.primary,
+                      onChanged: (bool val) {
+                        ref.read(themeProvider.notifier).updateGhostMode(val);
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(
+                            content: Text(
+                              val ? 'Ghost Mode enabled' : 'Ghost Mode disabled',
+                            ),
+                            behavior: SnackBarBehavior.floating,
+                          ),
+                        );
+                      },
+                    ),
+                  ],
+                ),
+                onTap: null,
+              ),
+              const Divider(height: 1),
+              _settingItem(
+                context,
+                icon: Icons.timer_rounded,
+                iconColor: Colors.green,
+                title: 'Disappearing Messages',
+                subtitle: 'Set messages to disappear after viewing',
+                trailing: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                  decoration: BoxDecoration(
+                    color: Colors.amber,
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: const Text(
+                    'PRO',
+                    style: TextStyle(
+                      color: Colors.black,
+                      fontSize: 10,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                ),
+                onTap: () {
+                  // Show disappearing messages dialog
                 },
               ),
-              const Divider(),
-              SwitchListTile(
-                contentPadding: EdgeInsets.zero,
-                title: const Text('Online Status'),
-                subtitle: const Text('Let others see when you are active'),
-                activeColor: Theme.of(context).colorScheme.primary,
-                value: user.isOnline,
-                onChanged: (bool val) {
-                  // Stubbed for local UI logic since missing from schema.
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(
-                      content: Text(
-                        val ? 'Status set to Online' : 'Status set to Offline',
-                      ),
-                      behavior: SnackBarBehavior.floating,
-                    ),
-                  );
+              const Divider(height: 1),
+              _settingItem(
+                context,
+                icon: Icons.star_rounded,
+                iconColor: Colors.amber,
+                title: 'Premium',
+                subtitle: 'Unlock all premium features',
+                trailing: const Icon(Icons.arrow_forward_ios_rounded, size: 16),
+                onTap: () {
+                  ref.read(premiumServiceProvider).showPremiumDialog(context);
+                },
+              ),
+              const Divider(height: 1),
+              _settingItem(
+                context,
+                icon: Icons.privacy_tip_rounded,
+                iconColor: Colors.purple,
+                title: 'Privacy',
+                subtitle: 'Manage your privacy settings',
+                trailing: const Icon(Icons.arrow_forward_ios_rounded, size: 16),
+                onTap: () {
+                  // Navigate to privacy settings
+                },
+              ),
+              const Divider(height: 1),
+              _settingItem(
+                context,
+                icon: Icons.security_rounded,
+                iconColor: Colors.orange,
+                title: 'Security',
+                subtitle: 'Account security and authentication',
+                trailing: const Icon(Icons.arrow_forward_ios_rounded, size: 16),
+                onTap: () {
+                  // Navigate to security settings
                 },
               ),
             ],
           ),
         ),
       ],
+    );
+  }
+
+  Widget _settingItem(
+    BuildContext context, {
+    required IconData icon,
+    required Color iconColor,
+    required String title,
+    required String subtitle,
+    required Widget? trailing,
+    required VoidCallback? onTap,
+  }) {
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(12),
+        child: Padding(
+          padding: const EdgeInsets.all(16),
+          child: Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(10),
+                decoration: BoxDecoration(
+                  color: iconColor.withValues(alpha: 0.1),
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: Icon(
+                  icon,
+                  color: iconColor,
+                  size: 20,
+                ),
+              ),
+              const SizedBox(width: 16),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      title,
+                      style: const TextStyle(
+                        fontWeight: FontWeight.w600,
+                        fontSize: 16,
+                      ),
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      subtitle,
+                      style: TextStyle(
+                        fontSize: 14,
+                        color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.6),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              if (trailing != null) ...[trailing],
+            ],
+          ),
+        ),
+      ),
     );
   }
 
@@ -312,26 +485,36 @@ class SettingsScreen extends ConsumerWidget {
           ),
         ),
         const SizedBox(height: 16),
-        GlassCard(
-          padding: const EdgeInsets.all(16),
-          child: Column(
-            children: <Widget>[
-              CustomButton(
-                label: 'Logout',
-                icon: Icons.logout_rounded,
-                filled: false,
-                onPressed: () {
-                  ref.read(authNotifierProvider.notifier).logout();
-                },
-              ),
-              const SizedBox(height: 12),
-              CustomButton(
-                label: 'Delete Account',
-                icon: Icons.delete_forever_rounded,
-                filled: false,
-                onPressed: () => _showDeleteDialog(context),
-              ),
-            ],
+        Card(
+          elevation: 0,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(12),
+            side: BorderSide(
+              color: Theme.of(context).colorScheme.error,
+              width: 1,
+            ),
+          ),
+          child: Padding(
+            padding: const EdgeInsets.all(16),
+            child: Column(
+              children: <Widget>[
+                CustomButton(
+                  label: 'Logout',
+                  icon: Icons.logout_rounded,
+                  filled: false,
+                  onPressed: () {
+                    ref.read(authNotifierProvider.notifier).logout();
+                  },
+                ),
+                const SizedBox(height: 12),
+                CustomButton(
+                  label: 'Delete Account',
+                  icon: Icons.delete_forever_rounded,
+                  filled: false,
+                  onPressed: () => _showDeleteDialog(context),
+                ),
+              ],
+            ),
           ),
         ),
       ],

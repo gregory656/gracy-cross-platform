@@ -8,10 +8,10 @@ import '../../../core/constants/app_constants.dart';
 import '../../../core/router/app_router.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../shared/providers/auth_provider.dart';
-import '../../../shared/models/user_model.dart';
-import '../../../shared/providers/mock_providers.dart';
 import '../../../shared/providers/profiles_provider.dart';
 import '../../../shared/services/presence_service.dart';
+import '../../../shared/models/user_model.dart';
+import '../../../shared/mock_data/mock_users.dart';
 import '../../../shared/widgets/custom_text_field.dart';
 import '../../../shared/widgets/profile_card.dart';
 import '../widgets/home_header.dart';
@@ -34,14 +34,27 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
       final AuthState authState = ref.read(authNotifierProvider);
       final String? userId = authState.userId;
       if (userId != null) {
-        unawaited(PresenceService.instance.markOnline(userId));
+        PresenceService.instance.markOnline(userId);
+        // Trigger contact sync
+        _triggerContactSync();
       }
     });
   }
 
+  Future<void> _triggerContactSync() async {
+    try {
+      // TODO: Re-enable when contact service is fixed
+      // final contactService = ref.read(contactServiceProvider);
+      // await contactService.showContactSyncDialog(context);
+    } catch (e) {
+      // Silently fail for contact sync
+      // print('Contact sync failed: $e');
+    }
+  }
+
   @override
   void dispose() {
-    unawaited(PresenceService.instance.markOffline());
+    PresenceService.instance.markOffline();
     _searchController.dispose();
     super.dispose();
   }
@@ -51,72 +64,40 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     final AsyncValue<List<UserModel>> profilesAsync = ref.watch(
       profilesDirectoryProvider,
     );
-    final List<UserModel> fallbackUsers = ref.watch(mockUsersProvider);
+    final List<UserModel> fallbackUsers = mockUsers;
     final UserModel headerUser =
         ref.watch(currentUserProvider) ?? fallbackUsers.first;
     final String query = _query.toLowerCase().trim();
 
     return Scaffold(
-      body: DecoratedBox(
-        decoration: const BoxDecoration(
-          gradient: LinearGradient(
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
-            colors: <Color>[
-              AppColors.background,
-              AppColors.backgroundAlt,
-              Color(0xFF091725),
+      body: SafeArea(
+        child: profilesAsync.when(
+          loading: () => ListView(
+            padding: AppConstants.screenPadding,
+            children: <Widget>[
+              HomeHeader(user: headerUser),
+              const SizedBox(height: 18),
+              CustomTextField(
+                controller: _searchController,
+                hintText: 'Scan QR or enter join code',
+                prefixIcon: Icons.qr_code_scanner_rounded,
+                height: 48,
+                onChanged: (String value) {
+                  setState(() {
+                    _query = value;
+                  });
+                },
+              ),
+              const SizedBox(height: 16),
+              _QuickStats(fallbackUsers.length),
+              const SizedBox(height: 16),
+              const Center(child: CircularProgressIndicator()),
             ],
           ),
-        ),
-        child: Stack(
-          children: <Widget>[
-            Positioned(
-              top: -60,
-              right: -30,
-              child: _GlowBlob(
-                color: AppColors.accentBlue.withValues(alpha: 0.20),
-              ),
-            ),
-            Positioned(
-              top: 90,
-              left: -20,
-              child: _GlowBlob(
-                color: AppColors.accentCyan.withValues(alpha: 0.16),
-                size: 150,
-              ),
-            ),
-            SafeArea(
-              child: profilesAsync.when(
-                loading: () => ListView(
-                  padding: AppConstants.screenPadding,
-                  children: <Widget>[
-                    HomeHeader(user: headerUser),
-                    const SizedBox(height: 18),
-                    CustomTextField(
-                      controller: _searchController,
-                      hintText: 'Scan QR or enter join code',
-                      prefixIcon: Icons.qr_code_scanner_rounded,
-                      height: 48,
-                      onChanged: (String value) {
-                        setState(() {
-                          _query = value;
-                        });
-                      },
-                    ),
-                    const SizedBox(height: 16),
-                    _QuickStats(fallbackUsers.length),
-                    const SizedBox(height: 16),
-                    const Center(child: CircularProgressIndicator()),
-                  ],
-                ),
-                error: (Object error, StackTrace stackTrace) =>
-                    _buildDirectory(context, fallbackUsers, headerUser, query),
-                data: (List<UserModel> users) =>
-                    _buildDirectory(context, users, headerUser, query),
-              ),
-            ),
-          ],
+          error: (Object error, StackTrace stackTrace) =>
+              _buildDirectory(context, fallbackUsers, headerUser, query),
+          data: (List<UserModel> users) =>
+              _buildDirectory(context, users, headerUser, query),
         ),
       ),
     );
@@ -257,9 +238,12 @@ class _StatCard extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(24),
-        color: AppColors.surface.withValues(alpha: 0.88),
-        border: Border.all(color: AppColors.outline),
+        borderRadius: BorderRadius.circular(12),
+        color: Theme.of(context).colorScheme.surface,
+        border: Border.all(
+          color: Theme.of(context).dividerTheme.color ?? Colors.grey,
+          width: 1,
+        ),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -281,32 +265,10 @@ class _StatCard extends StatelessWidget {
           Container(
             height: 3,
             decoration: BoxDecoration(
-              color: accent.withValues(alpha: 0.85),
+              color: accent,
               borderRadius: BorderRadius.circular(99),
             ),
           ),
-        ],
-      ),
-    );
-  }
-}
-
-class _GlowBlob extends StatelessWidget {
-  const _GlowBlob({required this.color, this.size = 180});
-
-  final Color color;
-  final double size;
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      width: size,
-      height: size,
-      decoration: BoxDecoration(
-        shape: BoxShape.circle,
-        color: color,
-        boxShadow: <BoxShadow>[
-          BoxShadow(color: color, blurRadius: 36, spreadRadius: 6),
         ],
       ),
     );

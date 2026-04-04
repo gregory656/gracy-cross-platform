@@ -7,10 +7,20 @@ final themeProvider = NotifierProvider<ThemeNotifier, String>(
   ThemeNotifier.new,
 );
 
+final isDarkModeProvider = Provider<bool>((ref) {
+  final theme = ref.watch(themeProvider);
+  return theme.toLowerCase() != 'light';
+});
+
+final ghostModeProvider = Provider<bool>((ref) {
+  final user = ref.watch(currentUserProvider);
+  return user?.isGhostMode ?? false;
+});
+
 class ThemeNotifier extends Notifier<String> {
   @override
   String build() {
-    return ref.watch(currentUserProvider)?.selectedTheme ?? 'midnight';
+    return ref.watch(currentUserProvider)?.selectedTheme ?? 'dark';
   }
 
   Future<void> setTheme(String themeName) async {
@@ -29,6 +39,12 @@ class ThemeNotifier extends Notifier<String> {
     }
   }
 
+  Future<void> toggleDarkLightMode() async {
+    final currentTheme = state;
+    final newTheme = currentTheme.toLowerCase() == 'light' ? 'dark' : 'light';
+    await setTheme(newTheme);
+  }
+
   Future<void> updateNotifications(bool enabled) async {
     final userId = ref.read(currentUserProvider)?.id;
     if (userId == null) return;
@@ -38,6 +54,21 @@ class ThemeNotifier extends Notifier<String> {
           .from('profiles')
           .update({'notifications_enabled': enabled})
           .eq('id', userId);
+    } catch (_) {}
+  }
+
+  Future<void> updateGhostMode(bool enabled) async {
+    final userId = ref.read(currentUserProvider)?.id;
+    if (userId == null) return;
+
+    try {
+      await Supabase.instance.client
+          .from('profiles')
+          .update({'is_ghost_mode': enabled})
+          .eq('id', userId);
+      
+      // Refresh the user data
+      ref.invalidate(currentUserProvider);
     } catch (_) {}
   }
 }

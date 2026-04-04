@@ -15,7 +15,7 @@ import '../../../shared/providers/profiles_provider.dart';
 import '../../../shared/widgets/chat_tile.dart';
 import '../../../shared/widgets/custom_button.dart';
 import '../../../shared/widgets/custom_text_field.dart';
-import '../../../shared/widgets/glass_card.dart';
+import '../../../shared/widgets/disappearing_messages_dialog.dart';
 import '../../../shared/widgets/message_bubble.dart';
 import '../../../shared/widgets/user_avatar.dart';
 import '../data/chat_repository.dart';
@@ -338,15 +338,14 @@ class _ChatShell extends ConsumerWidget {
               ),
             ),
             const SizedBox(height: 22),
-            GlassCard(
-              borderRadius: 28,
-              gradient: LinearGradient(
-                begin: Alignment.topLeft,
-                end: Alignment.bottomRight,
-                colors: <Color>[
-                  const Color(0xFF112342).withValues(alpha: 0.94),
-                  const Color(0xFF0C172A).withValues(alpha: 0.92),
-                ],
+            Card(
+              elevation: 0,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(28),
+                side: BorderSide(
+                  color: Theme.of(context).dividerTheme.color ?? Colors.grey,
+                  width: 1,
+                ),
               ),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -579,173 +578,149 @@ class _ThreadHeader extends StatelessWidget {
   Widget build(BuildContext context) {
     final bool isOfficial = participant.id == ChatRepository.botUserId;
 
-    return GlassCard(
-      borderRadius: 30,
-      gradient: LinearGradient(
-        begin: Alignment.topLeft,
-        end: Alignment.bottomRight,
-        colors: <Color>[
-          const Color(0xFF10213B).withValues(alpha: 0.95),
-          const Color(0xFF0B1425).withValues(alpha: 0.92),
-        ],
+    return Card(
+      elevation: 0,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(12),
+        side: BorderSide(
+          color: Theme.of(context).dividerTheme.color ?? Colors.grey,
+          width: 1,
+        ),
       ),
-      child: Row(
-        children: <Widget>[
-          if (onBack != null) ...<Widget>[
-            IconButton(
-              onPressed: onBack,
-              icon: const Icon(Icons.arrow_back_rounded),
-            ),
-            const SizedBox(width: 6),
-          ],
-          UserAvatar(user: participant, size: 58, fontSize: 18),
-          const SizedBox(width: 14),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: <Widget>[
-                Row(
-                  children: <Widget>[
-                    Flexible(
-                      child: Text(
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+        child: Row(
+          children: <Widget>[
+            if (onBack != null) ...<Widget>[
+              IconButton(
+                onPressed: onBack,
+                icon: const Icon(Icons.arrow_back_rounded),
+              ),
+              const SizedBox(width: 6),
+            ],
+            UserAvatar(user: participant, size: 40, fontSize: 14),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: <Widget>[
+                  Row(
+                    children: [
+                      Text(
                         participant.fullName,
-                        overflow: TextOverflow.ellipsis,
-                        style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                          fontWeight: FontWeight.w900,
+                        style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                          fontWeight: FontWeight.w700,
                         ),
                       ),
-                    ),
-                    if (isOfficial) ...<Widget>[
-                      const SizedBox(width: 10),
-                      Container(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 10,
-                          vertical: 6,
-                        ),
-                        decoration: BoxDecoration(
-                          color: AppColors.accentAmber.withValues(alpha: 0.16),
-                          borderRadius: BorderRadius.circular(999),
-                          border: Border.all(
-                            color: AppColors.accentAmber.withValues(
-                              alpha: 0.48,
+                      if (isOfficial) ...<Widget>[
+                        const SizedBox(width: 8),
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 8,
+                            vertical: 4,
+                          ),
+                          decoration: BoxDecoration(
+                            color: Theme.of(context).colorScheme.primary,
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          child: Text(
+                            'Official',
+                            style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                              color: Colors.white,
+                              fontWeight: FontWeight.bold,
                             ),
                           ),
                         ),
-                        child: Text(
-                          'Verified',
-                          style: Theme.of(context).textTheme.labelMedium
-                              ?.copyWith(
-                                color: AppColors.accentAmber,
-                                fontWeight: FontWeight.w800,
-                              ),
-                        ),
-                      ),
+                      ],
                     ],
-                  ],
-                ),
-                const SizedBox(height: 6),
-                Text(
-                  participant.gracyId == null
-                      ? participant.username
-                      : '${participant.gracyId}  |  ${participant.username}',
-                  style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                    color: AppColors.textSecondary,
                   ),
-                ),
-              ],
-            ),
-          ),
-          const SizedBox(width: 12),
-          IconButton(
-            onPressed: onViewProfile,
-            icon: const Icon(Icons.person_outline_rounded),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _TypingIndicator extends StatefulWidget {
-  const _TypingIndicator({required this.name});
-
-  final String name;
-
-  @override
-  State<_TypingIndicator> createState() => _TypingIndicatorState();
-}
-
-class _TypingIndicatorState extends State<_TypingIndicator>
-    with SingleTickerProviderStateMixin {
-  late final AnimationController _controller = AnimationController(
-    vsync: this,
-    duration: const Duration(milliseconds: 900),
-  )..repeat();
-
-  @override
-  void dispose() {
-    _controller.dispose();
-    super.dispose();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return Align(
-      alignment: Alignment.centerLeft,
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-        decoration: BoxDecoration(
-          color: AppColors.surfaceElevated.withValues(alpha: 0.92),
-          borderRadius: BorderRadius.circular(24),
-          border: Border.all(color: AppColors.outline),
-          boxShadow: <BoxShadow>[
-            BoxShadow(
-              color: Colors.black.withValues(alpha: 0.12),
-              blurRadius: 20,
-              offset: const Offset(0, 12),
-            ),
-          ],
-        ),
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: <Widget>[
-            Text(
-              '${widget.name} is typing',
-              style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                color: AppColors.textSecondary,
-                fontWeight: FontWeight.w600,
+                  const SizedBox(height: 2),
+                  Text(
+                    isOfficial ? 'Gracy Assistant' : 'Tap to view profile',
+                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                      color: AppColors.textSecondary,
+                    ),
+                  ),
+                ],
               ),
             ),
-            const SizedBox(width: 12),
-            AnimatedBuilder(
-              animation: _controller,
-              builder: (BuildContext context, Widget? child) {
-                return Row(
-                  children: List<Widget>.generate(3, (int index) {
-                    final double phase = (_controller.value - (index * 0.18))
-                        .clamp(0.0, 1.0);
-                    final double opacity =
-                        0.25 + ((1 - (phase - 0.5).abs() * 2) * 0.75);
-                    return Padding(
-                      padding: EdgeInsets.only(right: index == 2 ? 0 : 6),
-                      child: Container(
-                        width: 8,
-                        height: 8,
-                        decoration: BoxDecoration(
-                          color: AppColors.accentCyan.withValues(
-                            alpha: opacity,
-                          ),
-                          shape: BoxShape.circle,
-                        ),
-                      ),
+            const SizedBox(width: 8),
+            Consumer(
+              builder: (context, ref, child) {
+                return IconButton(
+                  onPressed: () {
+                    showDialog<void>(
+                      context: context,
+                      builder: (context) => const DisappearingMessagesDialog(),
                     );
-                  }),
+                  },
+                  icon: const Icon(Icons.timer_rounded),
+                  tooltip: 'Disappearing Messages',
                 );
               },
             ),
           ],
         ),
       ),
+    );
+  }
+}
+
+class _TypingIndicator extends StatelessWidget {
+  const _TypingIndicator({required this.name});
+
+  final String name;
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      children: <Widget>[
+        UserAvatar(
+          user: const UserModel(
+            id: 'bot',
+            fullName: 'Gracy Bot',
+            username: 'bot',
+            age: 25,
+            role: UserRole.staff,
+            courses: [],
+            bio: 'AI Assistant',
+            isOnline: true,
+            location: 'Virtual',
+            avatarSeed: 'bot',
+            year: '2024',
+          ),
+          size: 32,
+          fontSize: 12,
+        ),
+        const SizedBox(width: 12),
+        Container(
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+          decoration: BoxDecoration(
+            color: Theme.of(context).colorScheme.surface,
+            borderRadius: BorderRadius.circular(20),
+            border: Border.all(
+              color: Theme.of(context).dividerTheme.color ?? Colors.grey,
+            ),
+          ),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: <Widget>[
+              Text(
+                '$name is typing',
+                style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                  color: AppColors.textSecondary,
+                ),
+              ),
+              const SizedBox(width: 8),
+              const SizedBox(
+                width: 16,
+                height: 16,
+                child: CircularProgressIndicator(strokeWidth: 2),
+              ),
+            ],
+          ),
+        ),
+      ],
     );
   }
 }
@@ -758,28 +733,32 @@ class _CenteredMessage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 32),
-      child: GlassCard(
-        borderRadius: 28,
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(32),
         child: Column(
-          mainAxisSize: MainAxisSize.min,
+          mainAxisAlignment: MainAxisAlignment.center,
           children: <Widget>[
+            Icon(
+              Icons.chat_bubble_outline_rounded,
+              size: 64,
+              color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.3),
+            ),
+            const SizedBox(height: 16),
             Text(
               title,
+              style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                fontWeight: FontWeight.w700,
+              ),
               textAlign: TextAlign.center,
-              style: Theme.of(
-                context,
-              ).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w800),
             ),
-            const SizedBox(height: 10),
+            const SizedBox(height: 8),
             Text(
               subtitle,
-              textAlign: TextAlign.center,
               style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                 color: AppColors.textSecondary,
-                height: 1.45,
               ),
+              textAlign: TextAlign.center,
             ),
           ],
         ),

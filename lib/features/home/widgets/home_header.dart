@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../shared/models/user_model.dart';
 import '../../../shared/widgets/user_avatar.dart';
+import '../../../shared/widgets/theme_toggle.dart';
 import 'notification_bell.dart';
 
 class HomeHeader extends StatelessWidget {
@@ -19,13 +20,19 @@ class HomeHeader extends StatelessWidget {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: <Widget>[
-              Text(
-                'GRACY',
-                style: Theme.of(context).textTheme.headlineLarge?.copyWith(
-                  fontSize: 34,
-                  fontWeight: FontWeight.w900,
-                  letterSpacing: 2.0,
-                ),
+              Row(
+                children: [
+                  Text(
+                    'GRACY',
+                    style: Theme.of(context).textTheme.headlineLarge?.copyWith(
+                      fontSize: 34,
+                      fontWeight: FontWeight.w900,
+                      letterSpacing: 2.0,
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  const ThemeToggle(),
+                ],
               ),
               const SizedBox(height: 8),
               Text(
@@ -41,7 +48,7 @@ class HomeHeader extends StatelessWidget {
         const SizedBox(width: 16),
         Column(
           crossAxisAlignment: CrossAxisAlignment.end,
-          children: <Widget>[
+          children: [
             Row(
               children: [
                 const NotificationBell(),

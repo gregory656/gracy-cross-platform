@@ -107,7 +107,7 @@ class _NotificationTile extends ConsumerWidget {
           height: 60,
           child: Center(child: CircularProgressIndicator()),
         ),
-        error: (_, __) => const Text('Error loading sender info'),
+        error: (_, error) => const Text('Error loading sender info'),
         data: (sender) {
           if (sender == null) return const SizedBox.shrink();
 
