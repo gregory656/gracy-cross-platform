@@ -24,7 +24,7 @@ class ThemeToggle extends ConsumerWidget {
         child: Icon(
           isDarkMode ? Icons.dark_mode : Icons.light_mode,
           size: 20,
-          color: Theme.of(context).iconTheme.color,
+          color: Theme.of(context).colorScheme.onSurface,
         ),
       ),
     );

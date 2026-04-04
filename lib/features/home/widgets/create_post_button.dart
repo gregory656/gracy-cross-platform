@@ -2,6 +2,8 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../providers/post_providers.dart';
+import '../../../shared/widgets/upload_progress_overlay.dart';
+import '../../../shared/services/optimized_post_service.dart';
 
 class CreatePostButton extends ConsumerStatefulWidget {
   const CreatePostButton({super.key});
@@ -23,7 +25,7 @@ class _CreatePostButtonState extends ConsumerState<CreatePostButton> {
 
   Future<void> _pickImage() async {
     try {
-      final postService = ref.read(postServiceProvider);
+      final postService = ref.read(optimizedPostServiceProvider);
       final image = await postService.pickImage();
       
       if (image != null) {
@@ -58,6 +60,9 @@ class _CreatePostButtonState extends ConsumerState<CreatePostButton> {
       _isUploading = true;
     });
 
+    // Close the dialog first
+    Navigator.of(context).pop();
+
     try {
       await ref.read(postsProvider.notifier).createPost(
         content: _contentController.text.trim(),
@@ -65,7 +70,6 @@ class _CreatePostButtonState extends ConsumerState<CreatePostButton> {
       );
 
       if (mounted) {
-        Navigator.of(context).pop();
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
             content: Text('Post created successfully!'),
@@ -75,9 +79,19 @@ class _CreatePostButtonState extends ConsumerState<CreatePostButton> {
       }
     } catch (e) {
       if (mounted) {
+        String errorMessage = 'Failed to create post';
+        
+        if (e.toString().contains('timeout')) {
+          errorMessage = 'Upload timed out. Check your connection.';
+        } else if (e.toString().contains('compression')) {
+          errorMessage = 'Image compression failed. Try a different image.';
+        } else if (e.toString().contains('upload')) {
+          errorMessage = 'Upload failed. Please try again.';
+        }
+        
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Failed to create post: $e'),
+            content: Text(errorMessage),
             backgroundColor: Colors.red,
           ),
         );
@@ -86,6 +100,8 @@ class _CreatePostButtonState extends ConsumerState<CreatePostButton> {
       if (mounted) {
         setState(() {
           _isUploading = false;
+          _selectedImage = null;
+          _contentController.clear();
         });
       }
     }
@@ -303,12 +319,54 @@ class _CreatePostButtonState extends ConsumerState<CreatePostButton> {
 
   @override
   Widget build(BuildContext context) {
-    return FloatingActionButton(
-      onPressed: _showCreatePostDialog,
-      backgroundColor: const Color(0xFF00D4FF),
-      foregroundColor: Colors.black,
-      elevation: 4,
-      child: const Icon(Icons.add, size: 28),
+    // Watch upload progress from the posts notifier
+    final postsAsync = ref.watch(postsProvider);
+    final isUploading = postsAsync is AsyncLoading || 
+        (postsAsync.hasValue && ref.read(postsProvider.notifier).progress > 0);
+    
+    double uploadProgress = 0.0;
+    String uploadStatus = '';
+    
+    if (postsAsync.hasValue) {
+      uploadProgress = ref.read(postsProvider.notifier).progress;
+      uploadStatus = ref.read(postsProvider.notifier).status;
+    }
+
+    return Stack(
+      children: [
+        Padding(
+          padding: const EdgeInsets.only(bottom: 16.0),
+          child: Container(
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(16),
+              boxShadow: [
+                BoxShadow(
+                  color: const Color(0xFF00D4FF).withValues(alpha: 0.3),
+                  blurRadius: 12,
+                  spreadRadius: 2,
+                  offset: const Offset(0, 4),
+                ),
+              ],
+            ),
+            child: FloatingActionButton(
+              onPressed: isUploading ? null : _showCreatePostDialog,
+              backgroundColor: const Color(0xFF00D4FF),
+              foregroundColor: Colors.black,
+              elevation: 0,
+              child: const Icon(Icons.add, size: 28),
+            ),
+          ),
+        ),
+        
+        // Upload progress overlay
+        if (isUploading && uploadProgress > 0)
+          Positioned.fill(
+            child: UploadProgressOverlay(
+              progress: uploadProgress,
+              status: uploadStatus,
+            ),
+          ),
+      ],
     );
   }
 }

@@ -28,6 +28,7 @@ class HomeHeader extends StatelessWidget {
                       fontSize: 34,
                       fontWeight: FontWeight.w900,
                       letterSpacing: 2.0,
+                      color: Theme.of(context).colorScheme.onSurface,
                     ),
                   ),
                   const SizedBox(width: 12),

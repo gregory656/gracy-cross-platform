@@ -91,10 +91,10 @@ class _PostCardState extends ConsumerState<PostCard> {
     return Container(
       margin: const EdgeInsets.only(bottom: 16),
       decoration: BoxDecoration(
-        color: const Color(0xFF1A1A1A),
+        color: theme.colorScheme.surface,
         borderRadius: BorderRadius.circular(12),
         border: Border.all(
-          color: const Color(0xFF333333),
+          color: theme.dividerTheme.color ?? const Color(0xFF333333),
           width: 1,
         ),
       ),
@@ -111,28 +111,28 @@ class _PostCardState extends ConsumerState<PostCard> {
                   width: 40,
                   height: 40,
                   decoration: BoxDecoration(
-                    color: Colors.grey[700],
+                    color: theme.colorScheme.surfaceContainerHighest,
                     borderRadius: BorderRadius.circular(20),
                   ),
-                  child: widget.post.authorAvatar != null
+                  child: widget.post.authorAvatar != null && widget.post.authorAvatar!.isNotEmpty
                       ? ClipRRect(
                           borderRadius: BorderRadius.circular(20),
                           child: CachedNetworkImage(
                             imageUrl: widget.post.authorAvatar!,
                             fit: BoxFit.cover,
-                            placeholder: (context, url) => const Icon(
+                            placeholder: (context, url) => Icon(
                               Icons.person,
-                              color: Colors.grey,
+                              color: theme.colorScheme.onSurfaceVariant,
                             ),
-                            errorWidget: (context, url, error) => const Icon(
+                            errorWidget: (context, url, error) => Icon(
                               Icons.person,
-                              color: Colors.grey,
+                              color: theme.colorScheme.onSurfaceVariant,
                             ),
                           ),
                         )
-                      : const Icon(
+                      : Icon(
                           Icons.person,
-                          color: Colors.grey,
+                          color: theme.colorScheme.onSurfaceVariant,
                         ),
                 ),
                 const SizedBox(width: 12),
@@ -145,14 +145,14 @@ class _PostCardState extends ConsumerState<PostCard> {
                         widget.post.authorName ?? 'Unknown User',
                         style: theme.textTheme.titleMedium?.copyWith(
                           fontWeight: FontWeight.w600,
-                          color: Colors.white,
+                          color: theme.colorScheme.onSurface,
                         ),
                       ),
                       const SizedBox(height: 2),
                       Text(
                         _formatTimestamp(widget.post.createdAt),
                         style: theme.textTheme.bodySmall?.copyWith(
-                          color: Colors.grey[400],
+                          color: theme.colorScheme.onSurfaceVariant,
                         ),
                       ),
                     ],
@@ -169,14 +169,14 @@ class _PostCardState extends ConsumerState<PostCard> {
               child: Text(
                 widget.post.content,
                 style: theme.textTheme.bodyMedium?.copyWith(
-                  color: Colors.white,
+                  color: theme.colorScheme.onSurface,
                   height: 1.4,
                 ),
               ),
             ),
           
           // Image
-          if (widget.post.imageUrl != null)
+          if (widget.post.imageUrl != null && widget.post.imageUrl!.isNotEmpty)
             Padding(
               padding: const EdgeInsets.only(top: 12),
               child: ClipRRect(
@@ -190,21 +190,33 @@ class _PostCardState extends ConsumerState<PostCard> {
                   height: 300,
                   placeholder: (context, url) => Container(
                     height: 300,
-                    color: Colors.grey[800],
-                    child: const Center(
+                    color: theme.colorScheme.surfaceContainerHighest,
+                    child: Center(
                       child: CircularProgressIndicator(
-                        valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                        valueColor: AlwaysStoppedAnimation<Color>(theme.colorScheme.primary),
                       ),
                     ),
                   ),
                   errorWidget: (context, url, error) => Container(
                     height: 300,
-                    color: Colors.grey[800],
-                    child: const Center(
-                      child: Icon(
-                        Icons.broken_image,
-                        color: Colors.grey,
-                        size: 48,
+                    color: theme.colorScheme.surfaceContainerHighest,
+                    child: Center(
+                      child: Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Icon(
+                            Icons.broken_image,
+                            color: theme.colorScheme.onSurfaceVariant,
+                            size: 48,
+                          ),
+                          const SizedBox(height: 8),
+                          Text(
+                            'Image unavailable',
+                            style: theme.textTheme.bodyMedium?.copyWith(
+                              color: theme.colorScheme.onSurfaceVariant,
+                            ),
+                          ),
+                        ],
                       ),
                     ),
                   ),
@@ -237,7 +249,7 @@ class _PostCardState extends ConsumerState<PostCard> {
                   isActive: false,
                   isLoading: false,
                   onPressed: _showComments,
-                  activeColor: Colors.blue,
+                  activeColor: theme.colorScheme.primary,
                 ),
                 const SizedBox(width: 24),
                 
@@ -248,7 +260,7 @@ class _PostCardState extends ConsumerState<PostCard> {
                   isActive: false,
                   isLoading: false,
                   onPressed: _sharePost,
-                  activeColor: Colors.green,
+                  activeColor: theme.colorScheme.primary,
                 ),
               ],
             ),

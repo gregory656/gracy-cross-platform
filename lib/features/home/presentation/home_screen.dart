@@ -89,8 +89,9 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     final postsAsync = ref.watch(postsProvider);
 
     return Scaffold(
-      backgroundColor: Colors.black,
+      backgroundColor: Theme.of(context).colorScheme.surface,
       floatingActionButton: _showPosts ? const CreatePostButton() : null,
+      floatingActionButtonLocation: FloatingActionButtonLocation.centerFloat,
       body: SafeArea(
         child: _showPosts
             ? _buildPostsView(postsAsync, headerUser)
@@ -237,9 +238,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
               child: Padding(
                 padding: EdgeInsets.all(32),
                 child: Center(
-                  child: CircularProgressIndicator(
-                    valueColor: AlwaysStoppedAnimation<Color>(Color(0xFF00D4FF)),
-                  ),
+                  child: CircularProgressIndicator(),
                 ),
               ),
             ),
@@ -249,23 +248,23 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                 child: Center(
                   child: Column(
                     children: [
-                      const Icon(
+                      Icon(
                         Icons.error_outline,
-                        color: Colors.red,
+                        color: Theme.of(context).colorScheme.error,
                         size: 48,
                       ),
                       const SizedBox(height: 16),
                       Text(
                         'Failed to load posts',
                         style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                          color: Colors.white,
+                          color: Theme.of(context).colorScheme.onSurface,
                         ),
                       ),
                       const SizedBox(height: 8),
                       Text(
                         error.toString(),
                         style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                          color: Colors.grey[400],
+                          color: Theme.of(context).colorScheme.onSurfaceVariant,
                         ),
                         textAlign: TextAlign.center,
                       ),
@@ -275,8 +274,8 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                           ref.read(postsProvider.notifier).refresh();
                         },
                         style: ElevatedButton.styleFrom(
-                          backgroundColor: const Color(0xFF00D4FF),
-                          foregroundColor: Colors.black,
+                          backgroundColor: Theme.of(context).colorScheme.primary,
+                          foregroundColor: Theme.of(context).colorScheme.onPrimary,
                         ),
                         child: const Text('Retry'),
                       ),
@@ -295,14 +294,14 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                         children: [
                           Icon(
                             Icons.feed_outlined,
-                            color: Colors.grey[400],
+                            color: Theme.of(context).colorScheme.onSurfaceVariant,
                             size: 64,
                           ),
                           const SizedBox(height: 16),
                           Text(
                             'No posts yet',
                             style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                              color: Colors.white,
+                              color: Theme.of(context).colorScheme.onSurface,
                               fontWeight: FontWeight.w600,
                             ),
                           ),
@@ -310,7 +309,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                           Text(
                             'Be the first to create a post!',
                             style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                              color: Colors.grey[400],
+                              color: Theme.of(context).colorScheme.onSurfaceVariant,
                             ),
                           ),
                         ],
@@ -327,9 +326,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                       return const Padding(
                         padding: EdgeInsets.all(32),
                         child: Center(
-                          child: CircularProgressIndicator(
-                            valueColor: AlwaysStoppedAnimation<Color>(Color(0xFF00D4FF)),
-                          ),
+                          child: CircularProgressIndicator(),
                         ),
                       );
                     }
@@ -357,13 +354,15 @@ class _ViewToggle extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    
     return Container(
       height: 48,
       decoration: BoxDecoration(
-        color: const Color(0xFF1A1A1A),
+        color: theme.colorScheme.surfaceContainerHighest,
         borderRadius: BorderRadius.circular(24),
         border: Border.all(
-          color: const Color(0xFF333333),
+          color: theme.dividerTheme.color ?? Colors.grey,
           width: 1,
         ),
       ),
@@ -375,14 +374,14 @@ class _ViewToggle extends StatelessWidget {
               child: Container(
                 height: double.infinity,
                 decoration: BoxDecoration(
-                  color: showPosts ? const Color(0xFF00D4FF) : Colors.transparent,
+                  color: showPosts ? theme.colorScheme.primary : Colors.transparent,
                   borderRadius: BorderRadius.circular(23),
                 ),
                 child: Center(
                   child: Text(
                     'Posts',
                     style: TextStyle(
-                      color: showPosts ? Colors.black : Colors.grey[400],
+                      color: showPosts ? theme.colorScheme.onPrimary : theme.colorScheme.onSurfaceVariant,
                       fontWeight: FontWeight.w600,
                       fontSize: 16,
                     ),
@@ -397,14 +396,14 @@ class _ViewToggle extends StatelessWidget {
               child: Container(
                 height: double.infinity,
                 decoration: BoxDecoration(
-                  color: !showPosts ? const Color(0xFF00D4FF) : Colors.transparent,
+                  color: !showPosts ? theme.colorScheme.primary : Colors.transparent,
                   borderRadius: BorderRadius.circular(23),
                 ),
                 child: Center(
                   child: Text(
                     'Profiles',
                     style: TextStyle(
-                      color: !showPosts ? Colors.black : Colors.grey[400],
+                      color: !showPosts ? theme.colorScheme.onPrimary : theme.colorScheme.onSurfaceVariant,
                       fontWeight: FontWeight.w600,
                       fontSize: 16,
                     ),

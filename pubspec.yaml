@@ -27,6 +27,7 @@ dependencies:
   cached_network_image: ^3.4.1
   equatable: ^2.0.5
   meta: ^1.15.0
+  flutter_image_compress: ^2.3.0
 
 dev_dependencies:
   flutter_test:

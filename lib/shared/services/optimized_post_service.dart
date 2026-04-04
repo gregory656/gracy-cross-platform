@@ -1,20 +1,135 @@
 import 'dart:io';
+import 'dart:isolate';
+import 'dart:typed_data';
+import 'package:flutter_image_compress/flutter_image_compress.dart';
 import 'package:cloudinary_public/cloudinary_public.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../models/post_model.dart';
 import '../../core/secrets.dart';
 
-class PostService {
-  static final PostService _instance = PostService._internal();
-  factory PostService() => _instance;
-  PostService._internal();
+// Isolate data structure for background upload
+class UploadIsolateData {
+  final String imagePath;
+  final String cloudName;
+  final String unsignedPreset;
+  final String userId;
+  final String content;
 
-  final _cloudinary = CloudinaryPublic(
-    CloudinaryConfig.cloudName,
-    CloudinaryConfig.unsignedPreset,
-    cache: false,
-  );
+  UploadIsolateData({
+    required this.imagePath,
+    required this.cloudName,
+    required this.unsignedPreset,
+    required this.userId,
+    required this.content,
+  });
+
+  Map<String, dynamic> toMap() {
+    return {
+      'imagePath': imagePath,
+      'cloudName': cloudName,
+      'unsignedPreset': unsignedPreset,
+      'userId': userId,
+      'content': content,
+    };
+  }
+
+  static UploadIsolateData fromMap(Map<String, dynamic> map) {
+    return UploadIsolateData(
+      imagePath: map['imagePath'],
+      cloudName: map['cloudName'],
+      unsignedPreset: map['unsignedPreset'],
+      userId: map['userId'],
+      content: map['content'],
+    );
+  }
+}
+
+// Background upload result
+class UploadResult {
+  final bool success;
+  final String? imageUrl;
+  final String? error;
+
+  UploadResult({required this.success, this.imageUrl, this.error});
+
+  Map<String, dynamic> toMap() {
+    return {
+      'success': success,
+      'imageUrl': imageUrl,
+      'error': error,
+    };
+  }
+
+  static UploadResult fromMap(Map<String, dynamic> map) {
+    return UploadResult(
+      success: map['success'],
+      imageUrl: map['imageUrl'],
+      error: map['error'],
+    );
+  }
+}
+
+// Background isolate entry point
+void _uploadIsolateEntryPoint(SendPort sendPort) async {
+  final receivePort = ReceivePort();
+  sendPort.send(receivePort.sendPort);
+
+  await for (final message in receivePort) {
+    if (message is UploadIsolateData) {
+      try {
+        // Compress image in background
+        final compressedFile = await _compressImageInBackground(message.imagePath);
+        
+        if (compressedFile == null) {
+          sendPort.send(UploadResult(success: false, error: 'Image compression failed'));
+          continue;
+        }
+
+        // Upload to Cloudinary in background
+        final cloudinary = CloudinaryPublic(message.cloudName, message.unsignedPreset);
+        final response = await cloudinary.uploadFile(
+          CloudinaryFile.fromFile(
+            compressedFile.path,
+            resourceType: CloudinaryResourceType.Image,
+            folder: 'gracy_posts',
+          ),
+        ).timeout(const Duration(seconds: 30));
+
+        final imageUrl = response.secureUrl ?? '';
+        
+        // Clean up compressed file
+        await compressedFile.delete();
+
+        sendPort.send(UploadResult(success: true, imageUrl: imageUrl));
+      } catch (e) {
+        sendPort.send(UploadResult(success: false, error: e.toString()));
+      }
+    }
+  }
+}
+
+// Image compression in background
+Future<File?> _compressImageInBackground(String imagePath) async {
+  try {
+    final file = File(imagePath);
+    final result = await FlutterImageCompress.compressAndGetFile(
+      imagePath,
+      '${file.parent.path}/temp_compressed_${DateTime.now().millisecondsSinceEpoch}.jpg',
+      quality: 80,
+      minWidth: 1024,
+      minHeight: 1024,
+    );
+    return result != null ? File(result.path) : null;
+  } catch (e) {
+    return null;
+  }
+}
+
+class OptimizedPostService {
+  static final OptimizedPostService _instance = OptimizedPostService._internal();
+  factory OptimizedPostService() => _instance;
+  OptimizedPostService._internal();
 
   final _supabase = Supabase.instance.client;
   final _imagePicker = ImagePicker();
@@ -33,7 +148,8 @@ class PostService {
               avatar_url
             ),
             post_likes!left (
-              id
+              id,
+              user_id
             )
           ''')
           .order('created_at', ascending: false)
@@ -68,6 +184,7 @@ class PostService {
   Future<PostModel> createPost({
     required String content,
     File? imageFile,
+    Function(double)? onProgress,
   }) async {
     try {
       final userId = _supabase.auth.currentUser?.id;
@@ -76,8 +193,27 @@ class PostService {
       String? imageUrl;
       
       if (imageFile != null) {
-        imageUrl = await _uploadImageToCloudinary(imageFile);
+        onProgress?.call(0.1); // Starting compression
+        
+        // Compress image first
+        final compressedFile = await _compressImage(imageFile);
+        
+        if (compressedFile == null) {
+          throw Exception('Image compression failed');
+        }
+        
+        onProgress?.call(0.3); // Starting upload
+        
+        // Upload in background isolate
+        imageUrl = await _uploadImageInBackground(compressedFile, userId);
+        
+        onProgress?.call(0.8); // Upload complete, creating post
+        
+        // Clean up compressed file
+        await compressedFile.delete();
       }
+
+      onProgress?.call(0.9); // Creating post in database
 
       final postData = {
         'author_id': userId,
@@ -109,6 +245,8 @@ class PostService {
         'is_liked_by_current_user': false,
       });
 
+      onProgress?.call(1.0); // Complete
+
       // Check if this is the user's first post and trigger bot like
       await _checkAndTriggerBotLike(post.id, userId);
 
@@ -118,15 +256,37 @@ class PostService {
     }
   }
 
-  Future<String> _uploadImageToCloudinary(File imageFile) async {
+  Future<File?> _compressImage(File imageFile) async {
     try {
-      final response = await _cloudinary.uploadFile(
+      final result = await FlutterImageCompress.compressAndGetFile(
+        imageFile.path,
+        '${imageFile.parent.path}/temp_compressed_${DateTime.now().millisecondsSinceEpoch}.jpg',
+        quality: 80,
+        minWidth: 1024,
+        minHeight: 1024,
+      );
+      return result != null ? File(result.path) : null;
+    } catch (e) {
+      print('Image compression error: $e');
+      return null;
+    }
+  }
+
+  Future<String> _uploadImageInBackground(File compressedFile, String userId) async {
+    try {
+      final cloudinary = CloudinaryPublic(
+        CloudinaryConfig.cloudName,
+        CloudinaryConfig.unsignedPreset,
+        cache: false,
+      );
+
+      final response = await cloudinary.uploadFile(
         CloudinaryFile.fromFile(
-          imageFile.path,
+          compressedFile.path,
           resourceType: CloudinaryResourceType.Image,
           folder: 'gracy_posts',
         ),
-      );
+      ).timeout(const Duration(seconds: 30));
 
       return response.secureUrl ?? '';
     } catch (e) {

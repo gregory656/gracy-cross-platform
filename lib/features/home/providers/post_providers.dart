@@ -3,28 +3,44 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../../shared/models/post_model.dart';
 import '../../../shared/services/post_service.dart';
+import '../../../shared/services/optimized_post_service.dart';
 
 final postServiceProvider = Provider<PostService>((ref) {
   return PostService();
+});
+
+final optimizedPostServiceProvider = Provider<OptimizedPostService>((ref) {
+  return OptimizedPostService();
 });
 
 final postsProvider = AsyncNotifierProvider<PostsNotifier, List<PostModel>>(
   () => PostsNotifier(),
 );
 
+// Simple progress tracking using providers
+final uploadProgressProvider = Provider<double>((ref) => 0.0);
+final uploadStatusProvider = Provider<String>((ref) => '');
+
 class PostsNotifier extends AsyncNotifier<List<PostModel>> {
-  late final PostService _postService;
+  late final OptimizedPostService _postService;
   final List<PostModel> _posts = [];
   bool _hasMore = true;
   int _offset = 0;
   static const int _limit = 20;
+  
+  double _currentProgress = 0.0;
+  String _currentStatus = '';
 
   @override
   Future<List<PostModel>> build() async {
-    _postService = ref.read(postServiceProvider);
+    _postService = ref.read(optimizedPostServiceProvider);
     await _loadPosts();
     return _posts;
   }
+
+  // Getters for progress tracking
+  double get progress => _currentProgress;
+  String get status => _currentStatus;
 
   Future<void> _loadPosts({bool refresh = false}) async {
     if (refresh) {
@@ -72,14 +88,37 @@ class PostsNotifier extends AsyncNotifier<List<PostModel>> {
     File? imageFile,
   }) async {
     try {
+      // Update progress
+      _currentProgress = 0.0;
+      _currentStatus = 'Preparing post...';
+
       final newPost = await _postService.createPost(
         content: content,
         imageFile: imageFile,
+        onProgress: (progress) {
+          _currentProgress = progress;
+          if (progress < 0.2) {
+            _currentStatus = 'Compressing image...';
+          } else if (progress < 0.8) {
+            _currentStatus = 'Uploading image...';
+          } else if (progress < 0.9) {
+            _currentStatus = 'Creating post...';
+          } else {
+            _currentStatus = 'Almost done...';
+          }
+        },
       );
 
       _posts.insert(0, newPost);
       state = AsyncValue.data(List.from(_posts));
+
+      // Reset progress
+      _currentProgress = 0.0;
+      _currentStatus = '';
     } catch (e, stackTrace) {
+      // Reset progress on error
+      _currentProgress = 0.0;
+      _currentStatus = '';
       state = AsyncValue.error(e, stackTrace);
     }
   }
