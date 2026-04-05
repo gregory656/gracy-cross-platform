@@ -55,7 +55,6 @@ class NairobiTimezoneService {
 
   // Format full date and time
   String formatFullDateTime(DateTime dateTime) {
-    final nairobiTime = convertToNairobi(dateTime);
     return '${formatDate(dateTime)} at ${formatTime(dateTime)} EAT';
   }
 

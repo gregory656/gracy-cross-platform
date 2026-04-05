@@ -2,9 +2,8 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:image_cropper/image_cropper.dart';
-import '../providers/post_providers.dart';
-import '../../../shared/widgets/upload_progress_overlay.dart';
 
+import '../providers/post_providers.dart';
 
 class CreatePostButton extends ConsumerStatefulWidget {
   const CreatePostButton({super.key});
@@ -14,6 +13,7 @@ class CreatePostButton extends ConsumerStatefulWidget {
 }
 
 class _CreatePostButtonState extends ConsumerState<CreatePostButton> {
+  static const Color _fabColor = Color(0xFF007AFF);
   final TextEditingController _contentController = TextEditingController();
   File? _selectedImage;
   bool _isUploading = false;
@@ -28,20 +28,19 @@ class _CreatePostButtonState extends ConsumerState<CreatePostButton> {
     try {
       final postService = ref.read(optimizedPostServiceProvider);
       final image = await postService.pickImage();
-      
+
       if (image != null) {
-        // Show cropping dialog
         final croppedFile = await ImageCropper().cropImage(
           sourcePath: image.path,
           uiSettings: [
             AndroidUiSettings(
               toolbarTitle: 'Crop Image',
-              toolbarColor: const Color(0xFF00D4FF),
+              toolbarColor: _fabColor,
               toolbarWidgetColor: Colors.black,
               initAspectRatio: CropAspectRatioPreset.square,
               lockAspectRatio: false,
               backgroundColor: Colors.black,
-              activeControlsWidgetColor: const Color(0xFF00D4FF),
+              activeControlsWidgetColor: _fabColor,
               aspectRatioPresets: [
                 CropAspectRatioPreset.square,
                 CropAspectRatioPreset.ratio16x9,
@@ -62,8 +61,18 @@ class _CreatePostButtonState extends ConsumerState<CreatePostButton> {
         );
 
         if (croppedFile != null) {
+          final optimizedImage = await postService.compressSelectedImage(
+            File(croppedFile.path),
+          );
+
+          if (optimizedImage == null) {
+            throw Exception('Image optimization failed');
+          }
+
+          await _disposeSelectedImage();
+
           setState(() {
-            _selectedImage = File(croppedFile.path);
+            _selectedImage = optimizedImage;
           });
         }
       }
@@ -90,24 +99,29 @@ class _CreatePostButtonState extends ConsumerState<CreatePostButton> {
       return;
     }
 
-    // Close the dialog first, but wait for it to complete
-    Navigator.of(context).pop();
-    
-    // Add a small delay to ensure dialog is fully closed
-    await Future.delayed(const Duration(milliseconds: 100));
+    final messenger = ScaffoldMessenger.of(context);
+    final navigator = Navigator.of(context);
 
     setState(() {
       _isUploading = true;
     });
 
+    await Future<void>.delayed(Duration.zero);
+
+    final imageToUpload = _selectedImage;
+    _selectedImage = null;
+    await _disposePreviewImage(imageToUpload);
+    navigator.pop();
+
     try {
       await ref.read(postsProvider.notifier).createPost(
         content: _contentController.text.trim(),
-        imageFile: _selectedImage,
+        imageFile: imageToUpload,
       );
 
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
+        messenger.clearSnackBars();
+        messenger.showSnackBar(
           const SnackBar(
             content: Text('Post created successfully!'),
             backgroundColor: Colors.green,
@@ -126,7 +140,7 @@ class _CreatePostButtonState extends ConsumerState<CreatePostButton> {
           errorMessage = 'Upload failed. Please try again.';
         }
         
-        ScaffoldMessenger.of(context).showSnackBar(
+        messenger.showSnackBar(
           SnackBar(
             content: Text(errorMessage),
             backgroundColor: Colors.red,
@@ -134,14 +148,44 @@ class _CreatePostButtonState extends ConsumerState<CreatePostButton> {
         );
       }
     } finally {
+      await _deleteTemporaryImage(imageToUpload);
       if (mounted) {
         setState(() {
           _isUploading = false;
-          _selectedImage = null;
           _contentController.clear();
         });
       }
     }
+  }
+
+  Future<void> _disposePreviewImage(File? image) async {
+    if (image == null) {
+      return;
+    }
+
+    final provider = FileImage(image);
+    await provider.evict();
+    PaintingBinding.instance.imageCache.clear();
+    PaintingBinding.instance.imageCache.clearLiveImages();
+  }
+
+  Future<void> _deleteTemporaryImage(File? image) async {
+    if (image == null) {
+      return;
+    }
+
+    try {
+      if (await image.exists()) {
+        await image.delete();
+      }
+    } catch (_) {}
+  }
+
+  Future<void> _disposeSelectedImage() async {
+    final previous = _selectedImage;
+    _selectedImage = null;
+    await _disposePreviewImage(previous);
+    await _deleteTemporaryImage(previous);
   }
 
   void _showCreatePostDialog() {
@@ -230,6 +274,8 @@ class _CreatePostButtonState extends ConsumerState<CreatePostButton> {
                             fit: BoxFit.cover,
                             width: double.infinity,
                             height: double.infinity,
+                            cacheWidth: 1080,
+                            filterQuality: FilterQuality.low,
                           ),
                         ),
                         Positioned(
@@ -237,9 +283,8 @@ class _CreatePostButtonState extends ConsumerState<CreatePostButton> {
                           right: 8,
                           child: GestureDetector(
                             onTap: _isUploading ? null : () {
-                              setState(() {
-                                _selectedImage = null;
-                              });
+                              _disposeSelectedImage();
+                              setState(() {});
                             },
                             child: Container(
                               width: 32,
@@ -331,7 +376,7 @@ class _CreatePostButtonState extends ConsumerState<CreatePostButton> {
                       child: ElevatedButton(
                         onPressed: _isUploading ? null : _createPost,
                         style: ElevatedButton.styleFrom(
-                          backgroundColor: const Color(0xFF00D4FF),
+                          backgroundColor: _fabColor,
                           foregroundColor: Colors.black,
                           padding: const EdgeInsets.symmetric(vertical: 16),
                           shape: RoundedRectangleBorder(
@@ -368,54 +413,26 @@ class _CreatePostButtonState extends ConsumerState<CreatePostButton> {
 
   @override
   Widget build(BuildContext context) {
-    // Watch upload progress from the posts notifier
     final postsAsync = ref.watch(postsProvider);
-    final isUploading = postsAsync is AsyncLoading || 
+    final isUploading = postsAsync is AsyncLoading ||
         (postsAsync.hasValue && ref.read(postsProvider.notifier).progress > 0);
-    
-    double uploadProgress = 0.0;
-    String uploadStatus = '';
-    
-    if (postsAsync.hasValue) {
-      uploadProgress = ref.read(postsProvider.notifier).progress;
-      uploadStatus = ref.read(postsProvider.notifier).status;
-    }
 
-    return Stack(
-      children: [
-        Padding(
-          padding: const EdgeInsets.only(bottom: 32.0),
-          child: Container(
-            decoration: BoxDecoration(
-              borderRadius: BorderRadius.circular(16),
-              boxShadow: [
-                BoxShadow(
-                  color: const Color(0xFF00D4FF).withValues(alpha: 0.3),
-                  blurRadius: 12,
-                  spreadRadius: 2,
-                  offset: const Offset(0, 4),
-                ),
-              ],
-            ),
-            child: FloatingActionButton(
-              onPressed: isUploading ? null : _showCreatePostDialog,
-              backgroundColor: const Color(0xFF00D4FF),
-              foregroundColor: Colors.black,
-              elevation: 0,
-              child: const Icon(Icons.add, size: 28),
-            ),
-          ),
+    return Material(
+      color: Colors.transparent,
+      child: IconButton(
+        onPressed: isUploading ? null : _showCreatePostDialog,
+        tooltip: 'Create post',
+        style: IconButton.styleFrom(
+          backgroundColor: Colors.transparent,
+          foregroundColor: _fabColor,
+          disabledForegroundColor: Colors.grey[600],
+          minimumSize: const Size(48, 48),
         ),
-        
-        // Upload progress overlay
-        if (isUploading && uploadProgress > 0)
-          Positioned.fill(
-            child: UploadProgressOverlay(
-              progress: uploadProgress,
-              status: uploadStatus,
-            ),
-          ),
-      ],
+        icon: const Icon(
+          Icons.attach_file,
+          size: 26,
+        ),
+      ),
     );
   }
 }

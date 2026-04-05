@@ -126,12 +126,10 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
   }
 
   void _handleForward(MessageModel message) {
-    // TODO: Implement forward functionality
     _showFeedback('Forward feature coming soon');
   }
 
   void _handleDelete(MessageModel message) {
-    // TODO: Implement delete functionality
     _showFeedback('Delete feature coming soon');
   }
 

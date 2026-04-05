@@ -327,8 +327,6 @@ class _AnimatedStatusTicksState extends State<AnimatedStatusTicks>
         return const Color(0xFF8E8E93);
       case MessageStatus.read:
         return const Color(0xFF30D158);
-      default:
-        return const Color(0xFF8E8E93);
     }
   }
 

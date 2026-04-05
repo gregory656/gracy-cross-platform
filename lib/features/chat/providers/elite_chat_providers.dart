@@ -1,4 +1,5 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter_riverpod/legacy.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../../../shared/models/message_model.dart';
@@ -34,14 +35,15 @@ class EliteChatState {
 }
 
 // Chat notifier for zero-latency real-time updates
-class EliteChatNotifier extends Notifier<EliteChatState> {
-  EliteChatNotifier(this.chatId, String currentUserId) : _currentUserId = currentUserId;
+class EliteChatNotifier extends StateNotifier<EliteChatState> {
+  EliteChatNotifier({
+    required this.chatId,
+    required String currentUserId,
+  }) : _currentUserId = currentUserId,
+       super(const EliteChatState(messages: []));
 
   final String chatId;
   final String _currentUserId;
-
-  @override
-  EliteChatState build() => const EliteChatState(messages: []);
 
   Future<void> loadMessages() async {
     try {
@@ -95,7 +97,7 @@ class EliteChatNotifier extends Notifier<EliteChatState> {
         'content': text,
         'status': 'sent',
         'created_at': DateTime.now().toIso8601String(),
-        if (replyToId != null) 'reply_to_id': replyToId,
+        ...?replyToId == null ? null : {'reply_to_id': replyToId},
       };
 
       await Supabase.instance.client.from('messages').insert(messageData);
@@ -110,10 +112,10 @@ class EliteChatNotifier extends Notifier<EliteChatState> {
 }
 
 // Provider definition
-final eliteChatProvider = NotifierProvider.autoDispose.family<EliteChatNotifier, EliteChatState, String>(
+final eliteChatProvider = StateNotifierProvider.autoDispose.family<EliteChatNotifier, EliteChatState, String>(
   (ref, chatId) {
     final currentUserId = Supabase.instance.client.auth.currentUser?.id ?? '';
-    return EliteChatNotifier(chatId, currentUserId);
+    return EliteChatNotifier(chatId: chatId, currentUserId: currentUserId);
   },
 );
 

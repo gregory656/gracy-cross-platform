@@ -7,9 +7,14 @@ import '../../../shared/widgets/theme_toggle.dart';
 import 'notification_bell.dart';
 
 class HomeHeader extends StatelessWidget {
-  const HomeHeader({super.key, required this.user});
+  const HomeHeader({
+    super.key,
+    required this.user,
+    this.action,
+  });
 
   final UserModel user;
+  final Widget? action;
 
   @override
   Widget build(BuildContext context) {
@@ -52,6 +57,10 @@ class HomeHeader extends StatelessWidget {
           children: [
             Row(
               children: [
+                if (action != null) ...[
+                  action!,
+                  const SizedBox(width: 12),
+                ],
                 const NotificationBell(),
                 const SizedBox(width: 12),
                 UserAvatar(user: user, size: 48, fontSize: 16, showRing: true),

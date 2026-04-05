@@ -32,7 +32,7 @@ class UploadProgressOverlay extends StatelessWidget {
             mainAxisSize: MainAxisSize.min,
             children: [
               // Progress indicator
-              Container(
+              SizedBox(
                 width: 60,
                 height: 60,
                 child: Stack(

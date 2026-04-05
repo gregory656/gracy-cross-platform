@@ -1,129 +1,12 @@
 import 'dart:io';
-import 'dart:isolate';
+
+import 'package:flutter/foundation.dart';
 import 'package:flutter_image_compress/flutter_image_compress.dart';
 import 'package:cloudinary_public/cloudinary_public.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../models/post_model.dart';
 import '../../core/secrets.dart';
-
-// Isolate data structure for background upload
-class UploadIsolateData {
-  final String imagePath;
-  final String cloudName;
-  final String unsignedPreset;
-  final String userId;
-  final String content;
-
-  UploadIsolateData({
-    required this.imagePath,
-    required this.cloudName,
-    required this.unsignedPreset,
-    required this.userId,
-    required this.content,
-  });
-
-  Map<String, dynamic> toMap() {
-    return {
-      'imagePath': imagePath,
-      'cloudName': cloudName,
-      'unsignedPreset': unsignedPreset,
-      'userId': userId,
-      'content': content,
-    };
-  }
-
-  static UploadIsolateData fromMap(Map<String, dynamic> map) {
-    return UploadIsolateData(
-      imagePath: map['imagePath'],
-      cloudName: map['cloudName'],
-      unsignedPreset: map['unsignedPreset'],
-      userId: map['userId'],
-      content: map['content'],
-    );
-  }
-}
-
-// Background upload result
-class UploadResult {
-  final bool success;
-  final String? imageUrl;
-  final String? error;
-
-  UploadResult({required this.success, this.imageUrl, this.error});
-
-  Map<String, dynamic> toMap() {
-    return {
-      'success': success,
-      'imageUrl': imageUrl,
-      'error': error,
-    };
-  }
-
-  static UploadResult fromMap(Map<String, dynamic> map) {
-    return UploadResult(
-      success: map['success'],
-      imageUrl: map['imageUrl'],
-      error: map['error'],
-    );
-  }
-}
-
-// Background isolate entry point
-void _uploadIsolateEntryPoint(SendPort sendPort) async {
-  final receivePort = ReceivePort();
-  sendPort.send(receivePort.sendPort);
-
-  await for (final message in receivePort) {
-    if (message is UploadIsolateData) {
-      try {
-        // Compress image in background
-        final compressedFile = await _compressImageInBackground(message.imagePath);
-        
-        if (compressedFile == null) {
-          sendPort.send(UploadResult(success: false, error: 'Image compression failed'));
-          continue;
-        }
-
-        // Upload to Cloudinary in background
-        final cloudinary = CloudinaryPublic(message.cloudName, message.unsignedPreset);
-        final response = await cloudinary.uploadFile(
-          CloudinaryFile.fromFile(
-            compressedFile.path,
-            resourceType: CloudinaryResourceType.Image,
-            folder: 'gracy_posts',
-          ),
-        ).timeout(const Duration(seconds: 30));
-
-        final String imageUrl = response.secureUrl;
-        
-        // Clean up compressed file
-        await compressedFile.delete();
-
-        sendPort.send(UploadResult(success: true, imageUrl: imageUrl));
-      } catch (e) {
-        sendPort.send(UploadResult(success: false, error: e.toString()));
-      }
-    }
-  }
-}
-
-// Image compression in background
-Future<File?> _compressImageInBackground(String imagePath) async {
-  try {
-    final file = File(imagePath);
-    final result = await FlutterImageCompress.compressAndGetFile(
-      imagePath,
-      '${file.parent.path}/temp_compressed_${DateTime.now().millisecondsSinceEpoch}.jpg',
-      quality: 80,
-      minWidth: 1024,
-      minHeight: 1024,
-    );
-    return result != null ? File(result.path) : null;
-  } catch (e) {
-    return null;
-  }
-}
 
 class OptimizedPostService {
   static final OptimizedPostService _instance = OptimizedPostService._internal();
@@ -132,6 +15,10 @@ class OptimizedPostService {
 
   final _supabase = Supabase.instance.client;
   final _imagePicker = ImagePicker();
+  static const int _targetImageWidth = 1080;
+  static const int _targetImageHeight = 1080;
+  static const int _targetImageQuality = 80;
+  static const int _maxUploadBytes = 1000000;
 
   Future<List<PostModel>> getPosts({int limit = 20, int offset = 0}) async {
     try {
@@ -175,7 +62,7 @@ class OptimizedPostService {
       return posts;
     } catch (e) {
       // Return empty list on error to prevent crashes
-      print('Error fetching posts: $e');
+      debugPrint('Error fetching posts: $e');
       return [];
     }
   }
@@ -193,6 +80,7 @@ class OptimizedPostService {
       
       if (imageFile != null) {
         onProgress?.call(0.05); // Starting
+        await Future<void>.delayed(Duration.zero);
         
         // Compress image first with better error handling
         final compressedFile = await _compressImage(imageFile);
@@ -206,6 +94,7 @@ class OptimizedPostService {
         // Upload with timeout and retry logic
         try {
           onProgress?.call(0.3); // Starting upload
+          await _deleteTemporaryFile(imageFile);
           imageUrl = await _uploadImageWithRetry(compressedFile, userId);
           onProgress?.call(0.8); // Upload complete
         } catch (e) {
@@ -244,7 +133,8 @@ class OptimizedPostService {
           ''')
           .single();
 
-      final postDataWithProfile = response as Map<String, dynamic>;
+      final Map<String, dynamic> postDataWithProfile =
+          Map<String, dynamic>.from(response);
       final profile = postDataWithProfile['profiles'] as Map<String, dynamic>?;
 
       final post = PostModel.fromMap({
@@ -286,16 +176,35 @@ class OptimizedPostService {
 
   Future<File?> _compressImage(File imageFile) async {
     try {
-      final result = await FlutterImageCompress.compressAndGetFile(
-        imageFile.path,
-        '${imageFile.parent.path}/temp_compressed_${DateTime.now().millisecondsSinceEpoch}.jpg',
-        quality: 80,
-        minWidth: 1024,
-        minHeight: 1024,
-      );
-      return result != null ? File(result.path) : null;
+      var quality = _targetImageQuality;
+      File? compressed;
+
+      while (quality >= 45) {
+        final result = await FlutterImageCompress.compressAndGetFile(
+          imageFile.path,
+          '${imageFile.parent.path}/temp_compressed_${DateTime.now().millisecondsSinceEpoch}_$quality.jpg',
+          quality: quality,
+          minWidth: _targetImageWidth,
+          minHeight: _targetImageHeight,
+        );
+
+        if (result == null) {
+          return null;
+        }
+
+        compressed = File(result.path);
+        final length = await compressed.length();
+        if (length <= _maxUploadBytes) {
+          return compressed;
+        }
+
+        await _deleteTemporaryFile(compressed);
+        quality -= 10;
+      }
+
+      return compressed;
     } catch (e) {
-      print('Image compression error: $e');
+      debugPrint('Image compression error: $e');
       return null;
     }
   }
@@ -325,12 +234,12 @@ class OptimizedPostService {
   Future<void> _checkAndTriggerBotLike(String postId, String userId) async {
     try {
       // Check if this is the user's first post
-      final userPostsCount = await _supabase
+      final userPosts = await _supabase
           .from('posts')
           .select('id')
           .eq('author_id', userId);
 
-      if (userPostsCount.length == 1) {
+      if (userPosts.length == 1) {
         // This is the first post, trigger bot like after 10 seconds
         Future.delayed(const Duration(seconds: 10), () async {
           await _likePostAsBot(postId);
@@ -338,7 +247,7 @@ class OptimizedPostService {
       }
     } catch (e) {
       // Log error but don't throw since this is a background operation
-      print('Failed to check first post status: $e');
+      debugPrint('Failed to check first post status: $e');
     }
   }
 
@@ -354,7 +263,7 @@ class OptimizedPostService {
           .update({'likes_count': _supabase.rpc('increment')})
           .eq('id', postId);
     } catch (e) {
-      print('Failed to like post as bot: $e');
+      debugPrint('Failed to like post as bot: $e');
     }
   }
 
@@ -511,7 +420,9 @@ class OptimizedPostService {
           ''')
           .single();
 
-      final commentData = response as Map<String, dynamic>;
+      final Map<String, dynamic> commentData = Map<String, dynamic>.from(
+        response,
+      );
       final profile = commentData['profiles'] as Map<String, dynamic>?;
 
       return PostCommentModel.fromMap({
@@ -528,14 +439,47 @@ class OptimizedPostService {
     try {
       final XFile? pickedFile = await _imagePicker.pickImage(
         source: ImageSource.gallery,
-        maxWidth: 1920,
-        maxHeight: 1080,
-        imageQuality: 85,
+        maxWidth: _targetImageWidth.toDouble(),
+        maxHeight: _targetImageHeight.toDouble(),
+        imageQuality: _targetImageQuality,
       );
 
-      return pickedFile != null ? File(pickedFile.path) : null;
+      if (pickedFile == null) {
+        return null;
+      }
+
+      return File(pickedFile.path);
     } catch (e) {
       throw Exception('Failed to pick image: $e');
     }
+  }
+
+  Future<File?> compressSelectedImage(File imageFile) async {
+    try {
+      if (!await imageFile.exists()) {
+        throw Exception('Selected image no longer exists');
+      }
+
+      final compressedFile = await _compressImage(imageFile);
+      if (compressedFile == null) {
+        throw Exception('Image compression failed');
+      }
+
+      return compressedFile;
+    } catch (e) {
+      throw Exception('Failed to prepare image: $e');
+    }
+  }
+
+  Future<void> _deleteTemporaryFile(File? file) async {
+    if (file == null) {
+      return;
+    }
+
+    try {
+      if (await file.exists()) {
+        await file.delete();
+      }
+    } catch (_) {}
   }
 }

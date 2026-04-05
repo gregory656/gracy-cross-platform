@@ -68,11 +68,23 @@ class _PostCardFixedState extends ConsumerState<PostCardFixed> {
   }
 
   void _sharePost() {
-    final String content = widget.post.content.isNotEmpty 
-        ? widget.post.content 
+    final String content = widget.post.content.isNotEmpty
+        ? widget.post.content
         : 'Check out this post on Gracy!';
-    
-    Share.share(content);
+
+    SharePlus.instance.share(ShareParams(text: content));
+  }
+
+  void _showCommentsComingSoon() {
+    if (!mounted) {
+      return;
+    }
+
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text('Comments are coming soon'),
+      ),
+    );
   }
 
   @override
@@ -227,9 +239,7 @@ class _PostCardFixedState extends ConsumerState<PostCardFixed> {
                   label: widget.post.commentsCount.toString(),
                   isActive: false,
                   isLoading: false,
-                  onPressed: () {
-                    // TODO: Implement comments
-                  },
+                  onPressed: _showCommentsComingSoon,
                   activeColor: Colors.blue,
                 ),
                 const SizedBox(width: 24),

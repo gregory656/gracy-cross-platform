@@ -53,12 +53,11 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
 
   Future<void> _triggerContactSync() async {
     try {
-      // TODO: Re-enable when contact service is fixed
+      // Contact sync stays disabled until the Flutter contacts integration is restored.
       // final contactService = ref.read(contactServiceProvider);
       // await contactService.showContactSyncDialog(context);
-    } catch (e) {
+    } catch (_) {
       // Silently fail for contact sync
-      // print('Contact sync failed: $e');
     }
   }
 
@@ -90,8 +89,6 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
 
     return Scaffold(
       backgroundColor: Theme.of(context).colorScheme.surface,
-      floatingActionButton: _showPosts ? const CreatePostButton() : null,
-      floatingActionButtonLocation: FloatingActionButtonLocation.centerFloat,
       body: SafeArea(
         child: _showPosts
             ? _buildPostsView(postsAsync, headerUser)
@@ -205,6 +202,11 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
   }
 
   Widget _buildPostsView(AsyncValue<List<PostModel>> postsAsync, UserModel headerUser) {
+    final postsNotifier = ref.read(postsProvider.notifier);
+    final uploadProgress = postsNotifier.progress;
+    final uploadStatus = postsNotifier.status;
+    final isUploading = uploadProgress > 0 && uploadProgress < 1;
+
     return RefreshIndicator(
       onRefresh: () async {
         await ref.read(postsProvider.notifier).refresh();
@@ -218,8 +220,34 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
             sliver: SliverToBoxAdapter(
               child: Column(
                 children: [
-                  HomeHeader(user: headerUser),
+                  HomeHeader(
+                    user: headerUser,
+                    action: const CreatePostButton(),
+                  ),
                   const SizedBox(height: 18),
+                  if (isUploading) ...[
+                    ClipRRect(
+                      borderRadius: BorderRadius.circular(999),
+                      child: LinearProgressIndicator(
+                        value: uploadProgress <= 0 ? null : uploadProgress,
+                        minHeight: 6,
+                        backgroundColor: AppColors.textSecondary.withValues(alpha: 0.2),
+                        valueColor: const AlwaysStoppedAnimation<Color>(Color(0xFF007AFF)),
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    Align(
+                      alignment: Alignment.centerLeft,
+                      child: Text(
+                        uploadStatus.isEmpty ? 'Posting...' : uploadStatus,
+                        style: Theme.of(context).textTheme.labelMedium?.copyWith(
+                          color: AppColors.textSecondary,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 16),
+                  ],
                   _ViewToggle(
                     showPosts: _showPosts,
                     onToggle: () {

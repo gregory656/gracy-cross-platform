@@ -42,26 +42,36 @@ class DisappearingMessagesDialog extends ConsumerWidget {
           ),
           const SizedBox(height: 16),
           ...DisappearingDuration.values.map((duration) {
-            return RadioListTile<DisappearingDuration>(
+            final isSelected = duration == currentDuration;
+
+            return ListTile(
+              contentPadding: EdgeInsets.zero,
+              onTap: () {
+                ref.read(disappearingMessagesProvider.notifier).setDuration(
+                  duration,
+                );
+                Navigator.of(context).pop();
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(
+                    content: Text(
+                      'Disappearing messages set to ${duration.label}',
+                    ),
+                    behavior: SnackBarBehavior.floating,
+                  ),
+                );
+              },
+              leading: Icon(
+                isSelected
+                    ? Icons.radio_button_checked
+                    : Icons.radio_button_off,
+                color: isSelected
+                    ? Theme.of(context).colorScheme.primary
+                    : Theme.of(context).colorScheme.onSurfaceVariant,
+              ),
               title: Text(duration.label),
-              subtitle: duration == DisappearingDuration.off 
+              subtitle: duration == DisappearingDuration.off
                   ? const Text('Messages will not disappear')
                   : Text('Messages disappear after ${duration.label}'),
-              value: duration,
-              groupValue: currentDuration,
-              activeColor: Theme.of(context).colorScheme.primary,
-              onChanged: (DisappearingDuration? value) {
-                if (value != null) {
-                  ref.read(disappearingMessagesProvider.notifier).setDuration(value);
-                  Navigator.of(context).pop();
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(
-                      content: Text('Disappearing messages set to ${value.label}'),
-                      behavior: SnackBarBehavior.floating,
-                    ),
-                  );
-                }
-              },
             );
           }),
         ],

@@ -1,5 +1,7 @@
 import 'dart:io';
+
 import 'package:cloudinary_public/cloudinary_public.dart';
+import 'package:flutter/foundation.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../models/post_model.dart';
@@ -60,7 +62,7 @@ class PostService {
       return posts;
     } catch (e) {
       // Return empty list on error to prevent crashes
-      print('Error fetching posts: $e');
+      debugPrint('Error fetching posts: $e');
       return [];
     }
   }
@@ -99,7 +101,8 @@ class PostService {
           ''')
           .single();
 
-      final postDataWithProfile = response as Map<String, dynamic>;
+      final Map<String, dynamic> postDataWithProfile =
+          Map<String, dynamic>.from(response);
       final profile = postDataWithProfile['profiles'] as Map<String, dynamic>?;
 
       final post = PostModel.fromMap({
@@ -128,7 +131,7 @@ class PostService {
         ),
       );
 
-      return response.secureUrl ?? '';
+      return response.secureUrl;
     } catch (e) {
       throw Exception('Image upload failed: $e');
     }
@@ -150,7 +153,7 @@ class PostService {
       }
     } catch (e) {
       // Log error but don't throw since this is a background operation
-      print('Failed to check first post status: $e');
+      debugPrint('Failed to check first post status: $e');
     }
   }
 
@@ -166,7 +169,7 @@ class PostService {
           .update({'likes_count': _supabase.rpc('increment')})
           .eq('id', postId);
     } catch (e) {
-      print('Failed to like post as bot: $e');
+      debugPrint('Failed to like post as bot: $e');
     }
   }
 
@@ -230,7 +233,7 @@ class PostService {
           .eq('id', postId)
           .single();
 
-      final postData = response as Map<String, dynamic>;
+      final Map<String, dynamic> postData = Map<String, dynamic>.from(response);
       final profile = postData['profiles'] as Map<String, dynamic>?;
       final likes = postData['post_likes'] as List?;
 
@@ -323,7 +326,9 @@ class PostService {
           ''')
           .single();
 
-      final commentData = response as Map<String, dynamic>;
+      final Map<String, dynamic> commentData = Map<String, dynamic>.from(
+        response,
+      );
       final profile = commentData['profiles'] as Map<String, dynamic>?;
 
       return PostCommentModel.fromMap({

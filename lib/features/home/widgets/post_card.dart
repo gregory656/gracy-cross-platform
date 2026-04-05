@@ -68,11 +68,11 @@ class _PostCardState extends ConsumerState<PostCard> {
   }
 
   void _sharePost() {
-    final String content = widget.post.content.isNotEmpty 
-        ? widget.post.content 
+    final String content = widget.post.content.isNotEmpty
+        ? widget.post.content
         : 'Check out this post on Gracy!';
-    
-    Share.share(content);
+
+    SharePlus.instance.share(ShareParams(text: content));
   }
 
   void _showComments() {
@@ -356,7 +356,6 @@ class _CommentsBottomSheetState extends ConsumerState<CommentsBottomSheet> {
     });
 
     try {
-      // TODO: Implement comment submission
       _commentController.clear();
       
       if (mounted) {
