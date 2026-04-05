@@ -132,7 +132,7 @@ class _EliteChatScreenState extends ConsumerState<EliteChatScreen>
       itemCount: messages.length,
       itemBuilder: (context, index) {
         final message = messages[index];
-        final messageDate = timezoneService.toNairobiTime(message.sentAt);
+        final messageDate = timezoneService.convertToNairobi(message.sentAt);
         
         // Check if we need a date header
         bool showDateHeader = false;

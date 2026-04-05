@@ -8,9 +8,9 @@ import '../../../shared/services/nairobi_timezone_service.dart';
 class EliteChatState {
   const EliteChatState({
     required this.messages,
-    required this.isLoading,
-    required this.error,
-    required this.isTyping,
+    this.isLoading = false,
+    this.error,
+    this.isTyping = false,
   });
 
   final List<MessageModel> messages;
@@ -33,31 +33,20 @@ class EliteChatState {
   }
 }
 
-// Chat provider for zero-latency real-time updates
-class EliteChatProvider extends StateNotifier<EliteChatState> {
-  EliteChatProvider({
-    required this.chatId,
-    required this.currentUserId,
-  }) : super(const EliteChatState(
-           messages: [],
-           isLoading: false,
-           error: null,
-           isTyping: false,
-         )) {
-    _initialize();
-  }
+// Chat notifier for zero-latency real-time updates
+class EliteChatNotifier extends Notifier<EliteChatState> {
+  EliteChatNotifier(this.chatId, String currentUserId) : _currentUserId = currentUserId;
 
   final String chatId;
-  final String currentUserId;
-  RealtimeChannel? _channel;
+  final String _currentUserId;
 
-  void _initialize() {
-    // Initialize with loading state
-    _loadMessages();
-  }
+  @override
+  EliteChatState build() => const EliteChatState(messages: []);
 
-  Future<void> _loadMessages() async {
+  Future<void> loadMessages() async {
     try {
+      state = state.copyWith(isLoading: true);
+
       final response = await Supabase.instance.client
           .from('messages')
           .select('''
@@ -75,7 +64,7 @@ class EliteChatProvider extends StateNotifier<EliteChatState> {
         final profile = row['profiles'] as Map<String, dynamic>? ?? {};
         return MessageModel.fromDatabase(
           row: row,
-          currentUserId: currentUserId,
+          currentUserId: _currentUserId,
           senderName: profile['full_name'] ?? 'Unknown',
           senderUsername: profile['username'],
           isOfficial: profile['is_official'] ?? false,
@@ -90,7 +79,7 @@ class EliteChatProvider extends StateNotifier<EliteChatState> {
       );
     } catch (e) {
       state = EliteChatState(
-        messages: const [],
+        messages: [],
         isLoading: false,
         error: e.toString(),
         isTyping: false,
@@ -102,7 +91,7 @@ class EliteChatProvider extends StateNotifier<EliteChatState> {
     try {
       final messageData = {
         'room_id': chatId,
-        'sender_id': currentUserId,
+        'sender_id': _currentUserId,
         'content': text,
         'status': 'sent',
         'created_at': DateTime.now().toIso8601String(),
@@ -111,33 +100,20 @@ class EliteChatProvider extends StateNotifier<EliteChatState> {
 
       await Supabase.instance.client.from('messages').insert(messageData);
     } catch (e) {
-      state = EliteChatState(
-        messages: state.messages,
-        isLoading: false,
-        error: e.toString(),
-        isTyping: state.isTyping,
-      );
+      state = state.copyWith(error: e.toString());
     }
   }
 
   void setTyping(bool isTyping) {
-    state = EliteChatState(
-      messages: state.messages,
-      isLoading: state.isLoading,
-      error: state.error,
-      isTyping: isTyping,
-    );
+    state = state.copyWith(isTyping: isTyping);
   }
 }
 
 // Provider definition
-final eliteChatProvider = StateNotifierProvider.family<EliteChatProvider, EliteChatState, String>(
+final eliteChatProvider = NotifierProvider.autoDispose.family<EliteChatNotifier, EliteChatState, String>(
   (ref, chatId) {
     final currentUserId = Supabase.instance.client.auth.currentUser?.id ?? '';
-    return EliteChatProvider(
-      chatId: chatId,
-      currentUserId: currentUserId,
-    );
+    return EliteChatNotifier(chatId, currentUserId);
   },
 );
 

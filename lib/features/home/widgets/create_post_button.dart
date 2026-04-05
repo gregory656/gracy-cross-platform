@@ -1,9 +1,10 @@
 import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:image_cropper/image_cropper.dart';
 import '../providers/post_providers.dart';
 import '../../../shared/widgets/upload_progress_overlay.dart';
-import '../../../shared/services/optimized_post_service.dart';
+
 
 class CreatePostButton extends ConsumerStatefulWidget {
   const CreatePostButton({super.key});
@@ -23,15 +24,48 @@ class _CreatePostButtonState extends ConsumerState<CreatePostButton> {
     super.dispose();
   }
 
-  Future<void> _pickImage() async {
+  Future<void> _pickAndCropImage() async {
     try {
       final postService = ref.read(optimizedPostServiceProvider);
       final image = await postService.pickImage();
       
       if (image != null) {
-        setState(() {
-          _selectedImage = image;
-        });
+        // Show cropping dialog
+        final croppedFile = await ImageCropper().cropImage(
+          sourcePath: image.path,
+          uiSettings: [
+            AndroidUiSettings(
+              toolbarTitle: 'Crop Image',
+              toolbarColor: const Color(0xFF00D4FF),
+              toolbarWidgetColor: Colors.black,
+              initAspectRatio: CropAspectRatioPreset.square,
+              lockAspectRatio: false,
+              backgroundColor: Colors.black,
+              activeControlsWidgetColor: const Color(0xFF00D4FF),
+              aspectRatioPresets: [
+                CropAspectRatioPreset.square,
+                CropAspectRatioPreset.ratio16x9,
+                CropAspectRatioPreset.original,
+              ],
+            ),
+            IOSUiSettings(
+              title: 'Crop Image',
+              cancelButtonTitle: 'Cancel',
+              doneButtonTitle: 'Done',
+              aspectRatioPresets: [
+                CropAspectRatioPreset.square,
+                CropAspectRatioPreset.ratio16x9,
+                CropAspectRatioPreset.original,
+              ],
+            ),
+          ],
+        );
+
+        if (croppedFile != null) {
+          setState(() {
+            _selectedImage = File(croppedFile.path);
+          });
+        }
       }
     } catch (e) {
       if (mounted) {
@@ -56,12 +90,15 @@ class _CreatePostButtonState extends ConsumerState<CreatePostButton> {
       return;
     }
 
+    // Close the dialog first, but wait for it to complete
+    Navigator.of(context).pop();
+    
+    // Add a small delay to ensure dialog is fully closed
+    await Future.delayed(const Duration(milliseconds: 100));
+
     setState(() {
       _isUploading = true;
     });
-
-    // Close the dialog first
-    Navigator.of(context).pop();
 
     try {
       await ref.read(postsProvider.notifier).createPost(
@@ -110,207 +147,219 @@ class _CreatePostButtonState extends ConsumerState<CreatePostButton> {
   void _showCreatePostDialog() {
     showDialog(
       context: context,
+      barrierDismissible: false, // Prevent accidental dismissal during upload
       builder: (context) => Dialog(
         backgroundColor: const Color(0xFF1A1A1A),
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(16),
           side: const BorderSide(color: Color(0xFF333333)),
         ),
-        child: Container(
-          width: MediaQuery.of(context).size.width * 0.9,
-          constraints: BoxConstraints(
-            maxHeight: MediaQuery.of(context).size.height * 0.8,
-          ),
-          padding: const EdgeInsets.all(20),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              // Header
-              Row(
-                children: [
-                  Text(
-                    'Create Post',
-                    style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                      color: Colors.white,
-                      fontWeight: FontWeight.w600,
+        child: SingleChildScrollView(
+          child: Container(
+            width: MediaQuery.of(context).size.width * 0.9,
+            constraints: BoxConstraints(
+              maxHeight: MediaQuery.of(context).size.height * 0.8,
+            ),
+            padding: const EdgeInsets.all(20),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                // Header
+                Row(
+                  children: [
+                    Text(
+                      'Create Post',
+                      style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                        color: Colors.white,
+                        fontWeight: FontWeight.w600,
+                      ),
                     ),
-                  ),
-                  const Spacer(),
-                  IconButton(
-                    onPressed: () => Navigator.of(context).pop(),
-                    icon: const Icon(Icons.close, color: Colors.white),
-                  ),
-                ],
-              ),
-              
-              const SizedBox(height: 16),
-              
-              // Content Input
-              TextField(
-                controller: _contentController,
-                style: const TextStyle(color: Colors.white),
-                decoration: InputDecoration(
-                  hintText: 'What\'s on your mind?',
-                  hintStyle: TextStyle(color: Colors.grey[400]),
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(12),
-                    borderSide: const BorderSide(color: Color(0xFF333333)),
-                  ),
-                  enabledBorder: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(12),
-                    borderSide: const BorderSide(color: Color(0xFF333333)),
-                  ),
-                  focusedBorder: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(12),
-                    borderSide: const BorderSide(color: Color(0xFF444444)),
-                  ),
-                  contentPadding: const EdgeInsets.all(16),
+                    const Spacer(),
+                    IconButton(
+                      onPressed: _isUploading ? null : () => Navigator.of(context).pop(),
+                      icon: const Icon(Icons.close, color: Colors.white),
+                    ),
+                  ],
                 ),
-                maxLines: 5,
-                minLines: 3,
-              ),
-              
-              const SizedBox(height: 16),
-              
-              // Image Preview / Picker
-              if (_selectedImage != null)
-                Container(
-                  height: 200,
-                  width: double.infinity,
-                  decoration: BoxDecoration(
-                    borderRadius: BorderRadius.circular(12),
-                    border: Border.all(color: const Color(0xFF333333)),
+                
+                const SizedBox(height: 16),
+                
+                // Content Input
+                TextField(
+                  controller: _contentController,
+                  style: const TextStyle(color: Colors.white),
+                  decoration: InputDecoration(
+                    hintText: 'What\'s on your mind?',
+                    hintStyle: TextStyle(color: Colors.grey[400]),
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                      borderSide: const BorderSide(color: Color(0xFF333333)),
+                    ),
+                    enabledBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                      borderSide: const BorderSide(color: Color(0xFF333333)),
+                    ),
+                    focusedBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                      borderSide: const BorderSide(color: Color(0xFF444444)),
+                    ),
+                    contentPadding: const EdgeInsets.all(16),
                   ),
-                  child: Stack(
-                    children: [
-                      ClipRRect(
-                        borderRadius: BorderRadius.circular(12),
-                        child: Image.file(
-                          _selectedImage!,
-                          fit: BoxFit.cover,
-                          width: double.infinity,
-                          height: double.infinity,
-                        ),
-                      ),
-                      Positioned(
-                        top: 8,
-                        right: 8,
-                        child: GestureDetector(
-                          onTap: () {
-                            setState(() {
-                              _selectedImage = null;
-                            });
-                          },
-                          child: Container(
-                            width: 32,
-                            height: 32,
-                            decoration: const BoxDecoration(
-                              color: Colors.black54,
-                              shape: BoxShape.circle,
-                            ),
-                            child: const Icon(
-                              Icons.close,
-                              color: Colors.white,
-                              size: 18,
-                            ),
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                )
-              else
-                GestureDetector(
-                  onTap: _pickImage,
-                  child: Container(
-                    height: 120,
+                  maxLines: 5,
+                  minLines: 3,
+                  readOnly: _isUploading, // Disable input during upload
+                ),
+                
+                const SizedBox(height: 16),
+                
+                // Image Preview / Picker
+                if (_selectedImage != null)
+                  Container(
+                    height: 200,
                     width: double.infinity,
                     decoration: BoxDecoration(
-                      color: const Color(0xFF0A0A0A),
                       borderRadius: BorderRadius.circular(12),
-                      border: Border.all(
-                        color: const Color(0xFF333333),
-                        style: BorderStyle.solid,
-                      ),
+                      border: Border.all(color: const Color(0xFF333333)),
                     ),
-                    child: Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
+                    child: Stack(
                       children: [
-                        Icon(
-                          Icons.add_photo_alternate_outlined,
-                          size: 40,
-                          color: Colors.grey[400],
+                        ClipRRect(
+                          borderRadius: BorderRadius.circular(12),
+                          child: Image.file(
+                            _selectedImage!,
+                            fit: BoxFit.cover,
+                            width: double.infinity,
+                            height: double.infinity,
+                          ),
                         ),
-                        const SizedBox(height: 8),
-                        Text(
-                          'Add Photo',
-                          style: TextStyle(
-                            color: Colors.grey[400],
-                            fontSize: 16,
+                        Positioned(
+                          top: 8,
+                          right: 8,
+                          child: GestureDetector(
+                            onTap: _isUploading ? null : () {
+                              setState(() {
+                                _selectedImage = null;
+                              });
+                            },
+                            child: Container(
+                              width: 32,
+                              height: 32,
+                              decoration: const BoxDecoration(
+                                color: Colors.black54,
+                                shape: BoxShape.circle,
+                              ),
+                              child: const Icon(
+                                Icons.close,
+                                color: Colors.white,
+                                size: 18,
+                              ),
+                            ),
                           ),
                         ),
                       ],
                     ),
-                  ),
-                ),
-              
-              const SizedBox(height: 20),
-              
-              // Action Buttons
-              Row(
-                children: [
-                  Expanded(
-                    child: OutlinedButton(
-                      onPressed: () => Navigator.of(context).pop(),
-                      style: OutlinedButton.styleFrom(
-                        side: const BorderSide(color: Color(0xFF333333)),
-                        padding: const EdgeInsets.symmetric(vertical: 16),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(12),
+                  )
+                else
+                  GestureDetector(
+                    onTap: _isUploading ? null : _pickAndCropImage,
+                    child: Container(
+                      height: 120,
+                      width: double.infinity,
+                      decoration: BoxDecoration(
+                        color: const Color(0xFF0A0A0A),
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(
+                          color: const Color(0xFF333333),
+                          style: BorderStyle.solid,
                         ),
                       ),
-                      child: Text(
-                        'Cancel',
-                        style: TextStyle(
-                          color: Colors.grey[400],
-                          fontWeight: FontWeight.w600,
-                        ),
-                      ),
-                    ),
-                  ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: ElevatedButton(
-                      onPressed: _isUploading ? null : _createPost,
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: const Color(0xFF00D4FF),
-                        foregroundColor: Colors.black,
-                        padding: const EdgeInsets.symmetric(vertical: 16),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                        disabledBackgroundColor: Colors.grey[600],
-                      ),
-                      child: _isUploading
-                          ? const SizedBox(
-                              width: 20,
-                              height: 20,
-                              child: CircularProgressIndicator(
-                                strokeWidth: 2,
-                                valueColor: AlwaysStoppedAnimation<Color>(Colors.black),
-                              ),
-                            )
-                          : const Text(
-                              'Post',
-                              style: TextStyle(
-                                fontWeight: FontWeight.w600,
-                              ),
+                      child: Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Icon(
+                            Icons.add_photo_alternate_outlined,
+                            size: 40,
+                            color: _isUploading ? Colors.grey[600] : Colors.grey[400],
+                          ),
+                          const SizedBox(height: 8),
+                          Text(
+                            'Add Photo',
+                            style: TextStyle(
+                              color: _isUploading ? Colors.grey[600] : Colors.grey[400],
+                              fontSize: 16,
                             ),
+                          ),
+                          const SizedBox(height: 4),
+                          Text(
+                            'Tap to crop & edit',
+                            style: TextStyle(
+                              color: _isUploading ? Colors.grey[700] : Colors.grey[500],
+                              fontSize: 12,
+                            ),
+                          ),
+                        ],
+                      ),
                     ),
                   ),
-                ],
-              ),
-            ],
+                
+                const SizedBox(height: 20),
+                
+                // Action Buttons
+                Row(
+                  children: [
+                    Expanded(
+                      child: OutlinedButton(
+                        onPressed: _isUploading ? null : () => Navigator.of(context).pop(),
+                        style: OutlinedButton.styleFrom(
+                          side: const BorderSide(color: Color(0xFF333333)),
+                          padding: const EdgeInsets.symmetric(vertical: 16),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                        ),
+                        child: Text(
+                          'Cancel',
+                          style: TextStyle(
+                            color: _isUploading ? Colors.grey[600] : Colors.grey[400],
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: ElevatedButton(
+                        onPressed: _isUploading ? null : _createPost,
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: const Color(0xFF00D4FF),
+                          foregroundColor: Colors.black,
+                          padding: const EdgeInsets.symmetric(vertical: 16),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          disabledBackgroundColor: Colors.grey[600],
+                        ),
+                        child: _isUploading
+                            ? const SizedBox(
+                                width: 20,
+                                height: 20,
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 2,
+                                  valueColor: AlwaysStoppedAnimation<Color>(Colors.black),
+                                ),
+                              )
+                            : const Text(
+                                'Post',
+                                style: TextStyle(
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
           ),
         ),
       ),
@@ -335,7 +384,7 @@ class _CreatePostButtonState extends ConsumerState<CreatePostButton> {
     return Stack(
       children: [
         Padding(
-          padding: const EdgeInsets.only(bottom: 16.0),
+          padding: const EdgeInsets.only(bottom: 32.0),
           child: Container(
             decoration: BoxDecoration(
               borderRadius: BorderRadius.circular(16),

@@ -1,6 +1,5 @@
 import 'dart:io';
 import 'dart:isolate';
-import 'dart:typed_data';
 import 'package:flutter_image_compress/flutter_image_compress.dart';
 import 'package:cloudinary_public/cloudinary_public.dart';
 import 'package:image_picker/image_picker.dart';
@@ -96,7 +95,7 @@ void _uploadIsolateEntryPoint(SendPort sendPort) async {
           ),
         ).timeout(const Duration(seconds: 30));
 
-        final imageUrl = response.secureUrl ?? '';
+        final String imageUrl = response.secureUrl;
         
         // Clean up compressed file
         await compressedFile.delete();
@@ -193,24 +192,34 @@ class OptimizedPostService {
       String? imageUrl;
       
       if (imageFile != null) {
-        onProgress?.call(0.1); // Starting compression
+        onProgress?.call(0.05); // Starting
         
-        // Compress image first
+        // Compress image first with better error handling
         final compressedFile = await _compressImage(imageFile);
         
         if (compressedFile == null) {
-          throw Exception('Image compression failed');
+          throw Exception('Image compression failed - file may be corrupted');
         }
         
-        onProgress?.call(0.3); // Starting upload
+        onProgress?.call(0.2); // Compression done
         
-        // Upload in background isolate
-        imageUrl = await _uploadImageInBackground(compressedFile, userId);
-        
-        onProgress?.call(0.8); // Upload complete, creating post
+        // Upload with timeout and retry logic
+        try {
+          onProgress?.call(0.3); // Starting upload
+          imageUrl = await _uploadImageWithRetry(compressedFile, userId);
+          onProgress?.call(0.8); // Upload complete
+        } catch (e) {
+          // Clean up compressed file even if upload fails
+          try {
+            await compressedFile.delete();
+          } catch (_) {}
+          rethrow;
+        }
         
         // Clean up compressed file
-        await compressedFile.delete();
+        try {
+          await compressedFile.delete();
+        } catch (_) {}
       }
 
       onProgress?.call(0.9); // Creating post in database
@@ -248,12 +257,31 @@ class OptimizedPostService {
       onProgress?.call(1.0); // Complete
 
       // Check if this is the user's first post and trigger bot like
-      await _checkAndTriggerBotLike(post.id, userId);
+      _checkAndTriggerBotLike(post.id, userId);
 
       return post;
     } catch (e) {
       throw Exception('Failed to create post: $e');
     }
+  }
+
+  Future<String> _uploadImageWithRetry(File compressedFile, String userId) async {
+    const maxRetries = 3;
+    
+    for (int attempt = 1; attempt <= maxRetries; attempt++) {
+      try {
+        return await _uploadImageInBackground(compressedFile, userId);
+      } catch (e) {
+        if (attempt == maxRetries) {
+          rethrow;
+        }
+        
+        // Wait before retry with exponential backoff
+        await Future.delayed(Duration(milliseconds: 500 * attempt));
+      }
+    }
+    
+    throw Exception('Upload failed after $maxRetries attempts');
   }
 
   Future<File?> _compressImage(File imageFile) async {
@@ -288,7 +316,7 @@ class OptimizedPostService {
         ),
       ).timeout(const Duration(seconds: 30));
 
-      return response.secureUrl ?? '';
+      return response.secureUrl;
     } catch (e) {
       throw Exception('Image upload failed: $e');
     }
@@ -390,7 +418,7 @@ class OptimizedPostService {
           .eq('id', postId)
           .single();
 
-      final postData = response as Map<String, dynamic>;
+      final postData = response;
       final profile = postData['profiles'] as Map<String, dynamic>?;
       final likes = postData['post_likes'] as List?;
 
