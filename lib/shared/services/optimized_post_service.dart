@@ -34,7 +34,6 @@ class OptimizedPostService {
               avatar_url
             ),
             post_likes!left (
-              id,
               user_id
             )
           ''')
@@ -81,34 +80,16 @@ class OptimizedPostService {
       if (imageFile != null) {
         onProgress?.call(0.05); // Starting
         await Future<void>.delayed(Duration.zero);
-        
-        // Compress image first with better error handling
-        final compressedFile = await _compressImage(imageFile);
-        
-        if (compressedFile == null) {
-          throw Exception('Image compression failed - file may be corrupted');
-        }
-        
-        onProgress?.call(0.2); // Compression done
-        
-        // Upload with timeout and retry logic
+
+        onProgress?.call(0.2); // Image ready
+
         try {
           onProgress?.call(0.3); // Starting upload
-          await _deleteTemporaryFile(imageFile);
-          imageUrl = await _uploadImageWithRetry(compressedFile, userId);
+          imageUrl = await _uploadImageWithRetry(imageFile, userId);
           onProgress?.call(0.8); // Upload complete
         } catch (e) {
-          // Clean up compressed file even if upload fails
-          try {
-            await compressedFile.delete();
-          } catch (_) {}
           rethrow;
         }
-        
-        // Clean up compressed file
-        try {
-          await compressedFile.delete();
-        } catch (_) {}
       }
 
       onProgress?.call(0.9); // Creating post in database
@@ -320,7 +301,6 @@ class OptimizedPostService {
               avatar_url
             ),
             post_likes!left (
-              id,
               user_id
             )
           ''')

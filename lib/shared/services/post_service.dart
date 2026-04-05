@@ -35,7 +35,7 @@ class PostService {
               avatar_url
             ),
             post_likes!left (
-              id
+              user_id
             )
           ''')
           .order('created_at', ascending: false)
@@ -226,7 +226,6 @@ class PostService {
               avatar_url
             ),
             post_likes!left (
-              id,
               user_id
             )
           ''')

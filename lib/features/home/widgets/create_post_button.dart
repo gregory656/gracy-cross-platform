@@ -1,7 +1,6 @@
 import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:image_cropper/image_cropper.dart';
 
 import '../providers/post_providers.dart';
 
@@ -15,65 +14,49 @@ class CreatePostButton extends ConsumerStatefulWidget {
 class _CreatePostButtonState extends ConsumerState<CreatePostButton> {
   static const Color _fabColor = Color(0xFF007AFF);
   final TextEditingController _contentController = TextEditingController();
+  final List<File> _pendingCleanupImages = <File>[];
   File? _selectedImage;
   bool _isUploading = false;
 
   @override
   void dispose() {
+    for (final image in _pendingCleanupImages) {
+      if (image.existsSync()) {
+        image.deleteSync();
+      }
+    }
     _contentController.dispose();
     super.dispose();
   }
 
-  Future<void> _pickAndCropImage() async {
+  Future<void> _pickImage() async {
     try {
       final postService = ref.read(optimizedPostServiceProvider);
-      final image = await postService.pickImage();
+      final sourceImage = await postService.pickImage();
 
-      if (image != null) {
-        final croppedFile = await ImageCropper().cropImage(
-          sourcePath: image.path,
-          uiSettings: [
-            AndroidUiSettings(
-              toolbarTitle: 'Crop Image',
-              toolbarColor: _fabColor,
-              toolbarWidgetColor: Colors.black,
-              initAspectRatio: CropAspectRatioPreset.square,
-              lockAspectRatio: false,
-              backgroundColor: Colors.black,
-              activeControlsWidgetColor: _fabColor,
-              aspectRatioPresets: [
-                CropAspectRatioPreset.square,
-                CropAspectRatioPreset.ratio16x9,
-                CropAspectRatioPreset.original,
-              ],
-            ),
-            IOSUiSettings(
-              title: 'Crop Image',
-              cancelButtonTitle: 'Cancel',
-              doneButtonTitle: 'Done',
-              aspectRatioPresets: [
-                CropAspectRatioPreset.square,
-                CropAspectRatioPreset.ratio16x9,
-                CropAspectRatioPreset.original,
-              ],
-            ),
-          ],
+      if (sourceImage != null) {
+        final optimizedImage = await postService.compressSelectedImage(
+          sourceImage,
         );
 
-        if (croppedFile != null) {
-          final optimizedImage = await postService.compressSelectedImage(
-            File(croppedFile.path),
-          );
+        if (optimizedImage == null) {
+          throw Exception('Image optimization failed');
+        }
 
-          if (optimizedImage == null) {
-            throw Exception('Image optimization failed');
-          }
+        final previousImage = _selectedImage;
 
-          await _disposeSelectedImage();
+        if (!mounted) {
+          await _deleteTemporaryImage(optimizedImage);
+          return;
+        }
 
-          setState(() {
-            _selectedImage = optimizedImage;
-          });
+        setState(() {
+          _selectedImage = optimizedImage;
+        });
+
+        _queueTemporaryImage(previousImage);
+        if (optimizedImage.path != sourceImage.path) {
+          _queueTemporaryImage(sourceImage);
         }
       }
     } catch (e) {
@@ -88,7 +71,7 @@ class _CreatePostButtonState extends ConsumerState<CreatePostButton> {
     }
   }
 
-  Future<void> _createPost() async {
+  Future<void> _createPost(BuildContext dialogContext) async {
     if (_contentController.text.trim().isEmpty && _selectedImage == null) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
@@ -100,22 +83,22 @@ class _CreatePostButtonState extends ConsumerState<CreatePostButton> {
     }
 
     final messenger = ScaffoldMessenger.of(context);
-    final navigator = Navigator.of(context);
+    final content = _contentController.text.trim();
+    final imageToUpload = _selectedImage;
 
     setState(() {
       _isUploading = true;
     });
 
-    await Future<void>.delayed(Duration.zero);
+    if (dialogContext.mounted) {
+      Navigator.of(dialogContext).pop();
+    }
 
-    final imageToUpload = _selectedImage;
-    _selectedImage = null;
-    await _disposePreviewImage(imageToUpload);
-    navigator.pop();
+    await Future<void>.delayed(Duration.zero);
 
     try {
       await ref.read(postsProvider.notifier).createPost(
-        content: _contentController.text.trim(),
+        content: content,
         imageFile: imageToUpload,
       );
 
@@ -148,25 +131,17 @@ class _CreatePostButtonState extends ConsumerState<CreatePostButton> {
         );
       }
     } finally {
+      _queueTemporaryImage(imageToUpload);
+      await _flushQueuedImages();
       await _deleteTemporaryImage(imageToUpload);
       if (mounted) {
         setState(() {
+          _selectedImage = null;
           _isUploading = false;
           _contentController.clear();
         });
       }
     }
-  }
-
-  Future<void> _disposePreviewImage(File? image) async {
-    if (image == null) {
-      return;
-    }
-
-    final provider = FileImage(image);
-    await provider.evict();
-    PaintingBinding.instance.imageCache.clear();
-    PaintingBinding.instance.imageCache.clearLiveImages();
   }
 
   Future<void> _deleteTemporaryImage(File? image) async {
@@ -181,18 +156,49 @@ class _CreatePostButtonState extends ConsumerState<CreatePostButton> {
     } catch (_) {}
   }
 
-  Future<void> _disposeSelectedImage() async {
+  void _queueTemporaryImage(File? image) {
+    if (image == null) {
+      return;
+    }
+
+    final alreadyQueued = _pendingCleanupImages.any(
+      (queuedImage) => queuedImage.path == image.path,
+    );
+    if (!alreadyQueued) {
+      _pendingCleanupImages.add(image);
+    }
+  }
+
+  Future<void> _flushQueuedImages() async {
+    final filesToDelete = List<File>.from(_pendingCleanupImages);
+    _pendingCleanupImages.clear();
+
+    for (final image in filesToDelete) {
+      await _deleteTemporaryImage(image);
+    }
+  }
+
+  Future<void> _discardDraft(BuildContext dialogContext) async {
     final previous = _selectedImage;
-    _selectedImage = null;
-    await _disposePreviewImage(previous);
-    await _deleteTemporaryImage(previous);
+    if (mounted) {
+      setState(() {
+        _selectedImage = null;
+        _contentController.clear();
+      });
+    }
+
+    if (dialogContext.mounted) {
+      Navigator.of(dialogContext).pop();
+    }
+    _queueTemporaryImage(previous);
+    await _flushQueuedImages();
   }
 
   void _showCreatePostDialog() {
     showDialog(
       context: context,
       barrierDismissible: false, // Prevent accidental dismissal during upload
-      builder: (context) => Dialog(
+      builder: (dialogContext) => Dialog(
         backgroundColor: const Color(0xFF1A1A1A),
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(16),
@@ -200,9 +206,9 @@ class _CreatePostButtonState extends ConsumerState<CreatePostButton> {
         ),
         child: SingleChildScrollView(
           child: Container(
-            width: MediaQuery.of(context).size.width * 0.9,
+            width: MediaQuery.of(dialogContext).size.width * 0.9,
             constraints: BoxConstraints(
-              maxHeight: MediaQuery.of(context).size.height * 0.8,
+              maxHeight: MediaQuery.of(dialogContext).size.height * 0.8,
             ),
             padding: const EdgeInsets.all(20),
             child: Column(
@@ -213,14 +219,16 @@ class _CreatePostButtonState extends ConsumerState<CreatePostButton> {
                   children: [
                     Text(
                       'Create Post',
-                      style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                      style: Theme.of(dialogContext).textTheme.titleLarge?.copyWith(
                         color: Colors.white,
                         fontWeight: FontWeight.w600,
                       ),
                     ),
                     const Spacer(),
                     IconButton(
-                      onPressed: _isUploading ? null : () => Navigator.of(context).pop(),
+                      onPressed: _isUploading
+                          ? null
+                          : () => _discardDraft(dialogContext),
                       icon: const Icon(Icons.close, color: Colors.white),
                     ),
                   ],
@@ -282,10 +290,15 @@ class _CreatePostButtonState extends ConsumerState<CreatePostButton> {
                           top: 8,
                           right: 8,
                           child: GestureDetector(
-                            onTap: _isUploading ? null : () {
-                              _disposeSelectedImage();
-                              setState(() {});
-                            },
+                            onTap: _isUploading
+                                ? null
+                                : () async {
+                                    final previous = _selectedImage;
+                                    setState(() {
+                                      _selectedImage = null;
+                                    });
+                                    _queueTemporaryImage(previous);
+                                  },
                             child: Container(
                               width: 32,
                               height: 32,
@@ -306,7 +319,7 @@ class _CreatePostButtonState extends ConsumerState<CreatePostButton> {
                   )
                 else
                   GestureDetector(
-                    onTap: _isUploading ? null : _pickAndCropImage,
+                    onTap: _isUploading ? null : _pickImage,
                     child: Container(
                       height: 120,
                       width: double.infinity,
@@ -336,7 +349,7 @@ class _CreatePostButtonState extends ConsumerState<CreatePostButton> {
                           ),
                           const SizedBox(height: 4),
                           Text(
-                            'Tap to crop & edit',
+                            'Tap to attach',
                             style: TextStyle(
                               color: _isUploading ? Colors.grey[700] : Colors.grey[500],
                               fontSize: 12,
@@ -354,7 +367,9 @@ class _CreatePostButtonState extends ConsumerState<CreatePostButton> {
                   children: [
                     Expanded(
                       child: OutlinedButton(
-                        onPressed: _isUploading ? null : () => Navigator.of(context).pop(),
+                        onPressed: _isUploading
+                            ? null
+                            : () => _discardDraft(dialogContext),
                         style: OutlinedButton.styleFrom(
                           side: const BorderSide(color: Color(0xFF333333)),
                           padding: const EdgeInsets.symmetric(vertical: 16),
@@ -374,7 +389,9 @@ class _CreatePostButtonState extends ConsumerState<CreatePostButton> {
                     const SizedBox(width: 12),
                     Expanded(
                       child: ElevatedButton(
-                        onPressed: _isUploading ? null : _createPost,
+                        onPressed: _isUploading
+                            ? null
+                            : () => _createPost(dialogContext),
                         style: ElevatedButton.styleFrom(
                           backgroundColor: _fabColor,
                           foregroundColor: Colors.black,

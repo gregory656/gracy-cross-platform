@@ -92,24 +92,24 @@ class PostsNotifier extends AsyncNotifier<List<PostModel>> {
       _currentStatus = 'Preparing post...';
       state = AsyncValue.data(List.from(_posts));
 
-      final newPost = await Future<PostModel>.microtask(
-        () => _postService.createPost(
-          content: content,
-          imageFile: imageFile,
-          onProgress: (progress) {
-            _currentProgress = progress;
-            if (progress < 0.2) {
-              _currentStatus = 'Compressing image...';
-            } else if (progress < 0.8) {
-              _currentStatus = 'Uploading image...';
-            } else if (progress < 0.9) {
-              _currentStatus = 'Creating post...';
-            } else {
-              _currentStatus = 'Almost done...';
-            }
-            state = AsyncValue.data(List.from(_posts));
-          },
-        ),
+      await Future<void>.delayed(Duration.zero);
+
+      final newPost = await _postService.createPost(
+        content: content,
+        imageFile: imageFile,
+        onProgress: (progress) {
+          _currentProgress = progress;
+          if (progress < 0.2) {
+            _currentStatus = 'Preparing image...';
+          } else if (progress < 0.8) {
+            _currentStatus = 'Uploading image...';
+          } else if (progress < 0.9) {
+            _currentStatus = 'Creating post...';
+          } else {
+            _currentStatus = 'Almost done...';
+          }
+          state = AsyncValue.data(List.from(_posts));
+        },
       );
 
       _posts.insert(0, newPost);
