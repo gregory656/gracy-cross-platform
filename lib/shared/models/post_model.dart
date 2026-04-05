@@ -28,11 +28,19 @@ class PostModel extends Equatable {
   });
 
   factory PostModel.fromMap(Map<String, dynamic> map) {
+    final dynamic rawContent = map['content'] ??
+        map['text'] ??
+        map['caption'] ??
+        map['body'] ??
+        map['post_text'] ??
+        map['description'] ??
+        map['message'];
+
     return PostModel(
       id: map['id'] as String,
       authorId: map['author_id'] as String,
       imageUrl: map['image_url'] as String?,
-      content: map['content'] as String? ?? '',
+      content: rawContent?.toString() ?? '',
       likesCount: (map['likes_count'] as num?)?.toInt() ?? 0,
       commentsCount: (map['comments_count'] as num?)?.toInt() ?? 0,
       createdAt: DateTime.parse(map['created_at'] as String),

@@ -15,6 +15,7 @@ class _CreatePostButtonState extends ConsumerState<CreatePostButton> {
   static const Color _fabColor = Color(0xFF007AFF);
   final TextEditingController _contentController = TextEditingController();
   final List<File> _pendingCleanupImages = <File>[];
+  StateSetter? _dialogSetState;
   File? _selectedImage;
   bool _isUploading = false;
 
@@ -27,6 +28,13 @@ class _CreatePostButtonState extends ConsumerState<CreatePostButton> {
     }
     _contentController.dispose();
     super.dispose();
+  }
+
+  void _refreshDialog() {
+    final dialogSetState = _dialogSetState;
+    if (dialogSetState != null) {
+      dialogSetState(() {});
+    }
   }
 
   Future<void> _pickImage() async {
@@ -53,6 +61,7 @@ class _CreatePostButtonState extends ConsumerState<CreatePostButton> {
         setState(() {
           _selectedImage = optimizedImage;
         });
+        _refreshDialog();
 
         _queueTemporaryImage(previousImage);
         if (optimizedImage.path != sourceImage.path) {
@@ -89,6 +98,7 @@ class _CreatePostButtonState extends ConsumerState<CreatePostButton> {
     setState(() {
       _isUploading = true;
     });
+    _refreshDialog();
 
     if (dialogContext.mounted) {
       Navigator.of(dialogContext).pop();
@@ -113,7 +123,13 @@ class _CreatePostButtonState extends ConsumerState<CreatePostButton> {
       }
     } catch (e) {
       if (mounted) {
-        String errorMessage = 'Failed to create post';
+        String errorMessage = e.toString().replaceFirst(
+          'Exception: Failed to create post: ',
+          '',
+        );
+        if (errorMessage.trim().isEmpty) {
+          errorMessage = 'Failed to create post';
+        }
         
         if (e.toString().contains('timeout')) {
           errorMessage = 'Upload timed out. Check your connection.';
@@ -140,6 +156,7 @@ class _CreatePostButtonState extends ConsumerState<CreatePostButton> {
           _isUploading = false;
           _contentController.clear();
         });
+        _refreshDialog();
       }
     }
   }
@@ -185,6 +202,7 @@ class _CreatePostButtonState extends ConsumerState<CreatePostButton> {
         _selectedImage = null;
         _contentController.clear();
       });
+      _refreshDialog();
     }
 
     if (dialogContext.mounted) {
@@ -198,22 +216,26 @@ class _CreatePostButtonState extends ConsumerState<CreatePostButton> {
     showDialog(
       context: context,
       barrierDismissible: false, // Prevent accidental dismissal during upload
-      builder: (dialogContext) => Dialog(
-        backgroundColor: const Color(0xFF1A1A1A),
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(16),
-          side: const BorderSide(color: Color(0xFF333333)),
-        ),
-        child: SingleChildScrollView(
-          child: Container(
-            width: MediaQuery.of(dialogContext).size.width * 0.9,
-            constraints: BoxConstraints(
-              maxHeight: MediaQuery.of(dialogContext).size.height * 0.8,
+      builder: (dialogContext) => StatefulBuilder(
+        builder: (dialogContext, dialogSetState) {
+          _dialogSetState = dialogSetState;
+
+          return Dialog(
+            backgroundColor: const Color(0xFF1A1A1A),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(16),
+              side: const BorderSide(color: Color(0xFF333333)),
             ),
-            padding: const EdgeInsets.all(20),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
+            child: SingleChildScrollView(
+              child: Container(
+                width: MediaQuery.of(dialogContext).size.width * 0.9,
+                constraints: BoxConstraints(
+                  maxHeight: MediaQuery.of(dialogContext).size.height * 0.8,
+                ),
+                padding: const EdgeInsets.all(20),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
                 // Header
                 Row(
                   children: [
@@ -297,6 +319,7 @@ class _CreatePostButtonState extends ConsumerState<CreatePostButton> {
                                     setState(() {
                                       _selectedImage = null;
                                     });
+                                    _refreshDialog();
                                     _queueTemporaryImage(previous);
                                   },
                             child: Container(
@@ -420,12 +443,16 @@ class _CreatePostButtonState extends ConsumerState<CreatePostButton> {
                     ),
                   ],
                 ),
-              ],
+                  ],
+                ),
+              ),
             ),
-          ),
-        ),
+          );
+        },
       ),
-    );
+    ).whenComplete(() {
+      _dialogSetState = null;
+    });
   }
 
   @override

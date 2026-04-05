@@ -19,6 +19,15 @@ class OptimizedPostService {
   static const int _targetImageHeight = 1080;
   static const int _targetImageQuality = 80;
   static const int _maxUploadBytes = 1000000;
+  static const List<String> _postTextColumns = <String>[
+    'content',
+    'text',
+    'caption',
+    'body',
+    'post_text',
+    'description',
+    'message',
+  ];
 
   Future<List<PostModel>> getPosts({int limit = 20, int offset = 0}) async {
     try {
@@ -94,33 +103,17 @@ class OptimizedPostService {
 
       onProgress?.call(0.9); // Creating post in database
 
-      final postData = {
-        'author_id': userId,
-        'content': content,
-        'image_url': imageUrl,
-        'likes_count': 0,
-        'comments_count': 0,
-      };
-
-      final response = await _supabase
-          .from('posts')
-          .insert(postData)
-          .select('''
-            *,
-            profiles!posts_author_id_fkey (
-              username,
-              avatar_url
-            )
-          ''')
-          .single();
-
-      final Map<String, dynamic> postDataWithProfile =
-          Map<String, dynamic>.from(response);
-      final profile = postDataWithProfile['profiles'] as Map<String, dynamic>?;
+      final postDataWithProfile = await _insertPostRecord(
+        userId: userId,
+        content: content,
+        imageUrl: imageUrl,
+      );
+      final profile = await _getCurrentProfile(userId);
 
       final post = PostModel.fromMap({
         ...postDataWithProfile,
-        'author_name': profile?['username'] as String?,
+        'author_name': profile?['username'] as String? ??
+            _supabase.auth.currentUser?.userMetadata?['username']?.toString(),
         'author_avatar': profile?['avatar_url'] as String?,
         'is_liked_by_current_user': false,
       });
@@ -230,6 +223,73 @@ class OptimizedPostService {
       // Log error but don't throw since this is a background operation
       debugPrint('Failed to check first post status: $e');
     }
+  }
+
+  Future<Map<String, dynamic>?> _getCurrentProfile(String userId) async {
+    try {
+      final response = await _supabase
+          .from('profiles')
+          .select('username, avatar_url')
+          .eq('id', userId)
+          .maybeSingle();
+
+      if (response == null) {
+        return null;
+      }
+
+      return Map<String, dynamic>.from(response);
+    } catch (_) {
+      return null;
+    }
+  }
+
+  Future<Map<String, dynamic>> _insertPostRecord({
+    required String userId,
+    required String content,
+    required String? imageUrl,
+  }) async {
+    final baseData = <String, dynamic>{
+      'author_id': userId,
+      'image_url': imageUrl,
+      'likes_count': 0,
+      'comments_count': 0,
+    };
+    final trimmedContent = content.trim();
+    final candidateColumns = trimmedContent.isEmpty
+        ? <String?>[null]
+        : _postTextColumns.cast<String?>();
+
+    Object? lastError;
+
+    for (final column in candidateColumns) {
+      final postData = Map<String, dynamic>.from(baseData);
+      if (column != null) {
+        postData[column] = trimmedContent;
+      }
+
+      try {
+        final response = await _supabase.from('posts').insert(postData).select().single();
+        return Map<String, dynamic>.from(response);
+      } catch (e) {
+        lastError = e;
+        if (column != null && _isMissingColumnError(e, column)) {
+          continue;
+        }
+        rethrow;
+      }
+    }
+
+    throw Exception(
+      'Posts table text column is unsupported. Tried: ${_postTextColumns.join(', ')}. Last error: $lastError',
+    );
+  }
+
+  bool _isMissingColumnError(Object error, String column) {
+    final message = error.toString().toLowerCase();
+    final missingColumnMessage =
+        "could not find '$column' column of 'posts' in the schema cache";
+    return message.contains(missingColumnMessage) ||
+        (message.contains(column.toLowerCase()) && message.contains('column'));
   }
 
   Future<void> _likePostAsBot(String postId) async {

@@ -32,6 +32,7 @@ migrate_working_dir/
 .pub/
 /build/
 /coverage/
+.gradle-local/
 lib/core/constants_local.dart
 lib/core/secrets.dart
 
