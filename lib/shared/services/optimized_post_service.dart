@@ -305,6 +305,55 @@ class OptimizedPostService {
         (message.contains(column.toLowerCase()) && message.contains('column'));
   }
 
+  String? _resolvePostTextColumn(Map<String, dynamic> postData) {
+    for (final column in _postTextColumns) {
+      if (postData.containsKey(column) && postData[column] != null) {
+        return column;
+      }
+    }
+
+    for (final column in _postTextColumns) {
+      if (postData.containsKey(column)) {
+        return column;
+      }
+    }
+
+    return null;
+  }
+
+  Future<void> _updatePostTextRecord({
+    required String postId,
+    required String content,
+    String? preferredColumn,
+  }) async {
+    final orderedColumns = <String>[
+      ?preferredColumn,
+      ..._postTextColumns.where((column) => column != preferredColumn),
+    ];
+
+    Object? lastError;
+
+    for (final column in orderedColumns) {
+      try {
+        await _supabase
+            .from('posts')
+            .update({column: content})
+            .eq('id', postId);
+        return;
+      } catch (e) {
+        lastError = e;
+        if (_isMissingColumnError(e, column)) {
+          continue;
+        }
+        rethrow;
+      }
+    }
+
+    throw Exception(
+      'Posts table text column is unsupported. Tried: ${orderedColumns.join(', ')}. Last error: $lastError',
+    );
+  }
+
   Future<void> _likePostAsBot(String postId) async {
     try {
       await _supabase.from('post_likes').insert({
@@ -383,6 +432,38 @@ class OptimizedPostService {
     } catch (e) {
       _logSupabaseError('Failed to fetch post', e);
       throw Exception('Failed to fetch post: $e');
+    }
+  }
+
+  Future<PostModel> updatePostCaption({
+    required String postId,
+    required String content,
+  }) async {
+    try {
+      final userId = _supabase.auth.currentUser?.id;
+      if (userId == null) throw Exception('User not authenticated');
+
+      final response = await _supabase
+          .from('posts')
+          .select('*')
+          .eq('id', postId)
+          .single();
+      final postData = Map<String, dynamic>.from(response);
+
+      if (postData['author_id'] != userId) {
+        throw Exception('You can only edit your own posts');
+      }
+
+      await _updatePostTextRecord(
+        postId: postId,
+        content: content.trim(),
+        preferredColumn: _resolvePostTextColumn(postData),
+      );
+
+      return await getPostById(postId);
+    } catch (e) {
+      _logSupabaseError('Failed to update post', e);
+      throw Exception('Failed to update post: $e');
     }
   }
 

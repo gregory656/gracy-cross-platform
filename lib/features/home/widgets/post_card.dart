@@ -5,6 +5,7 @@ import 'package:share_plus/share_plus.dart';
 import 'package:intl/intl.dart';
 import '../../../core/utils/elite_animations.dart';
 import '../../../shared/models/post_model.dart';
+import '../../../shared/providers/auth_provider.dart';
 import '../../../shared/services/nairobi_timezone_service.dart';
 import '../providers/post_providers.dart';
 
@@ -19,6 +20,7 @@ class PostCard extends ConsumerStatefulWidget {
 
 class _PostCardState extends ConsumerState<PostCard> {
   bool _isLiking = false;
+  bool _isDeleting = false;
 
   String _formatTimestamp(DateTime timestamp) {
     final nairobiTime = NairobiTimezoneService.instance.convertToNairobi(
@@ -92,9 +94,113 @@ class _PostCardState extends ConsumerState<PostCard> {
     );
   }
 
+  bool _isOwnedByCurrentUser(String? currentUserId) {
+    return currentUserId != null && currentUserId == widget.post.authorId;
+  }
+
+  Future<void> _showOwnerActions() async {
+    if (_isDeleting) {
+      return;
+    }
+
+    final action = await showModalBottomSheet<_PostOwnerAction>(
+      context: context,
+      backgroundColor: Colors.transparent,
+      builder: (context) => const _PostOwnerActionSheet(),
+    );
+
+    if (!mounted || action == null) {
+      return;
+    }
+
+    switch (action) {
+      case _PostOwnerAction.edit:
+        await _showEditPostSheet();
+        break;
+      case _PostOwnerAction.delete:
+        await _confirmDeletePost();
+        break;
+    }
+  }
+
+  Future<void> _showEditPostSheet() async {
+    final messenger = ScaffoldMessenger.maybeOf(context);
+    final wasUpdated = await showModalBottomSheet<bool>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (context) => _EditPostSheet(post: widget.post),
+    );
+
+    if (wasUpdated == true) {
+      messenger?.clearSnackBars();
+      messenger?.showSnackBar(
+        const SnackBar(
+          content: Text('Post updated'),
+          backgroundColor: Colors.green,
+        ),
+      );
+    }
+  }
+
+  Future<void> _confirmDeletePost() async {
+    EliteHaptics.mediumImpact();
+
+    final shouldDelete = await showDialog<bool>(
+      context: context,
+      builder: (context) => const _DeletePostDialog(),
+    );
+
+    if (shouldDelete == true) {
+      await _deletePost();
+    }
+  }
+
+  Future<void> _deletePost() async {
+    if (_isDeleting) {
+      return;
+    }
+
+    final messenger = ScaffoldMessenger.maybeOf(context);
+
+    if (mounted) {
+      setState(() {
+        _isDeleting = true;
+      });
+    }
+
+    try {
+      await ref.read(postsProvider.notifier).deletePost(widget.post.id);
+      messenger?.clearSnackBars();
+      messenger?.showSnackBar(
+        const SnackBar(
+          content: Text('Post deleted'),
+          backgroundColor: Colors.green,
+        ),
+      );
+    } catch (e) {
+      messenger?.showSnackBar(
+        SnackBar(
+          content: Text('Failed to delete post: $e'),
+          backgroundColor: Colors.red,
+        ),
+      );
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isDeleting = false;
+        });
+      }
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final currentUserId = ref.watch(
+      authNotifierProvider.select((authState) => authState.userId),
+    );
+    final canManagePost = _isOwnedByCurrentUser(currentUserId);
 
     return Container(
       margin: const EdgeInsets.only(bottom: 16),
@@ -168,6 +274,20 @@ class _PostCardState extends ConsumerState<PostCard> {
                     ],
                   ),
                 ),
+                if (canManagePost)
+                  IconButton(
+                    onPressed: _showOwnerActions,
+                    style: IconButton.styleFrom(
+                      minimumSize: const Size(36, 36),
+                      padding: EdgeInsets.zero,
+                      tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                    ),
+                    icon: Icon(
+                      Icons.more_horiz,
+                      color: theme.colorScheme.onSurfaceVariant,
+                      size: 20,
+                    ),
+                  ),
               ],
             ),
           ),
@@ -333,6 +453,496 @@ class _EngagementButton extends StatelessWidget {
             ),
           ),
         ],
+      ),
+    );
+  }
+}
+
+enum _PostOwnerAction { edit, delete }
+
+class _PostOwnerActionSheet extends StatelessWidget {
+  const _PostOwnerActionSheet();
+
+  static const Color _sheetColor = Color(0xFF1A1A1A);
+  static const Color _borderColor = Color(0xFF333333);
+  static const Color _deleteColor = Color(0xFFFF3B30);
+
+  @override
+  Widget build(BuildContext context) {
+    final viewPadding = MediaQuery.of(context).viewPadding;
+
+    return SafeArea(
+      top: false,
+      child: Padding(
+        padding: EdgeInsets.fromLTRB(12, 0, 12, viewPadding.bottom + 12),
+        child: Material(
+          color: _sheetColor,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(24),
+            side: const BorderSide(color: _borderColor),
+          ),
+          clipBehavior: Clip.antiAlias,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Container(
+                width: 44,
+                height: 4,
+                margin: const EdgeInsets.only(top: 12, bottom: 8),
+                decoration: BoxDecoration(
+                  color: Colors.white24,
+                  borderRadius: BorderRadius.circular(999),
+                ),
+              ),
+              Padding(
+                padding: const EdgeInsets.fromLTRB(20, 4, 20, 8),
+                child: Align(
+                  alignment: Alignment.centerLeft,
+                  child: Text(
+                    'Post Actions',
+                    style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                      color: Colors.white,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                ),
+              ),
+              _ActionTile(
+                icon: Icons.edit_outlined,
+                label: 'Edit Post',
+                color: Colors.white,
+                onTap: () => Navigator.of(context).pop(_PostOwnerAction.edit),
+              ),
+              const Divider(height: 1, color: _borderColor),
+              _ActionTile(
+                icon: Icons.delete_outline,
+                label: 'Delete Post',
+                color: _deleteColor,
+                onTap: () => Navigator.of(context).pop(_PostOwnerAction.delete),
+              ),
+              const SizedBox(height: 8),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _ActionTile extends StatelessWidget {
+  const _ActionTile({
+    required this.icon,
+    required this.label,
+    required this.color,
+    required this.onTap,
+  });
+
+  final IconData icon;
+  final String label;
+  final Color color;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(16),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 18),
+        child: Row(
+          children: [
+            Icon(icon, color: color, size: 20),
+            const SizedBox(width: 14),
+            Text(
+              label,
+              style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                color: color,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _EditPostSheet extends ConsumerStatefulWidget {
+  const _EditPostSheet({required this.post});
+
+  final PostModel post;
+
+  @override
+  ConsumerState<_EditPostSheet> createState() => _EditPostSheetState();
+}
+
+class _EditPostSheetState extends ConsumerState<_EditPostSheet> {
+  static const Color _sheetColor = Color(0xFF1A1A1A);
+  static const Color _panelColor = Color(0xFF0E0E0E);
+  static const Color _borderColor = Color(0xFF333333);
+  final TextEditingController _captionController = TextEditingController();
+  bool _isSaving = false;
+
+  bool get _hasImage => widget.post.imageUrl?.isNotEmpty == true;
+
+  bool get _canSave {
+    if (_isSaving) {
+      return false;
+    }
+
+    final trimmedCaption = _captionController.text.trim();
+    final originalCaption = widget.post.content.trim();
+
+    if (trimmedCaption == originalCaption) {
+      return false;
+    }
+
+    if (trimmedCaption.isEmpty && !_hasImage) {
+      return false;
+    }
+
+    return true;
+  }
+
+  @override
+  void initState() {
+    super.initState();
+    _captionController.text = widget.post.content;
+    _captionController.addListener(_handleCaptionChanged);
+  }
+
+  @override
+  void dispose() {
+    _captionController
+      ..removeListener(_handleCaptionChanged)
+      ..dispose();
+    super.dispose();
+  }
+
+  void _handleCaptionChanged() {
+    if (mounted) {
+      setState(() {});
+    }
+  }
+
+  Future<void> _saveChanges() async {
+    if (!_canSave) {
+      return;
+    }
+
+    setState(() {
+      _isSaving = true;
+    });
+
+    try {
+      await ref
+          .read(postsProvider.notifier)
+          .updatePostCaption(
+            postId: widget.post.id,
+            content: _captionController.text,
+          );
+
+      if (!mounted) {
+        return;
+      }
+
+      Navigator.of(context).pop(true);
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(_buildEditErrorMessage(e)),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isSaving = false;
+        });
+      }
+    }
+  }
+
+  String _buildEditErrorMessage(Object error) {
+    final raw = error.toString();
+    const prefix = 'Exception: Failed to update post: ';
+    if (raw.startsWith(prefix)) {
+      return raw.substring(prefix.length);
+    }
+    return raw;
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final mediaQuery = MediaQuery.of(context);
+
+    return SafeArea(
+      top: false,
+      child: AnimatedPadding(
+        duration: const Duration(milliseconds: 180),
+        curve: Curves.easeOut,
+        padding: EdgeInsets.only(bottom: mediaQuery.viewInsets.bottom),
+        child: Container(
+          decoration: const BoxDecoration(
+            color: _sheetColor,
+            borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
+          ),
+          child: SingleChildScrollView(
+            padding: EdgeInsets.fromLTRB(
+              20,
+              12,
+              20,
+              mediaQuery.viewPadding.bottom + 20,
+            ),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Center(
+                  child: Container(
+                    width: 44,
+                    height: 4,
+                    decoration: BoxDecoration(
+                      color: Colors.white24,
+                      borderRadius: BorderRadius.circular(999),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 18),
+                Row(
+                  children: [
+                    Text(
+                      'Edit Post',
+                      style: theme.textTheme.titleLarge?.copyWith(
+                        color: Colors.white,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                    const Spacer(),
+                    IconButton(
+                      onPressed: _isSaving
+                          ? null
+                          : () => Navigator.of(context).pop(),
+                      icon: const Icon(Icons.close, color: Colors.white),
+                    ),
+                  ],
+                ),
+                Text(
+                  'Update your caption and keep the post looking sharp in the feed.',
+                  style: theme.textTheme.bodyMedium?.copyWith(
+                    color: Colors.white70,
+                    height: 1.4,
+                  ),
+                ),
+                const SizedBox(height: 20),
+                if (_hasImage) ...[
+                  Container(
+                    height: 220,
+                    width: double.infinity,
+                    decoration: BoxDecoration(
+                      color: _panelColor,
+                      borderRadius: BorderRadius.circular(16),
+                      border: Border.all(color: _borderColor),
+                    ),
+                    clipBehavior: Clip.antiAlias,
+                    child: CachedNetworkImage(
+                      imageUrl: widget.post.optimizedImageUrl,
+                      fit: BoxFit.cover,
+                      placeholder: (context, url) => const Center(
+                        child: CircularProgressIndicator(
+                          valueColor: AlwaysStoppedAnimation<Color>(
+                            Colors.white,
+                          ),
+                        ),
+                      ),
+                      errorWidget: (context, url, error) => const Center(
+                        child: Icon(
+                          Icons.broken_image_outlined,
+                          color: Colors.white54,
+                          size: 40,
+                        ),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 18),
+                ],
+                Text(
+                  'Caption',
+                  style: theme.textTheme.labelLarge?.copyWith(
+                    color: Colors.white,
+                    fontWeight: FontWeight.w700,
+                    letterSpacing: 0.4,
+                  ),
+                ),
+                const SizedBox(height: 10),
+                TextField(
+                  controller: _captionController,
+                  enabled: !_isSaving,
+                  style: const TextStyle(color: Colors.white),
+                  maxLines: 6,
+                  minLines: 4,
+                  textCapitalization: TextCapitalization.sentences,
+                  decoration: InputDecoration(
+                    hintText: 'Refine your caption...',
+                    hintStyle: const TextStyle(color: Colors.white38),
+                    filled: true,
+                    fillColor: _panelColor,
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(16),
+                      borderSide: const BorderSide(color: _borderColor),
+                    ),
+                    enabledBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(16),
+                      borderSide: const BorderSide(color: _borderColor),
+                    ),
+                    focusedBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(16),
+                      borderSide: const BorderSide(color: Colors.white70),
+                    ),
+                    contentPadding: const EdgeInsets.all(16),
+                  ),
+                ),
+                const SizedBox(height: 20),
+                Row(
+                  children: [
+                    Expanded(
+                      child: OutlinedButton(
+                        onPressed: _isSaving
+                            ? null
+                            : () => Navigator.of(context).pop(),
+                        style: OutlinedButton.styleFrom(
+                          side: const BorderSide(color: _borderColor),
+                          foregroundColor: Colors.white70,
+                          padding: const EdgeInsets.symmetric(vertical: 16),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(14),
+                          ),
+                        ),
+                        child: const Text('Cancel'),
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: ElevatedButton(
+                        onPressed: _canSave ? _saveChanges : null,
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: Colors.white,
+                          foregroundColor: Colors.black,
+                          disabledBackgroundColor: Colors.white24,
+                          disabledForegroundColor: Colors.white54,
+                          padding: const EdgeInsets.symmetric(vertical: 16),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(14),
+                          ),
+                        ),
+                        child: _isSaving
+                            ? const SizedBox(
+                                width: 18,
+                                height: 18,
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 2,
+                                  valueColor: AlwaysStoppedAnimation<Color>(
+                                    Colors.black,
+                                  ),
+                                ),
+                              )
+                            : const Text(
+                                'Save',
+                                style: TextStyle(fontWeight: FontWeight.w700),
+                              ),
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _DeletePostDialog extends StatelessWidget {
+  const _DeletePostDialog();
+
+  static const Color _dialogColor = Color(0xFF1A1A1A);
+  static const Color _borderColor = Color(0xFF333333);
+  static const Color _deleteColor = Color(0xFFFF3B30);
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+
+    return Dialog(
+      backgroundColor: _dialogColor,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(20),
+        side: const BorderSide(color: _borderColor),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.all(24),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              'Delete Post?',
+              style: theme.textTheme.titleLarge?.copyWith(
+                color: Colors.white,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+            const SizedBox(height: 10),
+            Text(
+              'This will permanently remove the post and its related activity. This action cannot be undone.',
+              style: theme.textTheme.bodyMedium?.copyWith(
+                color: Colors.white70,
+                height: 1.5,
+              ),
+            ),
+            const SizedBox(height: 24),
+            Row(
+              children: [
+                Expanded(
+                  child: OutlinedButton(
+                    onPressed: () => Navigator.of(context).pop(false),
+                    style: OutlinedButton.styleFrom(
+                      side: const BorderSide(color: _borderColor),
+                      foregroundColor: Colors.white70,
+                      padding: const EdgeInsets.symmetric(vertical: 15),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(14),
+                      ),
+                    ),
+                    child: const Text('Cancel'),
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: ElevatedButton(
+                    onPressed: () => Navigator.of(context).pop(true),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: _deleteColor,
+                      foregroundColor: Colors.white,
+                      padding: const EdgeInsets.symmetric(vertical: 15),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(14),
+                      ),
+                    ),
+                    child: const Text(
+                      'Delete',
+                      style: TextStyle(fontWeight: FontWeight.w700),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ),
       ),
     );
   }

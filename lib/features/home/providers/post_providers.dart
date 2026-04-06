@@ -157,14 +157,57 @@ class PostsNotifier extends AsyncNotifier<List<PostModel>> {
     }
   }
 
+  Future<void> updatePostCaption({
+    required String postId,
+    required String content,
+  }) async {
+    final index = _posts.indexWhere((post) => post.id == postId);
+    if (index == -1) {
+      await _postService.updatePostCaption(postId: postId, content: content);
+      return;
+    }
+
+    final originalPost = _posts[index];
+    final optimisticPost = originalPost.copyWith(
+      content: content.trim(),
+      updatedAt: DateTime.now(),
+    );
+
+    _posts[index] = optimisticPost;
+    state = AsyncValue.data(List<PostModel>.from(_posts));
+
+    try {
+      final updatedPost = await _postService.updatePostCaption(
+        postId: postId,
+        content: content,
+      );
+
+      _posts[index] = updatedPost;
+      state = AsyncValue.data(List<PostModel>.from(_posts));
+    } catch (e, stackTrace) {
+      _posts[index] = originalPost;
+      state = AsyncValue.data(List<PostModel>.from(_posts));
+      Error.throwWithStackTrace(e, stackTrace);
+    }
+  }
+
   Future<void> deletePost(String postId) async {
+    final index = _posts.indexWhere((post) => post.id == postId);
+    PostModel? removedPost;
+
+    if (index != -1) {
+      removedPost = _posts.removeAt(index);
+      state = AsyncValue.data(List<PostModel>.from(_posts));
+    }
+
     try {
       await _postService.deletePost(postId);
-
-      _posts.removeWhere((post) => post.id == postId);
-      state = AsyncValue.data(List.from(_posts));
     } catch (e, stackTrace) {
-      state = AsyncValue.error(e, stackTrace);
+      if (removedPost != null) {
+        _posts.insert(index, removedPost);
+        state = AsyncValue.data(List<PostModel>.from(_posts));
+      }
+      Error.throwWithStackTrace(e, stackTrace);
     }
   }
 }
