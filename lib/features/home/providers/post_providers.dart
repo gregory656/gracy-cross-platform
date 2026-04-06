@@ -13,6 +13,13 @@ final optimizedPostServiceProvider = Provider<OptimizedPostService>((ref) {
   return OptimizedPostService();
 });
 
+final postByIdProvider = FutureProvider.autoDispose.family<PostModel, String>((
+  ref,
+  String postId,
+) {
+  return ref.read(optimizedPostServiceProvider).getPostById(postId);
+});
+
 final postsProvider = AsyncNotifierProvider<PostsNotifier, List<PostModel>>(
   () => PostsNotifier(),
 );

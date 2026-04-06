@@ -7,12 +7,20 @@ import '../../../core/utils/elite_animations.dart';
 import '../../../shared/models/post_model.dart';
 import '../../../shared/providers/auth_provider.dart';
 import '../../../shared/services/nairobi_timezone_service.dart';
+import '../../../shared/utils/post_share_text.dart';
 import '../providers/post_providers.dart';
 
 class PostCard extends ConsumerStatefulWidget {
   final PostModel post;
+  final Future<void> Function()? onPostChanged;
+  final VoidCallback? onPostDeleted;
 
-  const PostCard({super.key, required this.post});
+  const PostCard({
+    super.key,
+    required this.post,
+    this.onPostChanged,
+    this.onPostDeleted,
+  });
 
   @override
   ConsumerState<PostCard> createState() => _PostCardState();
@@ -59,6 +67,9 @@ class _PostCardState extends ConsumerState<PostCard> {
 
     try {
       await ref.read(postsProvider.notifier).toggleLike(widget.post.id);
+      if (widget.onPostChanged != null) {
+        await widget.onPostChanged!.call();
+      }
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -78,11 +89,9 @@ class _PostCardState extends ConsumerState<PostCard> {
   }
 
   void _sharePost() {
-    final String content = widget.post.content.isNotEmpty
-        ? widget.post.content
-        : 'Check out this post on Gracy!';
-
-    SharePlus.instance.share(ShareParams(text: content));
+    SharePlus.instance.share(
+      ShareParams(text: buildPostShareText(widget.post)),
+    );
   }
 
   void _showComments() {
@@ -133,6 +142,9 @@ class _PostCardState extends ConsumerState<PostCard> {
     );
 
     if (wasUpdated == true) {
+      if (widget.onPostChanged != null) {
+        await widget.onPostChanged!.call();
+      }
       messenger?.clearSnackBars();
       messenger?.showSnackBar(
         const SnackBar(
@@ -178,6 +190,7 @@ class _PostCardState extends ConsumerState<PostCard> {
           backgroundColor: Colors.green,
         ),
       );
+      widget.onPostDeleted?.call();
     } catch (e) {
       messenger?.showSnackBar(
         SnackBar(

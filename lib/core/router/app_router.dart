@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 
 import '../../features/chat/presentation/chat_screen.dart';
 import '../../features/home/presentation/home_screen.dart';
+import '../../features/home/presentation/post_detail_screen.dart';
 import '../../features/onboarding/presentation/landing_screen.dart';
 import '../../features/onboarding/presentation/onboarding_screen.dart';
 import '../../features/profile/presentation/profile_screen.dart';
@@ -20,28 +21,42 @@ class AppRoutePaths {
   static const String chat = '/chat';
   static const String profile = '/profile';
   static const String settings = '/settings';
+  static const String postDetailPattern = '/post/:id';
+
+  static String postDetail(String postId) => '/post/$postId';
 }
 
 final appRouterProvider = Provider<GoRouter>((ref) {
   AuthState readAuthState() => ref.read(authNotifierProvider);
 
   final GoRouter router = GoRouter(
-    initialLocation: readAuthState().isAuthenticated 
-      ? (readAuthState().isOnboardingComplete ? AppRoutePaths.home : AppRoutePaths.onboarding)
-      : AppRoutePaths.welcome,
+    initialLocation: readAuthState().isAuthenticated
+        ? (readAuthState().isOnboardingComplete
+              ? AppRoutePaths.home
+              : AppRoutePaths.onboarding)
+        : AppRoutePaths.welcome,
     redirect: (BuildContext context, GoRouterState state) {
       final AuthState authState = readAuthState();
-      final bool isWelcomeRoute = state.matchedLocation == AppRoutePaths.welcome;
-      final bool isOnboardingRoute = state.matchedLocation == AppRoutePaths.onboarding;
-      
+      final bool isWelcomeRoute =
+          state.matchedLocation == AppRoutePaths.welcome;
+      final bool isOnboardingRoute =
+          state.matchedLocation == AppRoutePaths.onboarding;
+      final bool isSharedPostRoute =
+          state.uri.pathSegments.isNotEmpty &&
+          state.uri.pathSegments.first == 'post';
+
       final bool authenticated = authState.isAuthenticated;
       final bool completed = authState.isOnboardingComplete;
+
+      if (isSharedPostRoute) {
+        return null;
+      }
 
       // 1. Not Auth at all -> Must go to Welcome
       if (!authenticated && !isWelcomeRoute) {
         return AppRoutePaths.welcome;
       }
-      
+
       // 2. Auth but profile missing -> Must go to Onboarding
       if (authenticated && !completed && !isOnboardingRoute) {
         return AppRoutePaths.onboarding;
@@ -65,6 +80,13 @@ final appRouterProvider = Provider<GoRouter>((ref) {
         path: AppRoutePaths.onboarding,
         builder: (BuildContext context, GoRouterState state) {
           return const OnboardingScreen();
+        },
+      ),
+      GoRoute(
+        path: AppRoutePaths.postDetailPattern,
+        builder: (BuildContext context, GoRouterState state) {
+          final String postId = state.pathParameters['id'] ?? '';
+          return PostDetailScreen(postId: postId);
         },
       ),
       ShellRoute(

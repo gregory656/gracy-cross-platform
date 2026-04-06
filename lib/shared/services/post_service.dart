@@ -273,7 +273,6 @@ class PostService {
   Future<PostModel> getPostById(String postId) async {
     try {
       final userId = _supabase.auth.currentUser?.id;
-      if (userId == null) throw Exception('User not authenticated');
 
       final response = await _supabase
           .from('posts')
@@ -285,15 +284,21 @@ class PostService {
             )
           ''')
           .eq('id', postId)
-          .single();
+          .maybeSingle();
+
+      if (response == null) {
+        throw Exception('Post not found');
+      }
 
       final Map<String, dynamic> postData = Map<String, dynamic>.from(response);
-      final likeRecord = await _supabase
-          .from('post_likes')
-          .select('post_id')
-          .eq('post_id', postId)
-          .eq('user_id', userId)
-          .maybeSingle();
+      final likeRecord = userId == null
+          ? null
+          : await _supabase
+                .from('post_likes')
+                .select('post_id')
+                .eq('post_id', postId)
+                .eq('user_id', userId)
+                .maybeSingle();
 
       return _mapPost(postData, isLikedByCurrentUser: likeRecord != null);
     } catch (e) {

@@ -5,15 +5,13 @@ import 'package:share_plus/share_plus.dart';
 import 'package:intl/intl.dart';
 import '../../../shared/models/post_model.dart';
 import '../../../shared/services/nairobi_timezone_service.dart';
+import '../../../shared/utils/post_share_text.dart';
 import '../providers/post_providers_fixed.dart';
 
 class PostCardFixed extends ConsumerStatefulWidget {
   final PostModel post;
 
-  const PostCardFixed({
-    super.key,
-    required this.post,
-  });
+  const PostCardFixed({super.key, required this.post});
 
   @override
   ConsumerState<PostCardFixed> createState() => _PostCardFixedState();
@@ -23,7 +21,9 @@ class _PostCardFixedState extends ConsumerState<PostCardFixed> {
   bool _isLiking = false;
 
   String _formatTimestamp(DateTime timestamp) {
-    final nairobiTime = NairobiTimezoneService.instance.convertToNairobi(timestamp);
+    final nairobiTime = NairobiTimezoneService.instance.convertToNairobi(
+      timestamp,
+    );
     final now = NairobiTimezoneService.instance.now;
     final difference = now.difference(nairobiTime);
 
@@ -53,7 +53,9 @@ class _PostCardFixedState extends ConsumerState<PostCardFixed> {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Failed to ${widget.post.isLikedByCurrentUser ? 'unlike' : 'like'} post'),
+            content: Text(
+              'Failed to ${widget.post.isLikedByCurrentUser ? 'unlike' : 'like'} post',
+            ),
             backgroundColor: Colors.red,
           ),
         );
@@ -68,11 +70,9 @@ class _PostCardFixedState extends ConsumerState<PostCardFixed> {
   }
 
   void _sharePost() {
-    final String content = widget.post.content.isNotEmpty
-        ? widget.post.content
-        : 'Check out this post on Gracy!';
-
-    SharePlus.instance.share(ShareParams(text: content));
+    SharePlus.instance.share(
+      ShareParams(text: buildPostShareText(widget.post)),
+    );
   }
 
   void _showCommentsComingSoon() {
@@ -80,26 +80,21 @@ class _PostCardFixedState extends ConsumerState<PostCardFixed> {
       return;
     }
 
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        content: Text('Comments are coming soon'),
-      ),
-    );
+    ScaffoldMessenger.of(
+      context,
+    ).showSnackBar(const SnackBar(content: Text('Comments are coming soon')));
   }
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    
+
     return Container(
       margin: const EdgeInsets.only(bottom: 16),
       decoration: BoxDecoration(
         color: const Color(0xFF1A1A1A),
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(
-          color: const Color(0xFF333333),
-          width: 1,
-        ),
+        border: Border.all(color: const Color(0xFF333333), width: 1),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -123,20 +118,13 @@ class _PostCardFixedState extends ConsumerState<PostCardFixed> {
                           child: CachedNetworkImage(
                             imageUrl: widget.post.authorAvatar!,
                             fit: BoxFit.cover,
-                            placeholder: (context, url) => const Icon(
-                              Icons.person,
-                              color: Colors.grey,
-                            ),
-                            errorWidget: (context, url, error) => const Icon(
-                              Icons.person,
-                              color: Colors.grey,
-                            ),
+                            placeholder: (context, url) =>
+                                const Icon(Icons.person, color: Colors.grey),
+                            errorWidget: (context, url, error) =>
+                                const Icon(Icons.person, color: Colors.grey),
                           ),
                         )
-                      : const Icon(
-                          Icons.person,
-                          color: Colors.grey,
-                        ),
+                      : const Icon(Icons.person, color: Colors.grey),
                 ),
                 const SizedBox(width: 12),
                 // Author info
@@ -164,7 +152,7 @@ class _PostCardFixedState extends ConsumerState<PostCardFixed> {
               ],
             ),
           ),
-          
+
           // Content
           if (widget.post.content.isNotEmpty)
             Padding(
@@ -177,7 +165,7 @@ class _PostCardFixedState extends ConsumerState<PostCardFixed> {
                 ),
               ),
             ),
-          
+
           // Image
           if (widget.post.imageUrl != null)
             Padding(
@@ -214,7 +202,7 @@ class _PostCardFixedState extends ConsumerState<PostCardFixed> {
                 ),
               ),
             ),
-          
+
           // Engagement Bar
           Padding(
             padding: const EdgeInsets.all(16),
@@ -222,8 +210,8 @@ class _PostCardFixedState extends ConsumerState<PostCardFixed> {
               children: [
                 // Like Button
                 _EngagementButton(
-                  icon: widget.post.isLikedByCurrentUser 
-                      ? Icons.favorite 
+                  icon: widget.post.isLikedByCurrentUser
+                      ? Icons.favorite
                       : Icons.favorite_border,
                   label: widget.post.likesCount.toString(),
                   isActive: widget.post.isLikedByCurrentUser,
@@ -232,7 +220,7 @@ class _PostCardFixedState extends ConsumerState<PostCardFixed> {
                   activeColor: Colors.red,
                 ),
                 const SizedBox(width: 24),
-                
+
                 // Comment Button
                 _EngagementButton(
                   icon: Icons.comment_outlined,
@@ -243,7 +231,7 @@ class _PostCardFixedState extends ConsumerState<PostCardFixed> {
                   activeColor: Colors.blue,
                 ),
                 const SizedBox(width: 24),
-                
+
                 // Share Button
                 _EngagementButton(
                   icon: Icons.share_outlined,
