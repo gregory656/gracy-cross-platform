@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:share_plus/share_plus.dart';
 import 'package:intl/intl.dart';
+import '../../../core/utils/elite_animations.dart';
 import '../../../shared/models/post_model.dart';
 import '../../../shared/services/nairobi_timezone_service.dart';
 import '../providers/post_providers.dart';
@@ -10,10 +11,7 @@ import '../providers/post_providers.dart';
 class PostCard extends ConsumerStatefulWidget {
   final PostModel post;
 
-  const PostCard({
-    super.key,
-    required this.post,
-  });
+  const PostCard({super.key, required this.post});
 
   @override
   ConsumerState<PostCard> createState() => _PostCardState();
@@ -23,7 +21,9 @@ class _PostCardState extends ConsumerState<PostCard> {
   bool _isLiking = false;
 
   String _formatTimestamp(DateTime timestamp) {
-    final nairobiTime = NairobiTimezoneService.instance.convertToNairobi(timestamp);
+    final nairobiTime = NairobiTimezoneService.instance.convertToNairobi(
+      timestamp,
+    );
     final now = NairobiTimezoneService.instance.now;
     final difference = now.difference(nairobiTime);
 
@@ -42,6 +42,14 @@ class _PostCardState extends ConsumerState<PostCard> {
 
   Future<void> _toggleLike() async {
     if (_isLiking) return;
+    final isCurrentlyLiked = widget.post.isLikedByCurrentUser;
+    final actionLabel = widget.post.isLikedByCurrentUser ? 'unlike' : 'like';
+
+    if (isCurrentlyLiked) {
+      EliteHaptics.lightImpact();
+    } else {
+      EliteHaptics.mediumImpact();
+    }
 
     setState(() {
       _isLiking = true;
@@ -53,7 +61,7 @@ class _PostCardState extends ConsumerState<PostCard> {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Failed to ${widget.post.isLikedByCurrentUser ? 'unlike' : 'like'} post'),
+            content: Text('Failed to $actionLabel post'),
             backgroundColor: Colors.red,
           ),
         );
@@ -87,7 +95,7 @@ class _PostCardState extends ConsumerState<PostCard> {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    
+
     return Container(
       margin: const EdgeInsets.only(bottom: 16),
       decoration: BoxDecoration(
@@ -114,7 +122,9 @@ class _PostCardState extends ConsumerState<PostCard> {
                     color: theme.colorScheme.surfaceContainerHighest,
                     borderRadius: BorderRadius.circular(20),
                   ),
-                  child: widget.post.authorAvatar != null && widget.post.authorAvatar!.isNotEmpty
+                  child:
+                      widget.post.authorAvatar != null &&
+                          widget.post.authorAvatar!.isNotEmpty
                       ? ClipRRect(
                           borderRadius: BorderRadius.circular(20),
                           child: CachedNetworkImage(
@@ -161,7 +171,7 @@ class _PostCardState extends ConsumerState<PostCard> {
               ],
             ),
           ),
-          
+
           // Content
           if (widget.post.content.isNotEmpty)
             Padding(
@@ -174,7 +184,7 @@ class _PostCardState extends ConsumerState<PostCard> {
                 ),
               ),
             ),
-          
+
           // Image
           if (widget.post.imageUrl != null && widget.post.imageUrl!.isNotEmpty)
             Padding(
@@ -193,7 +203,9 @@ class _PostCardState extends ConsumerState<PostCard> {
                     color: theme.colorScheme.surfaceContainerHighest,
                     child: Center(
                       child: CircularProgressIndicator(
-                        valueColor: AlwaysStoppedAnimation<Color>(theme.colorScheme.primary),
+                        valueColor: AlwaysStoppedAnimation<Color>(
+                          theme.colorScheme.primary,
+                        ),
                       ),
                     ),
                   ),
@@ -223,7 +235,7 @@ class _PostCardState extends ConsumerState<PostCard> {
                 ),
               ),
             ),
-          
+
           // Engagement Bar
           Padding(
             padding: const EdgeInsets.all(16),
@@ -231,8 +243,8 @@ class _PostCardState extends ConsumerState<PostCard> {
               children: [
                 // Like Button
                 _EngagementButton(
-                  icon: widget.post.isLikedByCurrentUser 
-                      ? Icons.favorite 
+                  icon: widget.post.isLikedByCurrentUser
+                      ? Icons.favorite
                       : Icons.favorite_border,
                   label: widget.post.likesCount.toString(),
                   isActive: widget.post.isLikedByCurrentUser,
@@ -241,7 +253,7 @@ class _PostCardState extends ConsumerState<PostCard> {
                   activeColor: Colors.red,
                 ),
                 const SizedBox(width: 24),
-                
+
                 // Comment Button
                 _EngagementButton(
                   icon: Icons.comment_outlined,
@@ -252,7 +264,7 @@ class _PostCardState extends ConsumerState<PostCard> {
                   activeColor: theme.colorScheme.primary,
                 ),
                 const SizedBox(width: 24),
-                
+
                 // Share Button
                 _EngagementButton(
                   icon: Icons.share_outlined,
@@ -329,13 +341,11 @@ class _EngagementButton extends StatelessWidget {
 class CommentsBottomSheet extends ConsumerStatefulWidget {
   final String postId;
 
-  const CommentsBottomSheet({
-    super.key,
-    required this.postId,
-  });
+  const CommentsBottomSheet({super.key, required this.postId});
 
   @override
-  ConsumerState<CommentsBottomSheet> createState() => _CommentsBottomSheetState();
+  ConsumerState<CommentsBottomSheet> createState() =>
+      _CommentsBottomSheetState();
 }
 
 class _CommentsBottomSheetState extends ConsumerState<CommentsBottomSheet> {
@@ -357,7 +367,7 @@ class _CommentsBottomSheetState extends ConsumerState<CommentsBottomSheet> {
 
     try {
       _commentController.clear();
-      
+
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
@@ -392,9 +402,7 @@ class _CommentsBottomSheetState extends ConsumerState<CommentsBottomSheet> {
       height: MediaQuery.of(context).size.height * 0.7,
       decoration: const BoxDecoration(
         color: Color(0xFF1A1A1A),
-        borderRadius: BorderRadius.vertical(
-          top: Radius.circular(20),
-        ),
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
       ),
       child: Column(
         children: [
@@ -408,7 +416,7 @@ class _CommentsBottomSheetState extends ConsumerState<CommentsBottomSheet> {
               borderRadius: BorderRadius.circular(2),
             ),
           ),
-          
+
           // Header
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 16),
@@ -429,9 +437,9 @@ class _CommentsBottomSheetState extends ConsumerState<CommentsBottomSheet> {
               ],
             ),
           ),
-          
+
           const Divider(height: 1, color: Color(0xFF333333)),
-          
+
           // Comments List
           Expanded(
             child: Center(
@@ -463,14 +471,12 @@ class _CommentsBottomSheetState extends ConsumerState<CommentsBottomSheet> {
               ),
             ),
           ),
-          
+
           // Comment Input
           Container(
             padding: const EdgeInsets.all(16),
             decoration: const BoxDecoration(
-              border: Border(
-                top: BorderSide(color: Color(0xFF333333)),
-              ),
+              border: Border(top: BorderSide(color: Color(0xFF333333))),
             ),
             child: Row(
               children: [
@@ -512,7 +518,9 @@ class _CommentsBottomSheetState extends ConsumerState<CommentsBottomSheet> {
                           height: 20,
                           child: CircularProgressIndicator(
                             strokeWidth: 2,
-                            valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                            valueColor: AlwaysStoppedAnimation<Color>(
+                              Colors.white,
+                            ),
                           ),
                         )
                       : const Icon(Icons.send, color: Colors.white),
@@ -529,15 +537,12 @@ class _CommentsBottomSheetState extends ConsumerState<CommentsBottomSheet> {
 class CommentItem extends StatelessWidget {
   final PostCommentModel comment;
 
-  const CommentItem({
-    super.key,
-    required this.comment,
-  });
+  const CommentItem({super.key, required this.comment});
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    
+
     return Padding(
       padding: const EdgeInsets.only(bottom: 16),
       child: Row(
@@ -569,14 +574,10 @@ class CommentItem extends StatelessWidget {
                       ),
                     ),
                   )
-                : const Icon(
-                    Icons.person,
-                    color: Colors.grey,
-                    size: 16,
-                  ),
+                : const Icon(Icons.person, color: Colors.grey, size: 16),
           ),
           const SizedBox(width: 12),
-          
+
           // Comment Content
           Expanded(
             child: Column(
@@ -602,7 +603,7 @@ class CommentItem extends StatelessWidget {
                   ],
                 ),
                 const SizedBox(height: 4),
-                
+
                 // Comment text
                 Text(
                   comment.content,
@@ -620,7 +621,9 @@ class CommentItem extends StatelessWidget {
   }
 
   String _formatCommentTime(DateTime timestamp) {
-    final nairobiTime = NairobiTimezoneService.instance.convertToNairobi(timestamp);
+    final nairobiTime = NairobiTimezoneService.instance.convertToNairobi(
+      timestamp,
+    );
     final now = NairobiTimezoneService.instance.now;
     final difference = now.difference(nairobiTime);
 

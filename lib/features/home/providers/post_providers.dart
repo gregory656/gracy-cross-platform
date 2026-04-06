@@ -27,7 +27,7 @@ class PostsNotifier extends AsyncNotifier<List<PostModel>> {
   bool _hasMore = true;
   int _offset = 0;
   static const int _limit = 20;
-  
+
   double _currentProgress = 0.0;
   String _currentStatus = '';
 
@@ -83,10 +83,7 @@ class PostsNotifier extends AsyncNotifier<List<PostModel>> {
     }
   }
 
-  Future<void> createPost({
-    required String content,
-    File? imageFile,
-  }) async {
+  Future<void> createPost({required String content, File? imageFile}) async {
     try {
       _currentProgress = 0.0;
       _currentStatus = 'Preparing post...';
@@ -127,23 +124,43 @@ class PostsNotifier extends AsyncNotifier<List<PostModel>> {
   }
 
   Future<void> toggleLike(String postId) async {
+    final index = _posts.indexWhere((post) => post.id == postId);
+    PostModel? originalPost;
+
+    if (index != -1) {
+      originalPost = _posts[index];
+      final isCurrentlyLiked = originalPost.isLikedByCurrentUser;
+      final nextLikesCount = isCurrentlyLiked
+          ? (originalPost.likesCount > 0 ? originalPost.likesCount - 1 : 0)
+          : originalPost.likesCount + 1;
+
+      _posts[index] = originalPost.copyWith(
+        isLikedByCurrentUser: !isCurrentlyLiked,
+        likesCount: nextLikesCount,
+      );
+      state = AsyncValue.data(List.from(_posts));
+    }
+
     try {
       final updatedPost = await _postService.toggleLike(postId);
-      
-      final index = _posts.indexWhere((post) => post.id == postId);
+
       if (index != -1) {
         _posts[index] = updatedPost;
         state = AsyncValue.data(List.from(_posts));
       }
-    } catch (e, stackTrace) {
-      state = AsyncValue.error(e, stackTrace);
+    } catch (e) {
+      if (index != -1 && originalPost != null) {
+        _posts[index] = originalPost;
+        state = AsyncValue.data(List.from(_posts));
+      }
+      rethrow;
     }
   }
 
   Future<void> deletePost(String postId) async {
     try {
       await _postService.deletePost(postId);
-      
+
       _posts.removeWhere((post) => post.id == postId);
       state = AsyncValue.data(List.from(_posts));
     } catch (e, stackTrace) {
@@ -155,7 +172,7 @@ class PostsNotifier extends AsyncNotifier<List<PostModel>> {
 // Realtime provider for post updates
 final postRealtimeProvider = StreamProvider<List<PostModel>>((ref) {
   final supabase = Supabase.instance.client;
-  
+
   return supabase
       .from('posts')
       .stream(primaryKey: ['id'])
