@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 
 import '../../../core/theme/app_colors.dart';
-import '../../../core/theme/app_gradients.dart';
 import '../../../shared/models/user_model.dart';
 import '../../../shared/widgets/user_avatar.dart';
 
@@ -13,11 +12,24 @@ class ProfileBanner extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
+      clipBehavior: Clip.antiAlias,
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
         borderRadius: BorderRadius.circular(30),
-        gradient: AppGradients.card,
-        border: Border.all(color: AppColors.outline),
+        gradient: const RadialGradient(
+          center: Alignment(-0.68, -0.88),
+          radius: 1.25,
+          colors: <Color>[Color(0xFF123A72), Color(0xFF02050A)],
+          stops: <double>[0.0, 1.0],
+        ),
+        border: Border.all(color: Colors.white.withValues(alpha: 0.12)),
+        boxShadow: <BoxShadow>[
+          BoxShadow(
+            color: const Color(0xFF123A72).withValues(alpha: 0.18),
+            blurRadius: 32,
+            offset: const Offset(0, 18),
+          ),
+        ],
       ),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -36,9 +48,9 @@ class ProfileBanner extends StatelessWidget {
                 ),
                 const SizedBox(height: 6),
                 Text(
-                  '${user.username} • ${user.role.label}',
+                  '${user.username} | ${user.role.label}',
                   style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                    color: AppColors.textSecondary,
+                    color: Colors.white.withValues(alpha: 0.7),
                   ),
                 ),
                 const SizedBox(height: 12),

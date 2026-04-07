@@ -26,8 +26,9 @@ class SettingsScreen extends ConsumerWidget {
     }
 
     final String activeTheme = ref.watch(themeProvider);
-    final bool isGuest = SupabaseConfig.isConfigured && 
-                         Supabase.instance.client.auth.currentUser?.isAnonymous == true;
+    final bool isGuest =
+        SupabaseConfig.isConfigured &&
+        Supabase.instance.client.auth.currentUser?.isAnonymous == true;
 
     return Scaffold(
       appBar: AppBar(title: const Text('Settings'), scrolledUnderElevation: 0),
@@ -45,7 +46,7 @@ class SettingsScreen extends ConsumerWidget {
           _buildPreferencesSection(context, ref, currentUser),
           const SizedBox(height: 48),
           _buildDangerZone(context, ref),
-          const SizedBox(height: 32),
+          const SizedBox(height: 120),
         ],
       ),
     );
@@ -77,9 +78,9 @@ class SettingsScreen extends ConsumerWidget {
                 const SizedBox(height: 4),
                 Text(
                   'Sign up to save your progress!',
-                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                    color: AppColors.textPrimary,
-                  ),
+                  style: Theme.of(
+                    context,
+                  ).textTheme.bodySmall?.copyWith(color: AppColors.textPrimary),
                 ),
               ],
             ),
@@ -111,9 +112,9 @@ class SettingsScreen extends ConsumerWidget {
                 children: <Widget>[
                   Text(
                     user.fullName,
-                    style: Theme.of(
-                      context,
-                    ).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w800),
+                    style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                      fontWeight: FontWeight.w800,
+                    ),
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                   ),
@@ -173,7 +174,10 @@ class SettingsScreen extends ConsumerWidget {
               ),
             ),
             IconButton(
-              icon: const Icon(Icons.edit_rounded, color: AppColors.textPrimary),
+              icon: const Icon(
+                Icons.edit_rounded,
+                color: AppColors.textPrimary,
+              ),
               onPressed: () {
                 Navigator.of(context).push(
                   MaterialPageRoute<void>(
@@ -262,7 +266,7 @@ class SettingsScreen extends ConsumerWidget {
     UserModel user,
   ) {
     final bool isGhostMode = ref.watch(ghostModeProvider);
-    
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: <Widget>[
@@ -309,7 +313,10 @@ class SettingsScreen extends ConsumerWidget {
                 trailing: Row(
                   children: [
                     Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 6,
+                        vertical: 2,
+                      ),
                       decoration: BoxDecoration(
                         color: Colors.amber,
                         borderRadius: BorderRadius.circular(8),
@@ -332,7 +339,9 @@ class SettingsScreen extends ConsumerWidget {
                         ScaffoldMessenger.of(context).showSnackBar(
                           SnackBar(
                             content: Text(
-                              val ? 'Ghost Mode enabled' : 'Ghost Mode disabled',
+                              val
+                                  ? 'Ghost Mode enabled'
+                                  : 'Ghost Mode disabled',
                             ),
                             behavior: SnackBarBehavior.floating,
                           ),
@@ -351,7 +360,10 @@ class SettingsScreen extends ConsumerWidget {
                 title: 'Disappearing Messages',
                 subtitle: 'Set messages to disappear after viewing',
                 trailing: Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 6,
+                    vertical: 2,
+                  ),
                   decoration: BoxDecoration(
                     color: Colors.amber,
                     borderRadius: BorderRadius.circular(8),
@@ -436,11 +448,7 @@ class SettingsScreen extends ConsumerWidget {
                   color: iconColor.withValues(alpha: 0.1),
                   borderRadius: BorderRadius.circular(10),
                 ),
-                child: Icon(
-                  icon,
-                  color: iconColor,
-                  size: 20,
-                ),
+                child: Icon(icon, color: iconColor, size: 20),
               ),
               const SizedBox(width: 16),
               Expanded(
@@ -459,7 +467,9 @@ class SettingsScreen extends ConsumerWidget {
                       subtitle,
                       style: TextStyle(
                         fontSize: 14,
-                        color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.6),
+                        color: Theme.of(
+                          context,
+                        ).colorScheme.onSurface.withValues(alpha: 0.6),
                       ),
                     ),
                   ],
@@ -474,6 +484,9 @@ class SettingsScreen extends ConsumerWidget {
   }
 
   Widget _buildDangerZone(BuildContext context, WidgetRef ref) {
+    final Color dangerBorder = const Color(0xFF7A2A2A).withValues(alpha: 0.48);
+    final Color dangerSurface = const Color(0xFF561313).withValues(alpha: 0.12);
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: <Widget>[
@@ -485,33 +498,42 @@ class SettingsScreen extends ConsumerWidget {
           ),
         ),
         const SizedBox(height: 16),
-        Card(
-          elevation: 0,
-          shape: RoundedRectangleBorder(
+        Container(
+          decoration: BoxDecoration(
+            color: dangerSurface,
             borderRadius: BorderRadius.circular(12),
-            side: BorderSide(
-              color: Theme.of(context).colorScheme.error,
-              width: 1,
-            ),
+            border: Border.all(color: dangerBorder),
           ),
           child: Padding(
             padding: const EdgeInsets.all(16),
             child: Column(
               children: <Widget>[
-                CustomButton(
-                  label: 'Logout',
-                  icon: Icons.logout_rounded,
-                  filled: false,
-                  onPressed: () {
-                    ref.read(authNotifierProvider.notifier).logout();
-                  },
+                Center(
+                  child: SizedBox(
+                    width: 240,
+                    child: CustomButton(
+                      label: 'Logout',
+                      icon: Icons.logout_rounded,
+                      filled: false,
+                      fullWidth: true,
+                      onPressed: () {
+                        ref.read(authNotifierProvider.notifier).logout();
+                      },
+                    ),
+                  ),
                 ),
                 const SizedBox(height: 12),
-                CustomButton(
-                  label: 'Delete Account',
-                  icon: Icons.delete_forever_rounded,
-                  filled: false,
-                  onPressed: () => _showDeleteDialog(context),
+                Center(
+                  child: SizedBox(
+                    width: 240,
+                    child: CustomButton(
+                      label: 'Delete Account',
+                      icon: Icons.delete_forever_rounded,
+                      filled: false,
+                      fullWidth: true,
+                      onPressed: () => _showDeleteDialog(context),
+                    ),
+                  ),
                 ),
               ],
             ),
