@@ -9,11 +9,14 @@ import 'package:intl/intl.dart';
 import 'package:image_gallery_saver/image_gallery_saver.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:share_plus/share_plus.dart';
+import '../../../core/router/shell_ui_provider.dart';
 import '../../../core/utils/elite_animations.dart';
 import '../../../shared/models/post_model.dart';
 import '../../../shared/providers/auth_provider.dart';
 import '../../../shared/services/nairobi_timezone_service.dart';
 import '../../../shared/utils/post_share_text.dart';
+import '../../../shared/widgets/report_reason_sheet.dart';
+import 'post_comments_bottom_sheet.dart';
 import '../providers/post_providers.dart';
 
 class PostCard extends ConsumerStatefulWidget {
@@ -36,7 +39,24 @@ class _PostCardState extends ConsumerState<PostCard> {
   bool _isLiking = false;
   bool _isDeleting = false;
   bool _isSavingImage = false;
+  bool _isHiddenByReport = false;
   final ValueNotifier<bool> _isSavingImageNotifier = ValueNotifier(false);
+  late int _displayedCommentCount;
+
+  @override
+  void initState() {
+    super.initState();
+    _displayedCommentCount = widget.post.commentsCount;
+  }
+
+  @override
+  void didUpdateWidget(covariant PostCard oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.post.id != widget.post.id ||
+        oldWidget.post.commentsCount != widget.post.commentsCount) {
+      _displayedCommentCount = widget.post.commentsCount;
+    }
+  }
 
   @override
   void dispose() {
@@ -108,13 +128,29 @@ class _PostCardState extends ConsumerState<PostCard> {
     );
   }
 
-  void _showComments() {
-    showModalBottomSheet(
-      context: context,
-      isScrollControlled: true,
-      backgroundColor: Colors.transparent,
-      builder: (context) => CommentsBottomSheet(postId: widget.post.id),
-    );
+  Future<void> _showComments() async {
+    ref.read(shellNavigationVisibleProvider.notifier).hide();
+    try {
+      await showModalBottomSheet<void>(
+        context: context,
+        isScrollControlled: true,
+        backgroundColor: Colors.transparent,
+        builder: (context) => PostCommentsBottomSheet(
+          postId: widget.post.id,
+          initialCount: _displayedCommentCount,
+          onCountChanged: (int count) {
+            if (!mounted) {
+              return;
+            }
+            setState(() {
+              _displayedCommentCount = count;
+            });
+          },
+        ),
+      );
+    } finally {
+      ref.read(shellNavigationVisibleProvider.notifier).show();
+    }
   }
 
   bool _isOwnedByCurrentUser(String? currentUserId) {
@@ -124,7 +160,8 @@ class _PostCardState extends ConsumerState<PostCard> {
   bool get _hasSavableMedia => widget.post.imageUrl?.isNotEmpty == true;
 
   Future<void> _showPostActions(bool canManagePost) async {
-    if (_isDeleting || (!canManagePost && !_hasSavableMedia)) {
+    final bool canReportPost = !canManagePost;
+    if (_isDeleting || (!canManagePost && !_hasSavableMedia && !canReportPost)) {
       return;
     }
 
@@ -144,8 +181,60 @@ class _PostCardState extends ConsumerState<PostCard> {
           await _confirmDeletePost();
         },
         onSaveToGallery: _saveToGallery,
+        canReportPost: canReportPost,
+        onReport: () async {
+          Navigator.of(sheetContext).pop();
+          await _reportPost();
+        },
       ),
     );
+  }
+
+  Future<void> _reportPost() async {
+    final String? reason = await showReportReasonSheet(
+      context,
+      title: 'Report Post',
+      subtitle: 'Choose the reason that best matches this post.',
+    );
+
+    if (reason == null || !mounted) {
+      return;
+    }
+
+    setState(() {
+      _isHiddenByReport = true;
+    });
+
+    try {
+      await ref.read(optimizedPostServiceProvider).reportPost(
+            postId: widget.post.id,
+            reason: reason,
+          );
+      if (!mounted) {
+        return;
+      }
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text(
+            "Thank you. We've hidden this content and our team will review it shortly.",
+          ),
+          backgroundColor: Color(0xFF007AFF),
+        ),
+      );
+    } catch (e) {
+      if (!mounted) {
+        return;
+      }
+      setState(() {
+        _isHiddenByReport = false;
+      });
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Failed to report post: $e'),
+          backgroundColor: Colors.red,
+        ),
+      );
+    }
   }
 
   Future<void> _showEditPostSheet() async {
@@ -325,6 +414,10 @@ class _PostCardState extends ConsumerState<PostCard> {
     );
     final canManagePost = _isOwnedByCurrentUser(currentUserId);
 
+    if (_isHiddenByReport) {
+      return const SizedBox.shrink();
+    }
+
     return Container(
       margin: const EdgeInsets.only(bottom: 16),
       decoration: BoxDecoration(
@@ -397,7 +490,7 @@ class _PostCardState extends ConsumerState<PostCard> {
                     ],
                   ),
                 ),
-                if (canManagePost || _hasSavableMedia)
+                if (canManagePost || _hasSavableMedia || !canManagePost)
                   IconButton(
                     onPressed: () => _showPostActions(canManagePost),
                     style: IconButton.styleFrom(
@@ -500,7 +593,7 @@ class _PostCardState extends ConsumerState<PostCard> {
                 // Comment Button
                 _EngagementButton(
                   icon: Icons.comment_outlined,
-                  label: widget.post.commentsCount.toString(),
+                  label: _displayedCommentCount.toString(),
                   isActive: false,
                   isLoading: false,
                   onPressed: _showComments,
@@ -585,10 +678,12 @@ class _PostActionSheet extends StatelessWidget {
   const _PostActionSheet({
     required this.canManagePost,
     required this.canSaveToGallery,
+    required this.canReportPost,
     required this.isSavingImageListenable,
     required this.onEdit,
     required this.onDelete,
     required this.onSaveToGallery,
+    required this.onReport,
   });
 
   static const Color _sheetColor = Color(0xFF1A1A1A);
@@ -596,10 +691,12 @@ class _PostActionSheet extends StatelessWidget {
   static const Color _deleteColor = Color(0xFFFF3B30);
   final bool canManagePost;
   final bool canSaveToGallery;
+  final bool canReportPost;
   final ValueListenable<bool> isSavingImageListenable;
   final Future<void> Function() onEdit;
   final Future<void> Function() onDelete;
   final Future<void> Function() onSaveToGallery;
+  final Future<void> Function() onReport;
 
   @override
   Widget build(BuildContext context) {
@@ -655,8 +752,18 @@ class _PostActionSheet extends StatelessWidget {
                   },
                 ),
               ],
-              if (canSaveToGallery && canManagePost)
+              if ((canSaveToGallery && canManagePost) ||
+                  (canSaveToGallery && canReportPost))
                 const Divider(height: 1, color: _borderColor),
+              if (canReportPost) ...[
+                _ActionTile(
+                  icon: Icons.outlined_flag_rounded,
+                  label: 'Report Post',
+                  color: Colors.white,
+                  onTap: onReport,
+                ),
+                if (canManagePost) const Divider(height: 1, color: _borderColor),
+              ],
               if (canManagePost) ...[
                 _ActionTile(
                   icon: Icons.edit_outlined,

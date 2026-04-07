@@ -121,31 +121,44 @@ class PostModel extends Equatable {
 class PostCommentModel extends Equatable {
   final String id;
   final String postId;
-  final String userId;
+  final String authorId;
+  final String? parentId;
   final String content;
   final DateTime createdAt;
   final String? userName;
   final String? userAvatar;
+  final int likesCount;
+  final bool isLikedByCurrentUser;
+  final bool isPending;
 
   const PostCommentModel({
     required this.id,
     required this.postId,
-    required this.userId,
+    required this.authorId,
+    this.parentId,
     required this.content,
     required this.createdAt,
     this.userName,
     this.userAvatar,
+    this.likesCount = 0,
+    this.isLikedByCurrentUser = false,
+    this.isPending = false,
   });
 
   factory PostCommentModel.fromMap(Map<String, dynamic> map) {
     return PostCommentModel(
       id: map['id'] as String,
       postId: map['post_id'] as String,
-      userId: map['user_id'] as String,
+      authorId: (map['author_id'] ?? map['user_id']) as String,
+      parentId: map['parent_id'] as String?,
       content: map['content'] as String,
       createdAt: DateTime.parse(map['created_at'] as String),
       userName: map['user_name'] as String?,
       userAvatar: map['user_avatar'] as String?,
+      likesCount: (map['likes_count'] as num?)?.toInt() ?? 0,
+      isLikedByCurrentUser:
+          (map['is_liked_by_current_user'] as bool?) ?? false,
+      isPending: (map['is_pending'] as bool?) ?? false,
     );
   }
 
@@ -153,20 +166,58 @@ class PostCommentModel extends Equatable {
     return {
       'id': id,
       'post_id': postId,
-      'user_id': userId,
+      'author_id': authorId,
+      'parent_id': parentId,
       'content': content,
       'created_at': createdAt.toIso8601String(),
+      'likes_count': likesCount,
+      'is_liked_by_current_user': isLikedByCurrentUser,
+      'is_pending': isPending,
     };
+  }
+
+  PostCommentModel copyWith({
+    String? id,
+    String? postId,
+    String? authorId,
+    String? parentId,
+    bool clearParentId = false,
+    String? content,
+    DateTime? createdAt,
+    String? userName,
+    String? userAvatar,
+    int? likesCount,
+    bool? isLikedByCurrentUser,
+    bool? isPending,
+  }) {
+    return PostCommentModel(
+      id: id ?? this.id,
+      postId: postId ?? this.postId,
+      authorId: authorId ?? this.authorId,
+      parentId: clearParentId ? null : (parentId ?? this.parentId),
+      content: content ?? this.content,
+      createdAt: createdAt ?? this.createdAt,
+      userName: userName ?? this.userName,
+      userAvatar: userAvatar ?? this.userAvatar,
+      likesCount: likesCount ?? this.likesCount,
+      isLikedByCurrentUser:
+          isLikedByCurrentUser ?? this.isLikedByCurrentUser,
+      isPending: isPending ?? this.isPending,
+    );
   }
 
   @override
   List<Object?> get props => [
         id,
         postId,
-        userId,
+        authorId,
+        parentId,
         content,
         createdAt,
         userName,
         userAvatar,
+        likesCount,
+        isLikedByCurrentUser,
+        isPending,
       ];
 }

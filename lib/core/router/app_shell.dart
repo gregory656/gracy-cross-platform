@@ -1,10 +1,12 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../theme/app_colors.dart';
 import 'app_router.dart';
+import 'shell_ui_provider.dart';
 
-class AppShellScaffold extends StatelessWidget {
+class AppShellScaffold extends ConsumerWidget {
   const AppShellScaffold({super.key, required this.child});
 
   final Widget child;
@@ -41,50 +43,51 @@ class AppShellScaffold extends StatelessWidget {
   }
 
   @override
-  Widget build(BuildContext context) {
-    // ⚠️ DO NOT MODIFY: Core architecture logic
-    // This shell keeps tab navigation persistent while individual feature
-    // screens continue to own their own content and local state.
+  Widget build(BuildContext context, WidgetRef ref) {
+    final bool showNavigation = ref.watch(shellNavigationVisibleProvider);
+
     return Scaffold(
       extendBody: true,
       body: child,
-      bottomNavigationBar: NavigationBarTheme(
-        data: NavigationBarThemeData(
-          backgroundColor: AppColors.background.withValues(alpha: 0.88),
-          indicatorColor: AppColors.accentCyan.withValues(alpha: 0.16),
-          labelTextStyle: WidgetStateProperty.resolveWith(
-            (Set<WidgetState> states) => TextStyle(
-              color: states.contains(WidgetState.selected)
-                  ? AppColors.textPrimary
-                  : AppColors.textSecondary,
-              fontWeight: FontWeight.w700,
-            ),
-          ),
-        ),
-        child: NavigationBar(
-          selectedIndex: _selectedIndex(context),
-          onDestinationSelected: (int index) =>
-              _onDestinationSelected(context, index),
-          destinations: const <NavigationDestination>[
-            NavigationDestination(
-              icon: Icon(Icons.home_rounded),
-              label: 'Home',
-            ),
-            NavigationDestination(
-              icon: Icon(Icons.chat_bubble_rounded),
-              label: 'Chat',
-            ),
-            NavigationDestination(
-              icon: Icon(Icons.person_rounded),
-              label: 'Profile',
-            ),
-            NavigationDestination(
-              icon: Icon(Icons.settings_rounded),
-              label: 'Settings',
-            ),
-          ],
-        ),
-      ),
+      bottomNavigationBar: showNavigation
+          ? NavigationBarTheme(
+              data: NavigationBarThemeData(
+                backgroundColor: AppColors.background.withValues(alpha: 0.88),
+                indicatorColor: AppColors.accentCyan.withValues(alpha: 0.16),
+                labelTextStyle: WidgetStateProperty.resolveWith(
+                  (Set<WidgetState> states) => TextStyle(
+                    color: states.contains(WidgetState.selected)
+                        ? AppColors.textPrimary
+                        : AppColors.textSecondary,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+              ),
+              child: NavigationBar(
+                selectedIndex: _selectedIndex(context),
+                onDestinationSelected: (int index) =>
+                    _onDestinationSelected(context, index),
+                destinations: const <NavigationDestination>[
+                  NavigationDestination(
+                    icon: Icon(Icons.home_rounded),
+                    label: 'Home',
+                  ),
+                  NavigationDestination(
+                    icon: Icon(Icons.chat_bubble_rounded),
+                    label: 'Chat',
+                  ),
+                  NavigationDestination(
+                    icon: Icon(Icons.person_rounded),
+                    label: 'Profile',
+                  ),
+                  NavigationDestination(
+                    icon: Icon(Icons.settings_rounded),
+                    label: 'Settings',
+                  ),
+                ],
+              ),
+            )
+          : null,
     );
   }
 }

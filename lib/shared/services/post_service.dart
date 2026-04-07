@@ -331,11 +331,12 @@ class PostService {
 
   Future<List<PostCommentModel>> getComments(String postId) async {
     try {
+      final userId = _supabase.auth.currentUser?.id;
       final response = await _supabase
           .from('post_comments')
           .select('''
             *,
-            profiles!post_comments_user_id_fkey (
+            profiles!post_comments_author_id_fkey (
               username,
               avatar_url
             )
@@ -343,14 +344,31 @@ class PostService {
           .eq('post_id', postId)
           .order('created_at', ascending: true);
 
-      return (response as List).map((comment) {
-        final commentData = comment as Map<String, dynamic>;
+      final List<Map<String, dynamic>> commentRows = (response as List)
+          .map((dynamic comment) => Map<String, dynamic>.from(comment as Map))
+          .toList();
+      final List<String> commentIds = commentRows
+          .map((Map<String, dynamic> comment) => comment['id'] as String?)
+          .whereType<String>()
+          .toList();
+      final Map<String, int> likesByComment = await _fetchCommentLikeCounts(
+        commentIds,
+      );
+      final Set<String> likedByCurrentUser = userId == null
+          ? <String>{}
+          : await _fetchLikedCommentIds(userId: userId, commentIds: commentIds);
+
+      return commentRows.map((commentData) {
         final profile = commentData['profiles'] as Map<String, dynamic>?;
 
         return PostCommentModel.fromMap({
           ...commentData,
           'user_name': profile?['username'] as String?,
           'user_avatar': profile?['avatar_url'] as String?,
+          'likes_count': likesByComment[commentData['id']] ?? 0,
+          'is_liked_by_current_user': likedByCurrentUser.contains(
+            commentData['id'],
+          ),
         });
       }).toList();
     } catch (e) {
@@ -361,6 +379,7 @@ class PostService {
   Future<PostCommentModel> addComment({
     required String postId,
     required String content,
+    String? parentId,
   }) async {
     try {
       final userId = _supabase.auth.currentUser?.id;
@@ -368,10 +387,15 @@ class PostService {
 
       final response = await _supabase
           .from('post_comments')
-          .insert({'post_id': postId, 'user_id': userId, 'content': content})
+          .insert({
+            'post_id': postId,
+            'author_id': userId,
+            'parent_id': parentId,
+            'content': content,
+          })
           .select('''
             *,
-            profiles!post_comments_user_id_fkey (
+            profiles!post_comments_author_id_fkey (
               username,
               avatar_url
             )
@@ -390,6 +414,142 @@ class PostService {
       });
     } catch (e) {
       throw Exception('Failed to add comment: $e');
+    }
+  }
+
+  Future<PostCommentModel> updateComment({
+    required String commentId,
+    required String content,
+  }) async {
+    try {
+      final userId = _supabase.auth.currentUser?.id;
+      if (userId == null) throw Exception('User not authenticated');
+
+      final existing = await _supabase
+          .from('post_comments')
+          .select('author_id')
+          .eq('id', commentId)
+          .single();
+
+      if (existing['author_id'] != userId) {
+        throw Exception('You can only edit your own comments');
+      }
+
+      final response = await _supabase
+          .from('post_comments')
+          .update({'content': content.trim()})
+          .eq('id', commentId)
+          .select('''
+            *,
+            profiles!post_comments_author_id_fkey (
+              username,
+              avatar_url
+            )
+          ''')
+          .single();
+
+      final Map<String, dynamic> commentData = Map<String, dynamic>.from(
+        response,
+      );
+      final profile = commentData['profiles'] as Map<String, dynamic>?;
+
+      return PostCommentModel.fromMap({
+        ...commentData,
+        'user_name': profile?['username'] as String?,
+        'user_avatar': profile?['avatar_url'] as String?,
+      });
+    } catch (e) {
+      throw Exception('Failed to update comment: $e');
+    }
+  }
+
+  Future<void> deleteComment(String commentId) async {
+    try {
+      final userId = _supabase.auth.currentUser?.id;
+      if (userId == null) throw Exception('User not authenticated');
+
+      final existing = await _supabase
+          .from('post_comments')
+          .select('author_id')
+          .eq('id', commentId)
+          .single();
+
+      if (existing['author_id'] != userId) {
+        throw Exception('You can only delete your own comments');
+      }
+
+      await _supabase.from('post_comments').delete().eq('id', commentId);
+    } catch (e) {
+      throw Exception('Failed to delete comment: $e');
+    }
+  }
+
+  Future<bool> toggleCommentLike(String commentId) async {
+    try {
+      final userId = _supabase.auth.currentUser?.id;
+      if (userId == null) throw Exception('User not authenticated');
+
+      final existing = await _supabase
+          .from('comment_likes')
+          .select('comment_id')
+          .eq('comment_id', commentId)
+          .eq('user_id', userId)
+          .maybeSingle();
+
+      if (existing != null) {
+        await _supabase
+            .from('comment_likes')
+            .delete()
+            .eq('comment_id', commentId)
+            .eq('user_id', userId);
+        return false;
+      }
+
+      await _supabase.from('comment_likes').insert({
+        'comment_id': commentId,
+        'user_id': userId,
+      });
+      return true;
+    } catch (e) {
+      throw Exception('Failed to toggle comment like: $e');
+    }
+  }
+
+  Future<void> reportComment({
+    required String commentId,
+    required String reason,
+  }) async {
+    try {
+      final userId = _supabase.auth.currentUser?.id;
+      if (userId == null) throw Exception('User not authenticated');
+
+      await _supabase.from('content_reports').insert({
+        'reporter_id': userId,
+        'target_type': 'comment',
+        'target_id': commentId,
+        'reason': reason,
+      });
+    } catch (e) {
+      throw Exception('Failed to report comment: $e');
+    }
+  }
+
+  Future<void> reportPost({
+    required String postId,
+    required String reason,
+  }) async {
+    try {
+      final userId = _supabase.auth.currentUser?.id;
+      if (userId == null) throw Exception('User not authenticated');
+
+      await _supabase.from('content_reports').insert({
+        'reporter_id': userId,
+        'target_type': 'post',
+        'target_id': postId,
+        'reason': reason,
+      });
+    } catch (e) {
+      throw Exception('Failed to report post: $e');
     }
   }
 
@@ -448,6 +608,48 @@ class PostService {
 
   Future<void> _decrementLikesCount(String postId) async {
     await _supabase.rpc('decrement_likes', params: {'post_id_input': postId});
+  }
+
+  Future<Map<String, int>> _fetchCommentLikeCounts(List<String> commentIds) async {
+    if (commentIds.isEmpty) {
+      return <String, int>{};
+    }
+
+    final response = await _supabase
+        .from('comment_likes')
+        .select('comment_id')
+        .inFilter('comment_id', commentIds);
+
+    final Map<String, int> counts = <String, int>{};
+    for (final dynamic row in response as List) {
+      final String? commentId =
+          (row as Map<String, dynamic>)['comment_id'] as String?;
+      if (commentId == null) {
+        continue;
+      }
+      counts.update(commentId, (int count) => count + 1, ifAbsent: () => 1);
+    }
+    return counts;
+  }
+
+  Future<Set<String>> _fetchLikedCommentIds({
+    required String userId,
+    required List<String> commentIds,
+  }) async {
+    if (commentIds.isEmpty) {
+      return <String>{};
+    }
+
+    final response = await _supabase
+        .from('comment_likes')
+        .select('comment_id')
+        .eq('user_id', userId)
+        .inFilter('comment_id', commentIds);
+
+    return (response as List)
+        .map((dynamic row) => (row as Map<String, dynamic>)['comment_id'])
+        .whereType<String>()
+        .toSet();
   }
 
   void _logSupabaseError(String context, Object error) {
