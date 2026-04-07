@@ -1,8 +1,14 @@
+import 'dart:io';
+
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:cached_network_image/cached_network_image.dart';
-import 'package:share_plus/share_plus.dart';
+import 'package:dio/dio.dart';
 import 'package:intl/intl.dart';
+import 'package:image_gallery_saver/image_gallery_saver.dart';
+import 'package:permission_handler/permission_handler.dart';
+import 'package:share_plus/share_plus.dart';
 import '../../../core/utils/elite_animations.dart';
 import '../../../shared/models/post_model.dart';
 import '../../../shared/providers/auth_provider.dart';
@@ -29,6 +35,14 @@ class PostCard extends ConsumerStatefulWidget {
 class _PostCardState extends ConsumerState<PostCard> {
   bool _isLiking = false;
   bool _isDeleting = false;
+  bool _isSavingImage = false;
+  final ValueNotifier<bool> _isSavingImageNotifier = ValueNotifier(false);
+
+  @override
+  void dispose() {
+    _isSavingImageNotifier.dispose();
+    super.dispose();
+  }
 
   String _formatTimestamp(DateTime timestamp) {
     final nairobiTime = NairobiTimezoneService.instance.convertToNairobi(
@@ -107,29 +121,31 @@ class _PostCardState extends ConsumerState<PostCard> {
     return currentUserId != null && currentUserId == widget.post.authorId;
   }
 
-  Future<void> _showOwnerActions() async {
-    if (_isDeleting) {
+  bool get _hasSavableMedia => widget.post.imageUrl?.isNotEmpty == true;
+
+  Future<void> _showPostActions(bool canManagePost) async {
+    if (_isDeleting || (!canManagePost && !_hasSavableMedia)) {
       return;
     }
 
-    final action = await showModalBottomSheet<_PostOwnerAction>(
+    await showModalBottomSheet<void>(
       context: context,
       backgroundColor: Colors.transparent,
-      builder: (context) => const _PostOwnerActionSheet(),
+      builder: (sheetContext) => _PostActionSheet(
+        canManagePost: canManagePost,
+        canSaveToGallery: _hasSavableMedia,
+        isSavingImageListenable: _isSavingImageNotifier,
+        onEdit: () async {
+          Navigator.of(sheetContext).pop();
+          await _showEditPostSheet();
+        },
+        onDelete: () async {
+          Navigator.of(sheetContext).pop();
+          await _confirmDeletePost();
+        },
+        onSaveToGallery: _saveToGallery,
+      ),
     );
-
-    if (!mounted || action == null) {
-      return;
-    }
-
-    switch (action) {
-      case _PostOwnerAction.edit:
-        await _showEditPostSheet();
-        break;
-      case _PostOwnerAction.delete:
-        await _confirmDeletePost();
-        break;
-    }
   }
 
   Future<void> _showEditPostSheet() async {
@@ -205,6 +221,100 @@ class _PostCardState extends ConsumerState<PostCard> {
         });
       }
     }
+  }
+
+  Future<void> _saveToGallery() async {
+    if (_isSavingImage || !_hasSavableMedia) {
+      return;
+    }
+
+    final messenger = ScaffoldMessenger.maybeOf(context);
+
+    setState(() {
+      _isSavingImage = true;
+    });
+    _isSavingImageNotifier.value = true;
+
+    try {
+      final permissionGranted = await _requestGalleryPermission();
+      if (!permissionGranted) {
+        messenger?.showSnackBar(
+          const SnackBar(
+            content: Text('Gallery permission is required to save this post'),
+            backgroundColor: Colors.orange,
+          ),
+        );
+        return;
+      }
+
+      final dio = Dio();
+      final response = await dio.get(
+        widget.post.optimizedImageUrl,
+        options: Options(responseType: ResponseType.bytes),
+      );
+      final bytes = Uint8List.fromList(List<int>.from(response.data as List));
+
+      final result = await ImageGallerySaver.saveImage(
+        bytes,
+        quality: 100,
+        name: _buildGalleryFileName(),
+      );
+      final isSuccess =
+          result is Map &&
+          (result['isSuccess'] == true || result['success'] == true);
+
+      if (isSuccess) {
+        messenger?.showSnackBar(
+          const SnackBar(
+            content: Text('Post saved to gallery!'),
+            backgroundColor: Colors.green,
+          ),
+        );
+      } else {
+        messenger?.showSnackBar(
+          const SnackBar(
+            content: Text('Failed to save to gallery'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    } catch (e) {
+      messenger?.showSnackBar(
+        SnackBar(
+          content: Text('Download failed: $e'),
+          backgroundColor: Colors.red,
+        ),
+      );
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isSavingImage = false;
+        });
+      }
+      _isSavingImageNotifier.value = false;
+    }
+  }
+
+  Future<bool> _requestGalleryPermission() async {
+    if (Platform.isIOS) {
+      final status = await Permission.photosAddOnly.request();
+      return status.isGranted || status.isLimited;
+    }
+
+    if (Platform.isAndroid) {
+      // The Android plugin writes through MediaStore, so modern Android
+      // versions do not need a runtime storage prompt for this save flow.
+      return true;
+    }
+
+    return true;
+  }
+
+  String _buildGalleryFileName() {
+    final createdAt = DateFormat(
+      'yyyyMMdd_HHmmss',
+    ).format(widget.post.createdAt);
+    return 'gracy_post_$createdAt';
   }
 
   @override
@@ -287,9 +397,9 @@ class _PostCardState extends ConsumerState<PostCard> {
                     ],
                   ),
                 ),
-                if (canManagePost)
+                if (canManagePost || _hasSavableMedia)
                   IconButton(
-                    onPressed: _showOwnerActions,
+                    onPressed: () => _showPostActions(canManagePost),
                     style: IconButton.styleFrom(
                       minimumSize: const Size(36, 36),
                       padding: EdgeInsets.zero,
@@ -471,14 +581,25 @@ class _EngagementButton extends StatelessWidget {
   }
 }
 
-enum _PostOwnerAction { edit, delete }
-
-class _PostOwnerActionSheet extends StatelessWidget {
-  const _PostOwnerActionSheet();
+class _PostActionSheet extends StatelessWidget {
+  const _PostActionSheet({
+    required this.canManagePost,
+    required this.canSaveToGallery,
+    required this.isSavingImageListenable,
+    required this.onEdit,
+    required this.onDelete,
+    required this.onSaveToGallery,
+  });
 
   static const Color _sheetColor = Color(0xFF1A1A1A);
   static const Color _borderColor = Color(0xFF333333);
   static const Color _deleteColor = Color(0xFFFF3B30);
+  final bool canManagePost;
+  final bool canSaveToGallery;
+  final ValueListenable<bool> isSavingImageListenable;
+  final Future<void> Function() onEdit;
+  final Future<void> Function() onDelete;
+  final Future<void> Function() onSaveToGallery;
 
   @override
   Widget build(BuildContext context) {
@@ -520,19 +641,37 @@ class _PostOwnerActionSheet extends StatelessWidget {
                   ),
                 ),
               ),
-              _ActionTile(
-                icon: Icons.edit_outlined,
-                label: 'Edit Post',
-                color: Colors.white,
-                onTap: () => Navigator.of(context).pop(_PostOwnerAction.edit),
-              ),
-              const Divider(height: 1, color: _borderColor),
-              _ActionTile(
-                icon: Icons.delete_outline,
-                label: 'Delete Post',
-                color: _deleteColor,
-                onTap: () => Navigator.of(context).pop(_PostOwnerAction.delete),
-              ),
+              if (canSaveToGallery) ...[
+                ValueListenableBuilder<bool>(
+                  valueListenable: isSavingImageListenable,
+                  builder: (context, isSavingImage, _) {
+                    return _ActionTile(
+                      icon: Icons.download_outlined,
+                      label: 'Save to Gallery',
+                      color: Colors.white,
+                      isLoading: isSavingImage,
+                      onTap: isSavingImage ? null : onSaveToGallery,
+                    );
+                  },
+                ),
+              ],
+              if (canSaveToGallery && canManagePost)
+                const Divider(height: 1, color: _borderColor),
+              if (canManagePost) ...[
+                _ActionTile(
+                  icon: Icons.edit_outlined,
+                  label: 'Edit Post',
+                  color: Colors.white,
+                  onTap: onEdit,
+                ),
+                const Divider(height: 1, color: _borderColor),
+                _ActionTile(
+                  icon: Icons.delete_outline,
+                  label: 'Delete Post',
+                  color: _deleteColor,
+                  onTap: onDelete,
+                ),
+              ],
               const SizedBox(height: 8),
             ],
           ),
@@ -548,23 +687,39 @@ class _ActionTile extends StatelessWidget {
     required this.label,
     required this.color,
     required this.onTap,
+    this.isLoading = false,
   });
 
   final IconData icon;
   final String label;
   final Color color;
-  final VoidCallback onTap;
+  final Future<void> Function()? onTap;
+  final bool isLoading;
 
   @override
   Widget build(BuildContext context) {
     return InkWell(
-      onTap: onTap,
+      onTap: onTap == null
+          ? null
+          : () async {
+              await onTap!.call();
+            },
       borderRadius: BorderRadius.circular(16),
       child: Padding(
         padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 18),
         child: Row(
           children: [
-            Icon(icon, color: color, size: 20),
+            if (isLoading)
+              SizedBox(
+                width: 20,
+                height: 20,
+                child: CircularProgressIndicator(
+                  strokeWidth: 2,
+                  valueColor: AlwaysStoppedAnimation<Color>(color),
+                ),
+              )
+            else
+              Icon(icon, color: color, size: 20),
             const SizedBox(width: 14),
             Text(
               label,

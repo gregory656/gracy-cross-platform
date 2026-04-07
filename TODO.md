@@ -1,15 +1,30 @@
-# Flutter 3.41.x Upgrade TODO
+# Save to Gallery Feature - Implementation Steps
 
-- [x] 1. pubspec.yaml updated (Dart ^3.24.0+)
-- [x] 2. Platforms OK
-- [ ] 3. Install fresh Flutter SDK (see steps below)
-- [ ] 4. flutter pub upgrade ; flutter analyze
-- [ ] 5. flutter run
+## Status: [IN PROGRESS]
 
-**SDK Fix (Windows):**
-1. Download Flutter stable ZIP: https://docs.flutter.dev/release/archive?tab=windows
-2. Extract to short path e.g. C:\flutter
-3. Edit system PATH + C:\flutter\bin
-4. Restart terminal/VSCode
-5. flutter --version (should show 3.24.x+)
-6. flutter pub get here
+### 1. [x] Update pubspec.yaml ✅
+- Add `image_gallery_saver: ^2.0.3` and `dio: ^5.7.0`
+- Run `flutter pub get`
+
+### 2. [x] Update post_card.dart ✅
+- Extend menu to all users (_showPostActions)
+- Add "Save to Gallery" option if imageUrl present
+- Implement _saveToGallery() with Dio download, permission_handler request, ImageGallerySaver.saveImage
+- Add _isSavingImage state for progress indicator
+- Snackbar feedback
+
+### 3. [x] Platform Permissions ✅
+- AndroidManifest.xml: Add WRITE_EXTERNAL_STORAGE (legacy)
+- Info.plist: Add NSPhotoLibraryAddUsageDescription
+
+### 4. [x] Test ✅
+- `flutter pub get`
+- `flutter run` on device
+- Verify permission prompt, save to Gallery/Photos, "Gracy" album
+
+### 5. [ ] Completion
+- Update checklist
+- attempt_completion
+
+*Next step marked with current progress.*
+
