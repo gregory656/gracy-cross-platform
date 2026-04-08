@@ -181,6 +181,7 @@ class PostService {
       'image_url': imageUrl,
       'likes_count': 0,
       'comments_count': 0,
+      'view_count': 0,
     };
     final trimmedContent = content.trim();
     final candidateColumns = trimmedContent.isEmpty
@@ -663,6 +664,10 @@ class PostService {
 
   Future<void> _decrementLikesCount(String postId) async {
     await _supabase.rpc('decrement_likes', params: {'post_id_input': postId});
+  }
+
+  Future<void> incrementViewsCount(String postId) async {
+    await _supabase.rpc('increment_views', params: {'post_id_input': postId});
   }
 
   Future<Map<String, int>> _fetchCommentLikeCounts(

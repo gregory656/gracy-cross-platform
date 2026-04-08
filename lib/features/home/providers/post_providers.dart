@@ -29,6 +29,7 @@ final uploadProgressProvider = Provider<double>((ref) => 0.0);
 final uploadStatusProvider = Provider<String>((ref) => '');
 
 class PostsNotifier extends AsyncNotifier<List<PostModel>> {
+  static final Set<String> _trackedViewPostIds = <String>{};
   late final OptimizedPostService _postService;
   final List<PostModel> _posts = [];
   bool _hasMore = true;
@@ -161,6 +162,33 @@ class PostsNotifier extends AsyncNotifier<List<PostModel>> {
         state = AsyncValue.data(List.from(_posts));
       }
       rethrow;
+    }
+  }
+
+  Future<void> trackPostView(String postId) async {
+    if (_trackedViewPostIds.contains(postId)) {
+      return;
+    }
+
+    final index = _posts.indexWhere((post) => post.id == postId);
+    PostModel? originalPost;
+
+    _trackedViewPostIds.add(postId);
+
+    if (index != -1) {
+      originalPost = _posts[index];
+      _posts[index] = originalPost.copyWith(viewCount: originalPost.viewCount + 1);
+      state = AsyncValue.data(List<PostModel>.from(_posts));
+    }
+
+    try {
+      await _postService.incrementViewsCount(postId);
+    } catch (e) {
+      _trackedViewPostIds.remove(postId);
+      if (index != -1 && originalPost != null) {
+        _posts[index] = originalPost;
+        state = AsyncValue.data(List<PostModel>.from(_posts));
+      }
     }
   }
 

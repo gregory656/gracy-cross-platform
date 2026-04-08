@@ -7,6 +7,7 @@ class PostModel extends Equatable {
   final String content;
   final int likesCount;
   final int commentsCount;
+  final int viewCount;
   final DateTime createdAt;
   final DateTime? updatedAt;
   final String? authorName;
@@ -20,6 +21,7 @@ class PostModel extends Equatable {
     this.content = '',
     this.likesCount = 0,
     this.commentsCount = 0,
+    this.viewCount = 0,
     required this.createdAt,
     this.updatedAt,
     this.authorName,
@@ -44,6 +46,7 @@ class PostModel extends Equatable {
       content: rawContent?.toString() ?? '',
       likesCount: (map['likes_count'] as num?)?.toInt() ?? 0,
       commentsCount: (map['comments_count'] as num?)?.toInt() ?? 0,
+      viewCount: (map['view_count'] as num?)?.toInt() ?? 0,
       createdAt: DateTime.parse(map['created_at'] as String),
       updatedAt: map['updated_at'] != null
           ? DateTime.parse(map['updated_at'] as String)
@@ -62,6 +65,7 @@ class PostModel extends Equatable {
       'content': content,
       'likes_count': likesCount,
       'comments_count': commentsCount,
+      'view_count': viewCount,
       'created_at': createdAt.toIso8601String(),
       'updated_at': updatedAt?.toIso8601String(),
     };
@@ -74,6 +78,7 @@ class PostModel extends Equatable {
     String? content,
     int? likesCount,
     int? commentsCount,
+    int? viewCount,
     DateTime? createdAt,
     DateTime? updatedAt,
     String? authorName,
@@ -87,6 +92,7 @@ class PostModel extends Equatable {
       content: content ?? this.content,
       likesCount: likesCount ?? this.likesCount,
       commentsCount: commentsCount ?? this.commentsCount,
+      viewCount: viewCount ?? this.viewCount,
       createdAt: createdAt ?? this.createdAt,
       updatedAt: updatedAt ?? this.updatedAt,
       authorName: authorName ?? this.authorName,
@@ -111,6 +117,7 @@ class PostModel extends Equatable {
     content,
     likesCount,
     commentsCount,
+    viewCount,
     createdAt,
     updatedAt,
     authorName,

@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:io';
 
 import 'package:flutter/foundation.dart';
@@ -36,17 +37,20 @@ class PostCard extends ConsumerStatefulWidget {
 }
 
 class _PostCardState extends ConsumerState<PostCard> {
+  static const Duration _viewTrackingDelay = Duration(seconds: 1);
   bool _isLiking = false;
   bool _isDeleting = false;
   bool _isSavingImage = false;
   bool _isHiddenByReport = false;
   final ValueNotifier<bool> _isSavingImageNotifier = ValueNotifier(false);
   late int _displayedCommentCount;
+  Timer? _viewTrackingTimer;
 
   @override
   void initState() {
     super.initState();
     _displayedCommentCount = widget.post.commentsCount;
+    _scheduleViewTracking();
   }
 
   @override
@@ -56,10 +60,14 @@ class _PostCardState extends ConsumerState<PostCard> {
         oldWidget.post.commentsCount != widget.post.commentsCount) {
       _displayedCommentCount = widget.post.commentsCount;
     }
+    if (oldWidget.post.id != widget.post.id) {
+      _scheduleViewTracking();
+    }
   }
 
   @override
   void dispose() {
+    _viewTrackingTimer?.cancel();
     _isSavingImageNotifier.dispose();
     super.dispose();
   }
@@ -411,6 +419,32 @@ class _PostCardState extends ConsumerState<PostCard> {
     return 'gracy_post_$createdAt';
   }
 
+  void _scheduleViewTracking() {
+    _viewTrackingTimer?.cancel();
+    _viewTrackingTimer = Timer(_viewTrackingDelay, () {
+      if (!mounted) {
+        return;
+      }
+      unawaited(ref.read(postsProvider.notifier).trackPostView(widget.post.id));
+    });
+  }
+
+  String _formatCompactCount(int count) {
+    if (count >= 1000000) {
+      final value = count / 1000000;
+      return value >= 10
+          ? '${value.toStringAsFixed(0)}M'
+          : '${value.toStringAsFixed(1)}M';
+    }
+    if (count >= 1000) {
+      final value = count / 1000;
+      return value >= 10
+          ? '${value.toStringAsFixed(0)}k'
+          : '${value.toStringAsFixed(1)}k';
+    }
+    return count.toString();
+  }
+
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
@@ -418,6 +452,7 @@ class _PostCardState extends ConsumerState<PostCard> {
       authNotifierProvider.select((authState) => authState.userId),
     );
     final canManagePost = _isOwnedByCurrentUser(currentUserId);
+    final bool compactActions = MediaQuery.sizeOf(context).width < 380;
 
     if (_isHiddenByReport) {
       return const SizedBox.shrink();
@@ -582,38 +617,58 @@ class _PostCardState extends ConsumerState<PostCard> {
             padding: const EdgeInsets.all(16),
             child: Row(
               children: [
-                // Like Button
-                _EngagementButton(
-                  icon: widget.post.isLikedByCurrentUser
-                      ? Icons.favorite
-                      : Icons.favorite_border,
-                  label: widget.post.likesCount.toString(),
-                  isActive: widget.post.isLikedByCurrentUser,
-                  isLoading: _isLiking,
-                  onPressed: _toggleLike,
-                  activeColor: Colors.red,
+                Expanded(
+                  child: Center(
+                    child: _EngagementButton(
+                      icon: widget.post.isLikedByCurrentUser
+                          ? Icons.favorite
+                          : Icons.favorite_border,
+                      label: _formatCompactCount(widget.post.likesCount),
+                      isCompact: compactActions,
+                      isActive: widget.post.isLikedByCurrentUser,
+                      isLoading: _isLiking,
+                      onPressed: _toggleLike,
+                      activeColor: Colors.red,
+                    ),
+                  ),
                 ),
-                const SizedBox(width: 24),
-
-                // Comment Button
-                _EngagementButton(
-                  icon: Icons.comment_outlined,
-                  label: _displayedCommentCount.toString(),
-                  isActive: false,
-                  isLoading: false,
-                  onPressed: _showComments,
-                  activeColor: theme.colorScheme.primary,
+                Expanded(
+                  child: Center(
+                    child: _EngagementButton(
+                      icon: Icons.comment_outlined,
+                      label: _formatCompactCount(_displayedCommentCount),
+                      isCompact: compactActions,
+                      isActive: false,
+                      isLoading: false,
+                      onPressed: _showComments,
+                      activeColor: theme.colorScheme.primary,
+                    ),
+                  ),
                 ),
-                const SizedBox(width: 24),
-
-                // Share Button
-                _EngagementButton(
-                  icon: Icons.share_outlined,
-                  label: 'Share',
-                  isActive: false,
-                  isLoading: false,
-                  onPressed: _sharePost,
-                  activeColor: theme.colorScheme.primary,
+                Expanded(
+                  child: Center(
+                    child: _EngagementButton(
+                      icon: Icons.share_outlined,
+                      label: 'Share',
+                      isCompact: compactActions,
+                      isActive: false,
+                      isLoading: false,
+                      onPressed: _sharePost,
+                      activeColor: theme.colorScheme.primary,
+                    ),
+                  ),
+                ),
+                Expanded(
+                  child: Center(
+                    child: _PassiveMetric(
+                      icon: Icons.analytics_outlined,
+                      label: _formatCompactCount(widget.post.viewCount),
+                      isCompact: compactActions,
+                      color: theme.colorScheme.onSurfaceVariant.withValues(
+                        alpha: 0.75,
+                      ),
+                    ),
+                  ),
                 ),
               ],
             ),
@@ -624,9 +679,43 @@ class _PostCardState extends ConsumerState<PostCard> {
   }
 }
 
+class _PassiveMetric extends StatelessWidget {
+  const _PassiveMetric({
+    required this.icon,
+    required this.label,
+    required this.isCompact,
+    required this.color,
+  });
+
+  final IconData icon;
+  final String label;
+  final bool isCompact;
+  final Color color;
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Icon(icon, size: isCompact ? 18 : 20, color: color),
+        SizedBox(width: isCompact ? 4 : 6),
+        Text(
+          label,
+          style: TextStyle(
+            color: color,
+            fontSize: isCompact ? 13 : 14,
+            fontWeight: FontWeight.normal,
+          ),
+        ),
+      ],
+    );
+  }
+}
+
 class _EngagementButton extends StatelessWidget {
   final IconData icon;
   final String label;
+  final bool isCompact;
   final bool isActive;
   final bool isLoading;
   final VoidCallback onPressed;
@@ -635,6 +724,7 @@ class _EngagementButton extends StatelessWidget {
   const _EngagementButton({
     required this.icon,
     required this.label,
+    required this.isCompact,
     required this.isActive,
     required this.isLoading,
     required this.onPressed,
@@ -650,8 +740,8 @@ class _EngagementButton extends StatelessWidget {
         children: [
           isLoading
               ? SizedBox(
-                  width: 20,
-                  height: 20,
+                  width: isCompact ? 18 : 20,
+                  height: isCompact ? 18 : 20,
                   child: CircularProgressIndicator(
                     strokeWidth: 2,
                     valueColor: AlwaysStoppedAnimation<Color>(
@@ -661,15 +751,15 @@ class _EngagementButton extends StatelessWidget {
                 )
               : Icon(
                   icon,
-                  size: 20,
+                  size: isCompact ? 18 : 20,
                   color: isActive ? activeColor : Colors.grey[400],
                 ),
-          const SizedBox(width: 6),
+          SizedBox(width: isCompact ? 4 : 6),
           Text(
             label,
             style: TextStyle(
               color: isActive ? activeColor : Colors.grey[400],
-              fontSize: 14,
+              fontSize: isCompact ? 13 : 14,
               fontWeight: isActive ? FontWeight.w600 : FontWeight.normal,
             ),
           ),
