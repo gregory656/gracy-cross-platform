@@ -17,6 +17,7 @@ class AuthState {
     this.bio,
     this.yearOfStudy,
     this.gracyId,
+    this.avatarUrl,
     this.errorMessage,
     this.selectedTheme = 'midnight',
     this.notificationsEnabled = true,
@@ -31,6 +32,7 @@ class AuthState {
   final String? bio;
   final String? yearOfStudy;
   final String? gracyId;
+  final String? avatarUrl;
   final String? errorMessage;
   final String selectedTheme;
   final bool notificationsEnabled;
@@ -53,6 +55,7 @@ class AuthState {
     String? bio,
     String? yearOfStudy,
     String? gracyId,
+    String? avatarUrl,
     String? errorMessage,
     String? selectedTheme,
     bool? notificationsEnabled,
@@ -67,6 +70,7 @@ class AuthState {
       bio: bio ?? this.bio,
       yearOfStudy: yearOfStudy ?? this.yearOfStudy,
       gracyId: gracyId ?? this.gracyId,
+      avatarUrl: avatarUrl ?? this.avatarUrl,
       errorMessage: errorMessage,
       selectedTheme: selectedTheme ?? this.selectedTheme,
       notificationsEnabled: notificationsEnabled ?? this.notificationsEnabled,
@@ -143,6 +147,7 @@ class AuthNotifier extends Notifier<AuthState> {
       String? bio;
       String? yearOfStudy;
       String? gracyId;
+      String? avatarUrl;
       String selectedTheme = 'midnight';
       bool notificationsEnabled = true;
 
@@ -150,7 +155,7 @@ class AuthNotifier extends Notifier<AuthState> {
         final Map<String, dynamic>? profile = await client
             .from('profiles')
             .select(
-              'full_name,bio,year_of_study,gracy_id,username,selected_theme,notifications_enabled',
+              'full_name,bio,year_of_study,gracy_id,username,selected_theme,notifications_enabled,avatar_url',
             )
             .eq('id', user.id)
             .maybeSingle();
@@ -160,6 +165,7 @@ class AuthNotifier extends Notifier<AuthState> {
           bio = profile['bio']?.toString();
           yearOfStudy = profile['year_of_study']?.toString();
           gracyId = profile['gracy_id']?.toString();
+          avatarUrl = profile['avatar_url']?.toString();
           selectedTheme = profile['selected_theme']?.toString() ?? 'midnight';
           notificationsEnabled = profile['notifications_enabled'] == true;
           
@@ -182,6 +188,7 @@ class AuthNotifier extends Notifier<AuthState> {
         bio: bio,
         yearOfStudy: yearOfStudy,
         gracyId: gracyId,
+        avatarUrl: avatarUrl,
         selectedTheme: selectedTheme,
         notificationsEnabled: notificationsEnabled,
       );
@@ -353,6 +360,7 @@ class AuthNotifier extends Notifier<AuthState> {
     // Check if profile exists
     bool onboardingComplete = false;
     String? fullName, bio, yearOfStudy, gracyId;
+    String? avatarUrl;
     String username = user.userMetadata?['username']?.toString() ?? 'gracyuser';
 
     try {
@@ -368,6 +376,7 @@ class AuthNotifier extends Notifier<AuthState> {
         bio = profile['bio']?.toString();
         yearOfStudy = profile['year_of_study']?.toString();
         gracyId = profile['gracy_id']?.toString();
+        avatarUrl = profile['avatar_url']?.toString();
         username = profile['username']?.toString() ?? username;
         await DatabaseService.instance.setOnboardingComplete(true);
       } else {
@@ -385,6 +394,7 @@ class AuthNotifier extends Notifier<AuthState> {
       bio: bio,
       yearOfStudy: yearOfStudy,
       gracyId: gracyId,
+      avatarUrl: avatarUrl,
     );
     return true;
   }
@@ -392,17 +402,30 @@ class AuthNotifier extends Notifier<AuthState> {
   Future<void> updateProfile({
     required String fullName,
     required String bio,
+    String? avatarUrl,
   }) async {
     final SupabaseClient? client = _client;
     final String? userId = state.userId;
     if (client == null || userId == null) return;
 
-    state = state.copyWith(fullName: fullName, bio: bio);
+    state = state.copyWith(
+      fullName: fullName,
+      bio: bio,
+      avatarUrl: avatarUrl ?? state.avatarUrl,
+    );
 
     try {
+      final Map<String, dynamic> payload = <String, dynamic>{
+        'full_name': fullName,
+        'bio': bio,
+      };
+      if (avatarUrl != null) {
+        payload['avatar_url'] = avatarUrl;
+      }
+
       await client
           .from('profiles')
-          .update(<String, dynamic>{'full_name': fullName, 'bio': bio})
+          .update(payload)
           .eq('id', userId);
     } catch (_) {}
   }
@@ -444,6 +467,9 @@ final currentUserProvider = Provider<UserModel?>((ref) {
     year: authState.yearOfStudy?.trim().isNotEmpty == true
         ? authState.yearOfStudy!.trim()
         : 'Not set',
+    avatarUrl: authState.avatarUrl?.trim().isNotEmpty == true
+        ? authState.avatarUrl!.trim()
+        : null,
     gracyId: authState.gracyId,
     selectedTheme: authState.selectedTheme,
     notificationsEnabled: authState.notificationsEnabled,

@@ -13,6 +13,7 @@ class PostModel extends Equatable {
   final String? authorName;
   final String? authorAvatar;
   final bool isLikedByCurrentUser;
+  final bool likesVisible;
 
   const PostModel({
     required this.id,
@@ -27,6 +28,7 @@ class PostModel extends Equatable {
     this.authorName,
     this.authorAvatar,
     this.isLikedByCurrentUser = false,
+    this.likesVisible = true,
   });
 
   factory PostModel.fromMap(Map<String, dynamic> map) {
@@ -54,6 +56,7 @@ class PostModel extends Equatable {
       authorName: map['author_name'] as String?,
       authorAvatar: map['author_avatar'] as String?,
       isLikedByCurrentUser: (map['is_liked_by_current_user'] as bool?) ?? false,
+      likesVisible: (map['likes_visible'] as bool?) ?? true,
     );
   }
 
@@ -68,6 +71,7 @@ class PostModel extends Equatable {
       'view_count': viewCount,
       'created_at': createdAt.toIso8601String(),
       'updated_at': updatedAt?.toIso8601String(),
+      'likes_visible': likesVisible,
     };
   }
 
@@ -84,6 +88,7 @@ class PostModel extends Equatable {
     String? authorName,
     String? authorAvatar,
     bool? isLikedByCurrentUser,
+    bool? likesVisible,
   }) {
     return PostModel(
       id: id ?? this.id,
@@ -98,6 +103,7 @@ class PostModel extends Equatable {
       authorName: authorName ?? this.authorName,
       authorAvatar: authorAvatar ?? this.authorAvatar,
       isLikedByCurrentUser: isLikedByCurrentUser ?? this.isLikedByCurrentUser,
+      likesVisible: likesVisible ?? this.likesVisible,
     );
   }
 
@@ -123,6 +129,7 @@ class PostModel extends Equatable {
     authorName,
     authorAvatar,
     isLikedByCurrentUser,
+    likesVisible,
   ];
 }
 

@@ -39,6 +39,7 @@ class UserModel {
     required this.location,
     required this.avatarSeed,
     required this.year,
+    this.avatarUrl,
     this.gracyId,
     this.selectedTheme = 'dark',
     this.notificationsEnabled = true,
@@ -58,6 +59,7 @@ class UserModel {
   final String location;
   final String avatarSeed;
   final String year;
+  final String? avatarUrl;
   final String? gracyId;
   final String selectedTheme;
   final bool notificationsEnabled;
@@ -92,6 +94,7 @@ class UserModel {
     String? location,
     String? avatarSeed,
     String? year,
+    String? avatarUrl,
     String? gracyId,
     String? selectedTheme,
     bool? notificationsEnabled,
@@ -111,6 +114,7 @@ class UserModel {
       location: location ?? this.location,
       avatarSeed: avatarSeed ?? this.avatarSeed,
       year: year ?? this.year,
+      avatarUrl: avatarUrl ?? this.avatarUrl,
       gracyId: gracyId ?? this.gracyId,
       selectedTheme: selectedTheme ?? this.selectedTheme,
       notificationsEnabled: notificationsEnabled ?? this.notificationsEnabled,

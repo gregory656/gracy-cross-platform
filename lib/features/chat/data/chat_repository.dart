@@ -584,6 +584,10 @@ class ChatRepository {
         row['gracy_id']?.toString().trim().isNotEmpty == true
         ? row['gracy_id'].toString().trim()
         : null;
+    final String? avatarUrl =
+        row['avatar_url']?.toString().trim().isNotEmpty == true
+        ? row['avatar_url'].toString().trim()
+        : null;
 
     return UserModel(
       id: row['id']?.toString() ?? '',
@@ -597,6 +601,7 @@ class ChatRepository {
       location: 'Gracy network',
       avatarSeed: fullName,
       year: 'Active',
+      avatarUrl: avatarUrl,
       gracyId: gracyId,
     );
   }

@@ -20,6 +20,20 @@ final postByIdProvider = FutureProvider.autoDispose.family<PostModel, String>((
   return ref.read(optimizedPostServiceProvider).getPostById(postId);
 });
 
+final userPostsProvider = FutureProvider.autoDispose.family<List<PostModel>, String>((
+  ref,
+  String userId,
+) {
+  return ref.read(optimizedPostServiceProvider).getPostsByAuthor(userId);
+});
+
+final totalReachProvider = FutureProvider.autoDispose.family<int, String>((
+  ref,
+  String userId,
+) {
+  return ref.read(optimizedPostServiceProvider).getTotalReach(userId);
+});
+
 final postsProvider = AsyncNotifierProvider<PostsNotifier, List<PostModel>>(
   () => PostsNotifier(),
 );
@@ -240,6 +254,37 @@ class PostsNotifier extends AsyncNotifier<List<PostModel>> {
     } catch (e, stackTrace) {
       if (removedPost != null) {
         _posts.insert(index, removedPost);
+        state = AsyncValue.data(List<PostModel>.from(_posts));
+      }
+      Error.throwWithStackTrace(e, stackTrace);
+    }
+  }
+
+  Future<void> setLikesVisibility({
+    required String postId,
+    required bool isVisible,
+  }) async {
+    final int index = _posts.indexWhere((PostModel post) => post.id == postId);
+    PostModel? originalPost;
+
+    if (index != -1) {
+      originalPost = _posts[index];
+      _posts[index] = originalPost.copyWith(likesVisible: isVisible);
+      state = AsyncValue.data(List<PostModel>.from(_posts));
+    }
+
+    try {
+      final PostModel updatedPost = await _postService.setLikesVisibility(
+        postId: postId,
+        isVisible: isVisible,
+      );
+      if (index != -1) {
+        _posts[index] = updatedPost;
+        state = AsyncValue.data(List<PostModel>.from(_posts));
+      }
+    } catch (e, stackTrace) {
+      if (index != -1 && originalPost != null) {
+        _posts[index] = originalPost;
         state = AsyncValue.data(List<PostModel>.from(_posts));
       }
       Error.throwWithStackTrace(e, stackTrace);

@@ -41,6 +41,7 @@ class _PostCardState extends ConsumerState<PostCard> {
   bool _isLiking = false;
   bool _isDeleting = false;
   bool _isSavingImage = false;
+  bool _isUpdatingLikesVisibility = false;
   bool _isHiddenByReport = false;
   final ValueNotifier<bool> _isSavingImageNotifier = ValueNotifier(false);
   late int _displayedCommentCount;
@@ -193,6 +194,11 @@ class _PostCardState extends ConsumerState<PostCard> {
         onDelete: () async {
           Navigator.of(sheetContext).pop();
           await _confirmDeletePost();
+        },
+        likesVisible: widget.post.likesVisible,
+        onToggleLikesVisibility: () async {
+          Navigator.of(sheetContext).pop();
+          await _toggleLikesVisibility();
         },
         onSaveToGallery: _saveToGallery,
         canReportPost: canReportPost,
@@ -394,6 +400,48 @@ class _PostCardState extends ConsumerState<PostCard> {
         });
       }
       _isSavingImageNotifier.value = false;
+    }
+  }
+
+  Future<void> _toggleLikesVisibility() async {
+    if (_isUpdatingLikesVisibility) {
+      return;
+    }
+
+    final messenger = ScaffoldMessenger.maybeOf(context);
+    setState(() {
+      _isUpdatingLikesVisibility = true;
+    });
+
+    try {
+      await ref.read(postsProvider.notifier).setLikesVisibility(
+            postId: widget.post.id,
+            isVisible: !widget.post.likesVisible,
+          );
+      await widget.onPostChanged?.call();
+      messenger?.showSnackBar(
+        SnackBar(
+          content: Text(
+            widget.post.likesVisible
+                ? 'Like count hidden'
+                : 'Like count visible again',
+          ),
+          backgroundColor: const Color(0xFF007AFF),
+        ),
+      );
+    } catch (e) {
+      messenger?.showSnackBar(
+        SnackBar(
+          content: Text('Failed to update like visibility: $e'),
+          backgroundColor: Colors.red,
+        ),
+      );
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isUpdatingLikesVisibility = false;
+        });
+      }
     }
   }
 
@@ -623,7 +671,9 @@ class _PostCardState extends ConsumerState<PostCard> {
                       icon: widget.post.isLikedByCurrentUser
                           ? Icons.favorite
                           : Icons.favorite_border,
-                      label: _formatCompactCount(widget.post.likesCount),
+                      label: widget.post.likesVisible || canManagePost
+                          ? _formatCompactCount(widget.post.likesCount)
+                          : 'Hidden',
                       isCompact: compactActions,
                       isActive: widget.post.isLikedByCurrentUser,
                       isLoading: _isLiking,
@@ -775,8 +825,10 @@ class _PostActionSheet extends StatelessWidget {
     required this.canSaveToGallery,
     required this.canReportPost,
     required this.isSavingImageListenable,
+    required this.likesVisible,
     required this.onEdit,
     required this.onDelete,
+    required this.onToggleLikesVisibility,
     required this.onSaveToGallery,
     required this.onReport,
   });
@@ -787,9 +839,11 @@ class _PostActionSheet extends StatelessWidget {
   final bool canManagePost;
   final bool canSaveToGallery;
   final bool canReportPost;
+  final bool likesVisible;
   final ValueListenable<bool> isSavingImageListenable;
   final Future<void> Function() onEdit;
   final Future<void> Function() onDelete;
+  final Future<void> Function() onToggleLikesVisibility;
   final Future<void> Function() onSaveToGallery;
   final Future<void> Function() onReport;
 
@@ -866,6 +920,15 @@ class _PostActionSheet extends StatelessWidget {
                   label: 'Edit Post',
                   color: Colors.white,
                   onTap: onEdit,
+                ),
+                const Divider(height: 1, color: _borderColor),
+                _ActionTile(
+                  icon: likesVisible
+                      ? Icons.visibility_off_outlined
+                      : Icons.visibility_outlined,
+                  label: likesVisible ? 'Hide Like Count' : 'Show Like Count',
+                  color: Colors.white,
+                  onTap: onToggleLikesVisibility,
                 ),
                 const Divider(height: 1, color: _borderColor),
                 _ActionTile(

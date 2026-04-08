@@ -63,6 +63,10 @@ UserModel _userFromProfile(Map<String, dynamic> row) {
   final String year = row['year_of_study']?.toString().trim().isNotEmpty == true
       ? row['year_of_study'].toString()
       : 'Not set';
+  final String? avatarUrl =
+      row['avatar_url']?.toString().trim().isNotEmpty == true
+      ? row['avatar_url'].toString().trim()
+      : null;
   final String? gracyId = row['gracy_id']?.toString().trim().isNotEmpty == true
       ? row['gracy_id'].toString()
       : null;
@@ -83,6 +87,7 @@ UserModel _userFromProfile(Map<String, dynamic> row) {
     location: 'Gracy network',
     avatarSeed: username,
     year: year,
+    avatarUrl: avatarUrl,
     gracyId: gracyId,
     selectedTheme: selectedTheme,
     notificationsEnabled: notificationsEnabled,

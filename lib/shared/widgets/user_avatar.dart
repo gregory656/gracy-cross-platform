@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:cached_network_image/cached_network_image.dart';
 
 import '../../core/theme/app_colors.dart';
 import '../../core/utils/avatar_palette.dart';
@@ -47,37 +48,35 @@ class UserAvatar extends StatelessWidget {
               ),
             ],
           ),
-          child: Stack(
-            children: <Widget>[
-              Positioned(
-                left: size * 0.15,
-                top: size * 0.18,
-                child: _Orb(
-                  color: palette.accent.withValues(alpha: 0.22),
-                  diameter: size * 0.28,
-                ),
-              ),
-              Positioned(
-                right: size * 0.10,
-                bottom: size * 0.16,
-                child: _Orb(
-                  color: Colors.white.withValues(alpha: 0.18),
-                  diameter: size * 0.18,
-                ),
-              ),
-              Center(
-                child: Text(
-                  user.initials,
-                  style: Theme.of(context).textTheme.titleMedium?.copyWith(
+          clipBehavior: Clip.antiAlias,
+          child: user.avatarUrl != null && user.avatarUrl!.isNotEmpty
+              ? CachedNetworkImage(
+                  imageUrl: user.avatarUrl!,
+                  fit: BoxFit.cover,
+                  placeholder: (BuildContext context, String url) =>
+                      _AvatarFallback(
+                        user: user,
+                        size: size,
+                        fontSize: fontSize,
+                        palette: palette,
+                      ),
+                  errorWidget: (
+                    BuildContext context,
+                    String url,
+                    Object error,
+                  ) => _AvatarFallback(
+                    user: user,
+                    size: size,
                     fontSize: fontSize,
-                    fontWeight: FontWeight.w900,
-                    color: AppColors.background,
-                    letterSpacing: 1.1,
+                    palette: palette,
                   ),
+                )
+              : _AvatarFallback(
+                  user: user,
+                  size: size,
+                  fontSize: fontSize,
+                  palette: palette,
                 ),
-              ),
-            ],
-          ),
         ),
         if (showRing)
           Positioned.fill(
@@ -105,6 +104,55 @@ class UserAvatar extends StatelessWidget {
               ),
             ),
           ),
+      ],
+    );
+  }
+}
+
+class _AvatarFallback extends StatelessWidget {
+  const _AvatarFallback({
+    required this.user,
+    required this.size,
+    required this.fontSize,
+    required this.palette,
+  });
+
+  final UserModel user;
+  final double size;
+  final double? fontSize;
+  final AvatarPalette palette;
+
+  @override
+  Widget build(BuildContext context) {
+    return Stack(
+      children: <Widget>[
+        Positioned(
+          left: size * 0.15,
+          top: size * 0.18,
+          child: _Orb(
+            color: palette.accent.withValues(alpha: 0.22),
+            diameter: size * 0.28,
+          ),
+        ),
+        Positioned(
+          right: size * 0.10,
+          bottom: size * 0.16,
+          child: _Orb(
+            color: Colors.white.withValues(alpha: 0.18),
+            diameter: size * 0.18,
+          ),
+        ),
+        Center(
+          child: Text(
+            user.initials,
+            style: Theme.of(context).textTheme.titleMedium?.copyWith(
+              fontSize: fontSize,
+              fontWeight: FontWeight.w900,
+              color: AppColors.background,
+              letterSpacing: 1.1,
+            ),
+          ),
+        ),
       ],
     );
   }

@@ -136,12 +136,17 @@ class OptimizedPostService {
   Future<String> _uploadImageWithRetry(
     File compressedFile,
     String userId,
+    {String folder = 'gracy_posts'}
   ) async {
     const maxRetries = 3;
 
     for (int attempt = 1; attempt <= maxRetries; attempt++) {
       try {
-        return await _uploadImageInBackground(compressedFile, userId);
+        return await _uploadImageInBackground(
+          compressedFile,
+          userId,
+          folder: folder,
+        );
       } catch (e) {
         if (attempt == maxRetries) {
           rethrow;
@@ -193,6 +198,7 @@ class OptimizedPostService {
   Future<String> _uploadImageInBackground(
     File compressedFile,
     String userId,
+    {String folder = 'gracy_posts'}
   ) async {
     try {
       final cloudinary = CloudinaryPublic(
@@ -206,7 +212,7 @@ class OptimizedPostService {
             CloudinaryFile.fromFile(
               compressedFile.path,
               resourceType: CloudinaryResourceType.Image,
-              folder: 'gracy_posts',
+              folder: folder,
             ),
           )
           .timeout(const Duration(seconds: 30));
@@ -252,6 +258,28 @@ class OptimizedPostService {
       return Map<String, dynamic>.from(response);
     } catch (_) {
       return null;
+    }
+  }
+
+  Future<String> uploadProfileImage(File imageFile) async {
+    final userId = _supabase.auth.currentUser?.id;
+    if (userId == null) {
+      throw Exception('User not authenticated');
+    }
+
+    final File? compressedFile = await _compressImage(imageFile);
+    if (compressedFile == null) {
+      throw Exception('Image compression failed');
+    }
+
+    try {
+      return await _uploadImageWithRetry(
+        compressedFile,
+        userId,
+        folder: 'gracy_avatars',
+      );
+    } finally {
+      await _deleteTemporaryFile(compressedFile);
     }
   }
 
@@ -502,6 +530,133 @@ class OptimizedPostService {
     } catch (e) {
       throw Exception('Failed to delete post: $e');
     }
+  }
+
+  Future<List<PostModel>> getPostsByAuthor(String authorId) async {
+    try {
+      final String? currentUserId = _supabase.auth.currentUser?.id;
+      final response = await _supabase
+          .from('posts')
+          .select('''
+            *,
+            profiles!posts_author_id_fkey (
+              username,
+              avatar_url
+            )
+          ''')
+          .eq('author_id', authorId)
+          .order('created_at', ascending: false);
+
+      final List<Map<String, dynamic>> postRows = (response as List)
+          .map((dynamic row) => Map<String, dynamic>.from(row as Map))
+          .toList(growable: false);
+      final List<String> postIds = postRows
+          .map((Map<String, dynamic> row) => row['id'] as String?)
+          .whereType<String>()
+          .toList(growable: false);
+      final Set<String> likedPostIds = currentUserId == null
+          ? <String>{}
+          : await _fetchLikedPostIds(userId: currentUserId, postIds: postIds);
+      final Map<String, int> commentCounts = await _fetchVisibleCommentCounts(
+        postIds,
+      );
+
+      return postRows
+          .map(
+            (Map<String, dynamic> row) => _mapPost({
+              ...row,
+              'comments_count': commentCounts[row['id']] ?? 0,
+            }, isLikedByCurrentUser: likedPostIds.contains(row['id'])),
+          )
+          .toList(growable: false);
+    } catch (e) {
+      _logSupabaseError('Failed to fetch author posts', e);
+      return const <PostModel>[];
+    }
+  }
+
+  Future<int> getTotalReach(String authorId) async {
+    try {
+      final Map<String, dynamic>? reachRow = await _supabase
+          .from('user_total_reach')
+          .select('total_reach')
+          .eq('author_id', authorId)
+          .maybeSingle();
+      if (reachRow != null) {
+        return (reachRow['total_reach'] as num?)?.toInt() ?? 0;
+      }
+    } catch (e) {
+      _logSupabaseError('Failed to fetch total reach view', e);
+    }
+
+    try {
+      final response = await _supabase
+          .from('posts')
+          .select('view_count')
+          .eq('author_id', authorId);
+      final int total = (response as List<dynamic>).fold<int>(0, (
+        int sum,
+        dynamic row,
+      ) {
+        return sum + ((row as Map<String, dynamic>)['view_count'] as num?)!.toInt();
+      });
+      return total;
+    } catch (e) {
+      _logSupabaseError('Failed to calculate total reach fallback', e);
+      return 0;
+    }
+  }
+
+  Future<PostModel> setLikesVisibility({
+    required String postId,
+    required bool isVisible,
+  }) async {
+    final String? userId = _supabase.auth.currentUser?.id;
+    if (userId == null) {
+      throw Exception('User not authenticated');
+    }
+
+    final Map<String, dynamic> post = await _supabase
+        .from('posts')
+        .select('author_id')
+        .eq('id', postId)
+        .single();
+    if (post['author_id'] != userId) {
+      throw Exception('You can only manage your own posts');
+    }
+
+    await _supabase
+        .from('posts')
+        .update(<String, dynamic>{'likes_visible': isVisible})
+        .eq('id', postId);
+
+    return getPostById(postId);
+  }
+
+  Future<PostModel> createPostWithImageUrl({
+    required String content,
+    required String imageUrl,
+  }) async {
+    final String? userId = _supabase.auth.currentUser?.id;
+    if (userId == null) {
+      throw Exception('User not authenticated');
+    }
+
+    final Map<String, dynamic> postDataWithProfile = await _insertPostRecord(
+      userId: userId,
+      content: content,
+      imageUrl: imageUrl,
+    );
+    final Map<String, dynamic>? profile = await _getCurrentProfile(userId);
+
+    return PostModel.fromMap({
+      ...postDataWithProfile,
+      'author_name':
+          profile?['username'] as String? ??
+          _supabase.auth.currentUser?.userMetadata?['username']?.toString(),
+      'author_avatar': profile?['avatar_url'] as String?,
+      'is_liked_by_current_user': false,
+    });
   }
 
   Future<List<PostCommentModel>> getComments(String postId) async {
