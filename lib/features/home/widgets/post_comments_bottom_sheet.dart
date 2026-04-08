@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:uuid/uuid.dart';
 
 import '../../../core/theme/app_colors.dart';
+import '../../../core/utils/elite_animations.dart';
 import '../../../shared/models/post_model.dart';
 import '../../../shared/providers/auth_provider.dart';
 import '../../../shared/services/nairobi_timezone_service.dart';
@@ -14,11 +15,13 @@ class PostCommentsBottomSheet extends ConsumerStatefulWidget {
   const PostCommentsBottomSheet({
     super.key,
     required this.postId,
+    required this.postAuthorId,
     required this.initialCount,
     required this.onCountChanged,
   });
 
   final String postId;
+  final String postAuthorId;
   final int initialCount;
   final ValueChanged<int> onCountChanged;
 
@@ -114,12 +117,13 @@ class _PostCommentsBottomSheetState
     widget.onCountChanged(_visibleCommentCount);
 
     try {
-      final PostCommentModel savedComment =
-          await ref.read(optimizedPostServiceProvider).addComment(
-                postId: widget.postId,
-                content: content,
-                parentId: optimisticComment.parentId,
-              );
+      final PostCommentModel savedComment = await ref
+          .read(optimizedPostServiceProvider)
+          .addComment(
+            postId: widget.postId,
+            content: content,
+            parentId: optimisticComment.parentId,
+          );
       if (!mounted) {
         return;
       }
@@ -179,11 +183,9 @@ class _PostCommentsBottomSheetState
     });
 
     try {
-      final PostCommentModel updatedComment =
-          await ref.read(optimizedPostServiceProvider).updateComment(
-                commentId: target.id,
-                content: content,
-              );
+      final PostCommentModel updatedComment = await ref
+          .read(optimizedPostServiceProvider)
+          .updateComment(commentId: target.id, content: content);
       if (!mounted) {
         return;
       }
@@ -254,6 +256,55 @@ class _PostCommentsBottomSheetState
     }
   }
 
+  Future<void> _hideComment(PostCommentModel comment) async {
+    final PostCommentModel original = comment;
+
+    setState(() {
+      _comments = _comments
+          .map(
+            (PostCommentModel item) => item.id == comment.id
+                ? item.copyWith(isHidden: true, isPending: true)
+                : item,
+          )
+          .toList();
+    });
+
+    try {
+      final PostCommentModel hiddenComment = await ref
+          .read(optimizedPostServiceProvider)
+          .hideComment(comment.id);
+      if (!mounted) {
+        return;
+      }
+      setState(() {
+        _comments = _comments
+            .map(
+              (PostCommentModel item) =>
+                  item.id == comment.id ? hiddenComment : item,
+            )
+            .toList();
+      });
+    } catch (e) {
+      if (!mounted) {
+        return;
+      }
+      setState(() {
+        _comments = _comments
+            .map(
+              (PostCommentModel item) =>
+                  item.id == original.id ? original : item,
+            )
+            .toList();
+      });
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Failed to hide comment: $e'),
+          backgroundColor: Colors.red,
+        ),
+      );
+    }
+  }
+
   Future<void> _toggleCommentLike(PostCommentModel comment) async {
     final bool nextLiked = !comment.isLikedByCurrentUser;
     final int nextCount = nextLiked
@@ -274,7 +325,9 @@ class _PostCommentsBottomSheetState
     });
 
     try {
-      await ref.read(optimizedPostServiceProvider).toggleCommentLike(comment.id);
+      await ref
+          .read(optimizedPostServiceProvider)
+          .toggleCommentLike(comment.id);
     } catch (e) {
       if (!mounted) {
         return;
@@ -318,10 +371,9 @@ class _PostCommentsBottomSheetState
     widget.onCountChanged(_visibleCommentCount);
 
     try {
-      await ref.read(optimizedPostServiceProvider).reportComment(
-            commentId: comment.id,
-            reason: reason,
-          );
+      await ref
+          .read(optimizedPostServiceProvider)
+          .reportComment(commentId: comment.id, reason: reason);
       if (!mounted) {
         return;
       }
@@ -378,36 +430,54 @@ class _PostCommentsBottomSheetState
     });
   }
 
-  Future<void> _showAuthorActions(PostCommentModel comment) async {
+  Future<void> _showCommentActions(PostCommentModel comment) async {
     final String? currentUserId = ref.read(authNotifierProvider).userId;
-    if (currentUserId == null || currentUserId != comment.authorId) {
+    if (currentUserId == null) {
+      return;
+    }
+
+    final bool isWriter = currentUserId == comment.authorId;
+    final bool isPostOwner = currentUserId == widget.postAuthorId;
+
+    EliteHaptics.mediumImpact();
+
+    if (!isWriter && !isPostOwner) {
+      await _showReportActions(comment);
       return;
     }
 
     await showModalBottomSheet<void>(
       context: context,
-      builder: (BuildContext context) => SafeArea(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: <Widget>[
-            ListTile(
-              leading: const Icon(Icons.edit_outlined),
-              title: const Text('Edit'),
-              onTap: () {
-                Navigator.of(context).pop();
-                _startEdit(comment);
-              },
-            ),
-            ListTile(
-              leading: const Icon(Icons.delete_outline),
-              title: const Text('Delete'),
-              onTap: () {
-                Navigator.of(context).pop();
-                _deleteComment(comment);
-              },
-            ),
-          ],
-        ),
+      backgroundColor: Colors.transparent,
+      builder: (BuildContext context) => _CommentModerationSheet(
+        isWriter: isWriter,
+        isPostOwner: isPostOwner,
+        isHidden: comment.isHidden,
+        onEdit: () {
+          Navigator.of(context).pop();
+          _startEdit(comment);
+        },
+        onHide: () {
+          Navigator.of(context).pop();
+          _hideComment(comment);
+        },
+        onDelete: () {
+          Navigator.of(context).pop();
+          _deleteComment(comment);
+        },
+      ),
+    );
+  }
+
+  Future<void> _showReportActions(PostCommentModel comment) async {
+    await showModalBottomSheet<void>(
+      context: context,
+      backgroundColor: Colors.transparent,
+      builder: (BuildContext context) => _CommentReportSheet(
+        onReport: () {
+          Navigator.of(context).pop();
+          _confirmReportComment(comment);
+        },
       ),
     );
   }
@@ -429,12 +499,13 @@ class _PostCommentsBottomSheetState
   }
 
   List<PostCommentModel> _childrenOf(String? parentId) {
-    final List<PostCommentModel> children = _comments
-        .where((PostCommentModel comment) => comment.parentId == parentId)
-        .toList()
-      ..sort((PostCommentModel a, PostCommentModel b) {
-        return a.createdAt.compareTo(b.createdAt);
-      });
+    final List<PostCommentModel> children =
+        _comments
+            .where((PostCommentModel comment) => comment.parentId == parentId)
+            .toList()
+          ..sort((PostCommentModel a, PostCommentModel b) {
+            return a.createdAt.compareTo(b.createdAt);
+          });
     return children;
   }
 
@@ -493,23 +564,23 @@ class _PostCommentsBottomSheetState
             child: _isLoading
                 ? const Center(child: CircularProgressIndicator())
                 : roots.isEmpty
-                    ? _EmptyCommentsState(theme: theme)
-                    : ListView.builder(
-                        padding: const EdgeInsets.fromLTRB(16, 16, 16, 24),
-                        itemCount: roots.length,
-                        itemBuilder: (BuildContext context, int index) {
-                          return _ThreadedCommentBranch(
-                            comment: roots[index],
-                            children: _childrenOf(roots[index].id),
-                            allChildrenOf: _childrenOf,
-                            onReply: _startReply,
-                            onLike: _toggleCommentLike,
-                            onReport: _confirmReportComment,
-                            onFlag: _confirmReportComment,
-                            onLongPress: _showAuthorActions,
-                          );
-                        },
-                      ),
+                ? _EmptyCommentsState(theme: theme)
+                : ListView.builder(
+                    padding: const EdgeInsets.fromLTRB(16, 16, 16, 24),
+                    itemCount: roots.length,
+                    itemBuilder: (BuildContext context, int index) {
+                      return _ThreadedCommentBranch(
+                        comment: roots[index],
+                        children: _childrenOf(roots[index].id),
+                        allChildrenOf: _childrenOf,
+                        onReply: _startReply,
+                        onLike: _toggleCommentLike,
+                        onReport: _confirmReportComment,
+                        onFlag: _confirmReportComment,
+                        onLongPress: _showCommentActions,
+                      );
+                    },
+                  ),
           ),
           if (_replyTarget != null || _editingTarget != null)
             _ComposerBanner(
@@ -542,8 +613,8 @@ class _PostCommentsBottomSheetState
                         hintText: _editingTarget != null
                             ? 'Edit your comment...'
                             : _replyTarget != null
-                                ? 'Write a reply...'
-                                : 'Add a comment...',
+                            ? 'Write a reply...'
+                            : 'Add a comment...',
                         filled: true,
                         fillColor: theme.colorScheme.surfaceContainerHighest
                             .withValues(alpha: 0.35),
@@ -667,10 +738,7 @@ class _ComposerBanner extends StatelessWidget {
               ),
             ),
           ),
-          TextButton(
-            onPressed: onCancel,
-            child: const Text('Cancel'),
-          ),
+          TextButton(onPressed: onCancel, child: const Text('Cancel')),
         ],
       ),
     );
@@ -761,10 +829,11 @@ class _CommentItem extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final ThemeData theme = Theme.of(context);
+    final bool disableInlineActions = comment.isPending || comment.isHidden;
 
     return AnimatedOpacity(
       duration: const Duration(milliseconds: 180),
-      opacity: comment.isPending ? 0.6 : 1,
+      opacity: comment.isPending || comment.isHidden ? 0.5 : 1,
       child: GestureDetector(
         onLongPress: () => onLongPress(comment),
         child: Padding(
@@ -829,6 +898,27 @@ class _CommentItem extends StatelessWidget {
                               fontWeight: FontWeight.w600,
                             ),
                           ),
+                        if (comment.isHidden)
+                          Container(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 8,
+                              vertical: 2,
+                            ),
+                            decoration: BoxDecoration(
+                              color: Colors.white.withValues(alpha: 0.08),
+                              borderRadius: BorderRadius.circular(999),
+                              border: Border.all(
+                                color: Colors.white.withValues(alpha: 0.12),
+                              ),
+                            ),
+                            child: Text(
+                              'Hidden',
+                              style: theme.textTheme.bodySmall?.copyWith(
+                                color: theme.colorScheme.onSurfaceVariant,
+                                fontWeight: FontWeight.w700,
+                              ),
+                            ),
+                          ),
                       ],
                     ),
                     const SizedBox(height: 6),
@@ -843,8 +933,9 @@ class _CommentItem extends StatelessWidget {
                       children: <Widget>[
                         _CommentActionButton(
                           label: 'Reply',
-                          onPressed:
-                              comment.isPending ? null : () => onReply(comment),
+                          onPressed: disableInlineActions
+                              ? null
+                              : () => onReply(comment),
                         ),
                         _CommentActionButton(
                           label: 'Like',
@@ -857,19 +948,22 @@ class _CommentItem extends StatelessWidget {
                           trailingText: comment.likesCount > 0
                               ? '${comment.likesCount}'
                               : null,
-                          onPressed:
-                              comment.isPending ? null : () => onLike(comment),
+                          onPressed: disableInlineActions
+                              ? null
+                              : () => onLike(comment),
                         ),
                         _CommentActionButton(
                           label: 'Report',
-                          onPressed:
-                              comment.isPending ? null : () => onReport(comment),
+                          onPressed: disableInlineActions
+                              ? null
+                              : () => onReport(comment),
                         ),
                         _CommentActionButton(
                           label: 'Flag',
                           textColor: AppColors.warning,
-                          onPressed:
-                              comment.isPending ? null : () => onFlag(comment),
+                          onPressed: disableInlineActions
+                              ? null
+                              : () => onFlag(comment),
                         ),
                       ],
                     ),
@@ -884,9 +978,8 @@ class _CommentItem extends StatelessWidget {
   }
 
   String _formatCommentTime(DateTime timestamp) {
-    final DateTime nairobiTime = NairobiTimezoneService.instance.convertToNairobi(
-      timestamp,
-    );
+    final DateTime nairobiTime = NairobiTimezoneService.instance
+        .convertToNairobi(timestamp);
     final DateTime now = NairobiTimezoneService.instance.now;
     final Duration difference = now.difference(nairobiTime);
 
@@ -960,6 +1053,148 @@ class _CommentActionButton extends StatelessWidget {
           ],
         ],
       ),
+    );
+  }
+}
+
+class _CommentModerationSheet extends StatelessWidget {
+  const _CommentModerationSheet({
+    required this.isWriter,
+    required this.isPostOwner,
+    required this.isHidden,
+    required this.onEdit,
+    required this.onHide,
+    required this.onDelete,
+  });
+
+  final bool isWriter;
+  final bool isPostOwner;
+  final bool isHidden;
+  final VoidCallback onEdit;
+  final VoidCallback onHide;
+  final VoidCallback onDelete;
+
+  @override
+  Widget build(BuildContext context) {
+    return SafeArea(
+      child: _CommentSheetFrame(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: <Widget>[
+            if (isWriter)
+              _ModerationActionTile(
+                icon: Icons.edit_outlined,
+                label: 'Edit Comment',
+                onTap: onEdit,
+              ),
+            if (isPostOwner && !isWriter)
+              _ModerationActionTile(
+                icon: Icons.visibility_off_outlined,
+                label: isHidden ? 'Comment Hidden' : 'Hide Comment',
+                enabled: !isHidden,
+                onTap: onHide,
+              ),
+            _ModerationActionTile(
+              icon: Icons.delete_outline,
+              label: 'Delete Comment',
+              iconColor: const Color(0xFFFF3B30),
+              textColor: const Color(0xFFFF3B30),
+              onTap: onDelete,
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _CommentReportSheet extends StatelessWidget {
+  const _CommentReportSheet({required this.onReport});
+
+  final VoidCallback onReport;
+
+  @override
+  Widget build(BuildContext context) {
+    return SafeArea(
+      child: _CommentSheetFrame(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: <Widget>[
+            _ModerationActionTile(
+              icon: Icons.report_outlined,
+              label: 'Report Comment',
+              onTap: onReport,
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _CommentSheetFrame extends StatelessWidget {
+  const _CommentSheetFrame({required this.child});
+
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      decoration: const BoxDecoration(
+        color: Color(0xFF1A1A1A),
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: <Widget>[
+          const SizedBox(height: 12),
+          Container(
+            width: 44,
+            height: 4,
+            decoration: BoxDecoration(
+              color: Colors.white.withValues(alpha: 0.2),
+              borderRadius: BorderRadius.circular(999),
+            ),
+          ),
+          const SizedBox(height: 12),
+          child,
+          const SizedBox(height: 12),
+        ],
+      ),
+    );
+  }
+}
+
+class _ModerationActionTile extends StatelessWidget {
+  const _ModerationActionTile({
+    required this.icon,
+    required this.label,
+    required this.onTap,
+    this.enabled = true,
+    this.iconColor = Colors.white,
+    this.textColor = Colors.white,
+  });
+
+  final IconData icon;
+  final String label;
+  final VoidCallback onTap;
+  final bool enabled;
+  final Color iconColor;
+  final Color textColor;
+
+  @override
+  Widget build(BuildContext context) {
+    return ListTile(
+      enabled: enabled,
+      leading: Icon(icon, color: enabled ? iconColor : Colors.white38),
+      title: Text(
+        label,
+        style: Theme.of(context).textTheme.titleMedium?.copyWith(
+          color: enabled ? textColor : Colors.white38,
+          fontWeight: FontWeight.w600,
+        ),
+      ),
+      onTap: enabled ? onTap : null,
     );
   }
 }

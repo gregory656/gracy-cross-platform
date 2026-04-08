@@ -58,13 +58,16 @@ class OptimizedPostService {
         userId: userId,
         postIds: postIds,
       );
+      final Map<String, int> commentCounts = await _fetchVisibleCommentCounts(
+        postIds,
+      );
 
       final posts = postRows
           .map(
-            (postData) => _mapPost(
-              postData,
-              isLikedByCurrentUser: likedPostIds.contains(postData['id']),
-            ),
+            (postData) => _mapPost({
+              ...postData,
+              'comments_count': commentCounts[postData['id']] ?? 0,
+            }, isLikedByCurrentUser: likedPostIds.contains(postData['id'])),
           )
           .toList(growable: false);
 
@@ -432,8 +435,14 @@ class OptimizedPostService {
                 .eq('post_id', postId)
                 .eq('user_id', userId)
                 .maybeSingle();
+      final Map<String, int> commentCounts = await _fetchVisibleCommentCounts(
+        <String>[postId],
+      );
 
-      return _mapPost(postData, isLikedByCurrentUser: likeRecord != null);
+      return _mapPost({
+        ...postData,
+        'comments_count': commentCounts[postId] ?? 0,
+      }, isLikedByCurrentUser: likeRecord != null);
     } catch (e) {
       _logSupabaseError('Failed to fetch post', e);
       throw Exception('Failed to fetch post: $e');
@@ -590,39 +599,29 @@ class OptimizedPostService {
       final userId = _supabase.auth.currentUser?.id;
       if (userId == null) throw Exception('User not authenticated');
 
-      final existing = await _supabase
-          .from('post_comments')
-          .select('author_id')
-          .eq('id', commentId)
-          .single();
+      final PostCommentModel existing = await _fetchCommentById(
+        commentId,
+        userId: userId,
+      );
 
-      if (existing['author_id'] != userId) {
+      if (existing.authorId != userId) {
         throw Exception('You can only edit your own comments');
       }
 
-      final response = await _supabase
+      final Map<String, dynamic>? updated = await _supabase
           .from('post_comments')
           .update({'content': content.trim()})
           .eq('id', commentId)
-          .select('''
-            *,
-            profiles!post_comments_author_id_fkey (
-              username,
-              avatar_url
-            )
-          ''')
-          .single();
+          .select('id')
+          .maybeSingle();
 
-      final Map<String, dynamic> commentData = Map<String, dynamic>.from(
-        response,
-      );
-      final profile = commentData['profiles'] as Map<String, dynamic>?;
+      if (updated == null) {
+        throw Exception(
+          'Comment update was blocked by Supabase RLS. Add an UPDATE policy that allows the comment author to edit their own comments.',
+        );
+      }
 
-      return PostCommentModel.fromMap({
-        ...commentData,
-        'user_name': profile?['username'] as String?,
-        'user_avatar': profile?['avatar_url'] as String?,
-      });
+      return existing.copyWith(content: content.trim(), isPending: false);
     } catch (e) {
       throw Exception('Failed to update comment: $e');
     }
@@ -635,17 +634,73 @@ class OptimizedPostService {
 
       final existing = await _supabase
           .from('post_comments')
-          .select('author_id')
+          .select('author_id, post_id')
           .eq('id', commentId)
           .single();
 
-      if (existing['author_id'] != userId) {
-        throw Exception('You can only delete your own comments');
+      final post = await _supabase
+          .from('posts')
+          .select('author_id')
+          .eq('id', existing['post_id'])
+          .single();
+
+      final bool isCommentAuthor = existing['author_id'] == userId;
+      final bool isPostOwner = post['author_id'] == userId;
+
+      if (!isCommentAuthor && !isPostOwner) {
+        throw Exception(
+          'You can only delete your own comments or moderate comments on your posts',
+        );
       }
 
       await _supabase.from('post_comments').delete().eq('id', commentId);
     } catch (e) {
       throw Exception('Failed to delete comment: $e');
+    }
+  }
+
+  Future<PostCommentModel> hideComment(String commentId) async {
+    try {
+      final userId = _supabase.auth.currentUser?.id;
+      if (userId == null) throw Exception('User not authenticated');
+
+      final PostCommentModel existingComment = await _fetchCommentById(
+        commentId,
+        userId: userId,
+      );
+      final existing = await _supabase
+          .from('post_comments')
+          .select('author_id, post_id')
+          .eq('id', commentId)
+          .single();
+
+      final post = await _supabase
+          .from('posts')
+          .select('author_id')
+          .eq('id', existing['post_id'])
+          .single();
+
+      final bool isPostOwner = post['author_id'] == userId;
+      if (!isPostOwner) {
+        throw Exception('Only the post owner can hide comments');
+      }
+
+      final Map<String, dynamic>? updated = await _supabase
+          .from('post_comments')
+          .update({'is_hidden': true})
+          .eq('id', commentId)
+          .select('id')
+          .maybeSingle();
+
+      if (updated == null) {
+        throw Exception(
+          'Comment hide was blocked by Supabase RLS. Add an UPDATE policy that allows the post owner to hide comments on their own posts.',
+        );
+      }
+
+      return existingComment.copyWith(isHidden: true, isPending: false);
+    } catch (e) {
+      throw Exception('Failed to hide comment: $e');
     }
   }
 
@@ -808,7 +863,9 @@ class OptimizedPostService {
     await _supabase.rpc('decrement_likes', params: {'post_id_input': postId});
   }
 
-  Future<Map<String, int>> _fetchCommentLikeCounts(List<String> commentIds) async {
+  Future<Map<String, int>> _fetchCommentLikeCounts(
+    List<String> commentIds,
+  ) async {
     if (commentIds.isEmpty) {
       return <String, int>{};
     }
@@ -828,6 +885,67 @@ class OptimizedPostService {
       counts.update(commentId, (int count) => count + 1, ifAbsent: () => 1);
     }
     return counts;
+  }
+
+  Future<Map<String, int>> _fetchVisibleCommentCounts(
+    List<String> postIds,
+  ) async {
+    if (postIds.isEmpty) {
+      return <String, int>{};
+    }
+
+    final response = await _supabase
+        .from('post_comments')
+        .select('post_id')
+        .inFilter('post_id', postIds);
+
+    final Map<String, int> counts = <String, int>{};
+    for (final dynamic row in response as List) {
+      final String? postId =
+          (row as Map<String, dynamic>)['post_id'] as String?;
+      if (postId == null) {
+        continue;
+      }
+      counts.update(postId, (int count) => count + 1, ifAbsent: () => 1);
+    }
+    return counts;
+  }
+
+  Future<PostCommentModel> _fetchCommentById(
+    String commentId, {
+    required String userId,
+  }) async {
+    final response = await _supabase
+        .from('post_comments')
+        .select('''
+          *,
+          profiles!post_comments_author_id_fkey (
+            username,
+            avatar_url
+          )
+        ''')
+        .eq('id', commentId)
+        .single();
+
+    final Map<String, dynamic> commentData = Map<String, dynamic>.from(
+      response,
+    );
+    final profile = commentData['profiles'] as Map<String, dynamic>?;
+    final Map<String, int> likeCounts = await _fetchCommentLikeCounts(<String>[
+      commentId,
+    ]);
+    final Set<String> likedByCurrentUser = await _fetchLikedCommentIds(
+      userId: userId,
+      commentIds: <String>[commentId],
+    );
+
+    return PostCommentModel.fromMap({
+      ...commentData,
+      'user_name': profile?['username'] as String?,
+      'user_avatar': profile?['avatar_url'] as String?,
+      'likes_count': likeCounts[commentId] ?? 0,
+      'is_liked_by_current_user': likedByCurrentUser.contains(commentId),
+    });
   }
 
   Future<Set<String>> _fetchLikedCommentIds({

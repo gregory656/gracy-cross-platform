@@ -137,6 +137,7 @@ class _PostCardState extends ConsumerState<PostCard> {
         backgroundColor: Colors.transparent,
         builder: (context) => PostCommentsBottomSheet(
           postId: widget.post.id,
+          postAuthorId: widget.post.authorId,
           initialCount: _displayedCommentCount,
           onCountChanged: (int count) {
             if (!mounted) {
@@ -145,6 +146,10 @@ class _PostCardState extends ConsumerState<PostCard> {
             setState(() {
               _displayedCommentCount = count;
             });
+            ref.read(postsProvider.notifier).updateCommentsCount(
+                  postId: widget.post.id,
+                  commentsCount: count,
+                );
           },
         ),
       );
@@ -161,7 +166,8 @@ class _PostCardState extends ConsumerState<PostCard> {
 
   Future<void> _showPostActions(bool canManagePost) async {
     final bool canReportPost = !canManagePost;
-    if (_isDeleting || (!canManagePost && !_hasSavableMedia && !canReportPost)) {
+    if (_isDeleting ||
+        (!canManagePost && !_hasSavableMedia && !canReportPost)) {
       return;
     }
 
@@ -206,10 +212,9 @@ class _PostCardState extends ConsumerState<PostCard> {
     });
 
     try {
-      await ref.read(optimizedPostServiceProvider).reportPost(
-            postId: widget.post.id,
-            reason: reason,
-          );
+      await ref
+          .read(optimizedPostServiceProvider)
+          .reportPost(postId: widget.post.id, reason: reason);
       if (!mounted) {
         return;
       }
@@ -762,7 +767,8 @@ class _PostActionSheet extends StatelessWidget {
                   color: Colors.white,
                   onTap: onReport,
                 ),
-                if (canManagePost) const Divider(height: 1, color: _borderColor),
+                if (canManagePost)
+                  const Divider(height: 1, color: _borderColor),
               ],
               if (canManagePost) ...[
                 _ActionTile(

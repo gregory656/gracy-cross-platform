@@ -217,6 +217,19 @@ class PostsNotifier extends AsyncNotifier<List<PostModel>> {
       Error.throwWithStackTrace(e, stackTrace);
     }
   }
+
+  void updateCommentsCount({
+    required String postId,
+    required int commentsCount,
+  }) {
+    final index = _posts.indexWhere((post) => post.id == postId);
+    if (index == -1) {
+      return;
+    }
+
+    _posts[index] = _posts[index].copyWith(commentsCount: commentsCount);
+    state = AsyncValue.data(List<PostModel>.from(_posts));
+  }
 }
 
 // Realtime provider for post updates

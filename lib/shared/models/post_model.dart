@@ -28,7 +28,8 @@ class PostModel extends Equatable {
   });
 
   factory PostModel.fromMap(Map<String, dynamic> map) {
-    final dynamic rawContent = map['content'] ??
+    final dynamic rawContent =
+        map['content'] ??
         map['text'] ??
         map['caption'] ??
         map['body'] ??
@@ -44,8 +45,8 @@ class PostModel extends Equatable {
       likesCount: (map['likes_count'] as num?)?.toInt() ?? 0,
       commentsCount: (map['comments_count'] as num?)?.toInt() ?? 0,
       createdAt: DateTime.parse(map['created_at'] as String),
-      updatedAt: map['updated_at'] != null 
-          ? DateTime.parse(map['updated_at'] as String) 
+      updatedAt: map['updated_at'] != null
+          ? DateTime.parse(map['updated_at'] as String)
           : null,
       authorName: map['author_name'] as String?,
       authorAvatar: map['author_avatar'] as String?,
@@ -104,18 +105,18 @@ class PostModel extends Equatable {
 
   @override
   List<Object?> get props => [
-        id,
-        authorId,
-        imageUrl,
-        content,
-        likesCount,
-        commentsCount,
-        createdAt,
-        updatedAt,
-        authorName,
-        authorAvatar,
-        isLikedByCurrentUser,
-      ];
+    id,
+    authorId,
+    imageUrl,
+    content,
+    likesCount,
+    commentsCount,
+    createdAt,
+    updatedAt,
+    authorName,
+    authorAvatar,
+    isLikedByCurrentUser,
+  ];
 }
 
 class PostCommentModel extends Equatable {
@@ -129,6 +130,7 @@ class PostCommentModel extends Equatable {
   final String? userAvatar;
   final int likesCount;
   final bool isLikedByCurrentUser;
+  final bool isHidden;
   final bool isPending;
 
   const PostCommentModel({
@@ -142,6 +144,7 @@ class PostCommentModel extends Equatable {
     this.userAvatar,
     this.likesCount = 0,
     this.isLikedByCurrentUser = false,
+    this.isHidden = false,
     this.isPending = false,
   });
 
@@ -156,8 +159,8 @@ class PostCommentModel extends Equatable {
       userName: map['user_name'] as String?,
       userAvatar: map['user_avatar'] as String?,
       likesCount: (map['likes_count'] as num?)?.toInt() ?? 0,
-      isLikedByCurrentUser:
-          (map['is_liked_by_current_user'] as bool?) ?? false,
+      isLikedByCurrentUser: (map['is_liked_by_current_user'] as bool?) ?? false,
+      isHidden: (map['is_hidden'] as bool?) ?? false,
       isPending: (map['is_pending'] as bool?) ?? false,
     );
   }
@@ -172,6 +175,7 @@ class PostCommentModel extends Equatable {
       'created_at': createdAt.toIso8601String(),
       'likes_count': likesCount,
       'is_liked_by_current_user': isLikedByCurrentUser,
+      'is_hidden': isHidden,
       'is_pending': isPending,
     };
   }
@@ -188,6 +192,7 @@ class PostCommentModel extends Equatable {
     String? userAvatar,
     int? likesCount,
     bool? isLikedByCurrentUser,
+    bool? isHidden,
     bool? isPending,
   }) {
     return PostCommentModel(
@@ -200,24 +205,25 @@ class PostCommentModel extends Equatable {
       userName: userName ?? this.userName,
       userAvatar: userAvatar ?? this.userAvatar,
       likesCount: likesCount ?? this.likesCount,
-      isLikedByCurrentUser:
-          isLikedByCurrentUser ?? this.isLikedByCurrentUser,
+      isLikedByCurrentUser: isLikedByCurrentUser ?? this.isLikedByCurrentUser,
+      isHidden: isHidden ?? this.isHidden,
       isPending: isPending ?? this.isPending,
     );
   }
 
   @override
   List<Object?> get props => [
-        id,
-        postId,
-        authorId,
-        parentId,
-        content,
-        createdAt,
-        userName,
-        userAvatar,
-        likesCount,
-        isLikedByCurrentUser,
-        isPending,
-      ];
+    id,
+    postId,
+    authorId,
+    parentId,
+    content,
+    createdAt,
+    userName,
+    userAvatar,
+    likesCount,
+    isLikedByCurrentUser,
+    isHidden,
+    isPending,
+  ];
 }
