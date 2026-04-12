@@ -22,6 +22,20 @@ class IndustrialChatComposer extends StatefulWidget {
 class _IndustrialChatComposerState extends State<IndustrialChatComposer> {
   bool _isEmpty = true;
 
+  void _showComingSoonMessage() {
+    HapticFeedback.lightImpact();
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text(
+          'Media attachments unavailable for now.',
+          style: TextStyle(color: Colors.white),
+        ),
+        backgroundColor: Colors.black,
+        behavior: SnackBarBehavior.floating,
+      ),
+    );
+  }
+
   @override
   void initState() {
     super.initState();
@@ -57,7 +71,6 @@ class _IndustrialChatComposerState extends State<IndustrialChatComposer> {
       decoration: BoxDecoration(
         color: const Color(0xFF111418),
         borderRadius: BorderRadius.circular(28),
-        border: Border.all(color: Colors.white.withValues(alpha: 0.08)),
         boxShadow: <BoxShadow>[
           BoxShadow(
             color: Colors.black.withValues(alpha: 0.26),
@@ -117,39 +130,52 @@ class _IndustrialChatComposerState extends State<IndustrialChatComposer> {
               children: [
                 _CircleActionButton(
                   icon: Icons.add_rounded,
-                  onTap: () {
-                    HapticFeedback.selectionClick();
-                  },
+                  onTap: _showComingSoonMessage,
                 ),
                 const SizedBox(width: 10),
                 Expanded(
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 16,
-                      vertical: 4,
+                  child: TextField(
+                    controller: widget.controller,
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontSize: 16,
                     ),
-                    decoration: BoxDecoration(
-                      color: Colors.white.withValues(alpha: 0.05),
-                      borderRadius: BorderRadius.circular(22),
-                    ),
-                    child: TextField(
-                      controller: widget.controller,
-                      style: const TextStyle(
-                        color: Colors.white,
+                    decoration: InputDecoration(
+                      hintText: 'Type a message',
+                      hintStyle: const TextStyle(
+                        color: Colors.grey,
                         fontSize: 16,
                       ),
-                      decoration: const InputDecoration(
-                        hintText: 'Type a message',
-                        hintStyle: TextStyle(
-                          color: Colors.grey,
-                          fontSize: 16,
+                      filled: true,
+                      fillColor: Colors.white.withValues(alpha: 0.04),
+                      enabledBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(22),
+                        borderSide: const BorderSide(
+                          color: Color(0xFF007AFF),
+                          width: 1.5,
                         ),
-                        border: InputBorder.none,
-                        contentPadding: EdgeInsets.zero,
                       ),
-                      maxLines: null,
-                      textCapitalization: TextCapitalization.sentences,
+                      focusedBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(22),
+                        borderSide: const BorderSide(
+                          color: Color(0xFF007AFF),
+                          width: 1.5,
+                        ),
+                      ),
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(22),
+                        borderSide: const BorderSide(
+                          color: Color(0xFF007AFF),
+                          width: 1.5,
+                        ),
+                      ),
+                      contentPadding: const EdgeInsets.symmetric(
+                        horizontal: 18,
+                        vertical: 14,
+                      ),
                     ),
+                    maxLines: null,
+                    textCapitalization: TextCapitalization.sentences,
                   ),
                 ),
                 const SizedBox(width: 12),
