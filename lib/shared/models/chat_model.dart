@@ -1,3 +1,5 @@
+import 'message_model.dart';
+
 class ChatModel {
   const ChatModel({
     required this.id,
@@ -9,6 +11,7 @@ class ChatModel {
     this.isOfficial = false,
     this.gracyId,
     this.isOnline = false,
+    this.lastMessageStatus = MessageStatus.sent,
   });
 
   final String id;
@@ -20,4 +23,5 @@ class ChatModel {
   final bool isOfficial;
   final String? gracyId;
   final bool isOnline;
+  final MessageStatus lastMessageStatus;
 }

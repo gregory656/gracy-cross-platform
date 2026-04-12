@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 
 import '../../features/chat/presentation/chat_screen.dart';
 import '../../features/home/presentation/home_screen.dart';
+import '../../features/onboarding/presentation/auth_splash_screen.dart';
 import '../../features/home/presentation/post_detail_screen.dart';
 import '../../features/onboarding/presentation/landing_screen.dart';
 import '../../features/onboarding/presentation/onboarding_screen.dart';
@@ -16,6 +17,7 @@ class AppRoutePaths {
   const AppRoutePaths._();
 
   static const String welcome = '/welcome';
+  static const String splash = '/launch';
   static const String onboarding = '/onboarding';
   static const String home = '/';
   static const String chat = '/chat';
@@ -30,13 +32,10 @@ final appRouterProvider = Provider<GoRouter>((ref) {
   AuthState readAuthState() => ref.read(authNotifierProvider);
 
   final GoRouter router = GoRouter(
-    initialLocation: readAuthState().isAuthenticated
-        ? (readAuthState().isOnboardingComplete
-              ? AppRoutePaths.home
-              : AppRoutePaths.onboarding)
-        : AppRoutePaths.welcome,
+    initialLocation: AppRoutePaths.splash,
     redirect: (BuildContext context, GoRouterState state) {
       final AuthState authState = readAuthState();
+      final bool isSplashRoute = state.matchedLocation == AppRoutePaths.splash;
       final bool isWelcomeRoute =
           state.matchedLocation == AppRoutePaths.welcome;
       final bool isOnboardingRoute =
@@ -50,6 +49,17 @@ final appRouterProvider = Provider<GoRouter>((ref) {
 
       if (isSharedPostRoute) {
         return null;
+      }
+
+      if (authState.isBootstrapping) {
+        return isSplashRoute ? null : AppRoutePaths.splash;
+      }
+
+      if (isSplashRoute) {
+        if (!authenticated) {
+          return AppRoutePaths.welcome;
+        }
+        return completed ? AppRoutePaths.home : AppRoutePaths.onboarding;
       }
 
       // 1. Not Auth at all -> Must go to Welcome
@@ -70,6 +80,12 @@ final appRouterProvider = Provider<GoRouter>((ref) {
       return null;
     },
     routes: <RouteBase>[
+      GoRoute(
+        path: AppRoutePaths.splash,
+        builder: (BuildContext context, GoRouterState state) {
+          return const AuthSplashScreen();
+        },
+      ),
       GoRoute(
         path: AppRoutePaths.welcome,
         builder: (BuildContext context, GoRouterState state) {

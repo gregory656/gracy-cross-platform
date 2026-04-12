@@ -166,6 +166,8 @@ class ChatRepository {
         StreamController<List<MessageModel>>();
     final Map<String, Map<String, dynamic>> messageRowsById =
         <String, Map<String, dynamic>>{};
+    bool hasDeliveredMessages = false;
+    bool hasCachedMessages = false;
 
     Future<void> emitMessages() async {
       final List<Map<String, dynamic>> rows = messageRowsById.values.toList()
@@ -200,6 +202,7 @@ class ChatRepository {
           .toList();
 
       await _databaseService.cacheMessages(roomId: roomId, messages: messages);
+      hasDeliveredMessages = messages.isNotEmpty;
 
       if (!controller.isClosed) {
         controller.add(messages);
@@ -211,6 +214,7 @@ class ChatRepository {
           .getCachedMessages(roomId: roomId, currentUserId: currentUserId);
 
       if (cachedMessages.isNotEmpty && !controller.isClosed) {
+        hasCachedMessages = true;
         controller.add(cachedMessages);
       }
     }
@@ -262,7 +266,9 @@ class ChatRepository {
         )
         .subscribe((RealtimeSubscribeStatus status, Object? error) {
           if (status == RealtimeSubscribeStatus.channelError &&
-              !controller.isClosed) {
+              !controller.isClosed &&
+              !hasDeliveredMessages &&
+              !hasCachedMessages) {
             controller.addError(error ?? 'Realtime channel error');
           }
         });
@@ -272,7 +278,7 @@ class ChatRepository {
         await emitCachedMessages();
         await hydrateInitialMessages();
       } catch (error, stackTrace) {
-        if (!controller.isClosed) {
+        if (!controller.isClosed && !hasCachedMessages) {
           controller.addError(error, stackTrace);
         }
       }
@@ -307,93 +313,101 @@ class ChatRepository {
   }
 
   Future<List<ChatModel>> fetchRecentChats(String currentUserId) async {
-    final List<Map<String, dynamic>> roomRows = await _fetchRoomRowsForUser(
-      currentUserId,
-    );
-
-    if (roomRows.isEmpty) {
-      return const <ChatModel>[];
-    }
-
-    final List<String> roomIds = roomRows
-        .map((Map<String, dynamic> row) => row['id']?.toString() ?? '')
-        .where((String id) => id.isNotEmpty)
-        .toList();
-    final Set<String> participantIds = <String>{};
-
-    for (final Map<String, dynamic> row in roomRows) {
-      final String participantId = await _resolveParticipantId(
-        roomId: row['id']?.toString() ?? '',
-        currentUserId: currentUserId,
-        roomHash: row['room_hash']?.toString() ?? '',
+    try {
+      final List<Map<String, dynamic>> roomRows = await _fetchRoomRowsForUser(
+        currentUserId,
       );
-      if (participantId.isNotEmpty) {
-        participantIds.add(participantId);
-      }
-    }
 
-    final Map<String, UserModel> participants = await _fetchProfilesByIds(
-      participantIds,
-    );
-    final List<Map<String, dynamic>> messageRows = roomIds.isEmpty
-        ? const <Map<String, dynamic>>[]
-        : ((await _client
-                      .from(_messagesTable)
-                      .select('id,room_id,sender_id,content,created_at,status,delivered_at,read_at')
-                      .inFilter('room_id', roomIds)
-                      .order('created_at', ascending: false))
-                  as List<dynamic>)
-              .map((dynamic row) => Map<String, dynamic>.from(row as Map))
-              .toList();
-
-    final Map<String, Map<String, dynamic>> latestByRoom =
-        <String, Map<String, dynamic>>{};
-    for (final Map<String, dynamic> row in messageRows) {
-      final String roomId = row['room_id']?.toString() ?? '';
-      latestByRoom.putIfAbsent(roomId, () => row);
-    }
-
-    final List<ChatModel> chats = <ChatModel>[];
-    for (final Map<String, dynamic> row in roomRows) {
-      final String roomId = row['id']?.toString() ?? '';
-      final String roomHash = row['room_hash']?.toString() ?? '';
-      final String participantId = await _resolveParticipantId(
-        roomId: roomId,
-        currentUserId: currentUserId,
-        roomHash: roomHash,
-      );
-      final UserModel? participant = participants[participantId];
-      final Map<String, dynamic>? latest = latestByRoom[roomId];
-
-      if (participant == null) {
-        continue;
+      if (roomRows.isEmpty) {
+        return const <ChatModel>[];
       }
 
-      chats.add(
-        ChatModel(
-          id: roomId,
-          participantId: participantId,
-          lastMessage:
-              latest?['content']?.toString() ??
-              (participant.id == botUserId
-                  ? 'Official Gracy bot is ready.'
-                  : 'Start the conversation'),
-          lastMessageAt:
-              DateTime.tryParse(latest?['created_at']?.toString() ?? '') ??
-              DateTime.now(),
-          unreadCount: 0,
+      final List<String> roomIds = roomRows
+          .map((Map<String, dynamic> row) => row['id']?.toString() ?? '')
+          .where((String id) => id.isNotEmpty)
+          .toList();
+      final Set<String> participantIds = <String>{};
+
+      for (final Map<String, dynamic> row in roomRows) {
+        final String participantId = await _resolveParticipantId(
+          roomId: row['id']?.toString() ?? '',
+          currentUserId: currentUserId,
+          roomHash: row['room_hash']?.toString() ?? '',
+        );
+        if (participantId.isNotEmpty) {
+          participantIds.add(participantId);
+        }
+      }
+
+      final Map<String, UserModel> participants = await _fetchProfilesByIds(
+        participantIds,
+      );
+      final List<Map<String, dynamic>> messageRows = roomIds.isEmpty
+          ? const <Map<String, dynamic>>[]
+          : ((await _client
+                        .from(_messagesTable)
+                        .select(
+                          'id,room_id,sender_id,content,created_at,status,delivered_at,read_at',
+                        )
+                        .inFilter('room_id', roomIds)
+                        .order('created_at', ascending: false))
+                    as List<dynamic>)
+                .map((dynamic row) => Map<String, dynamic>.from(row as Map))
+                .toList();
+
+      final Map<String, Map<String, dynamic>> latestByRoom =
+          <String, Map<String, dynamic>>{};
+      for (final Map<String, dynamic> row in messageRows) {
+        final String roomId = row['room_id']?.toString() ?? '';
+        latestByRoom.putIfAbsent(roomId, () => row);
+      }
+
+      final List<ChatModel> chats = <ChatModel>[];
+      for (final Map<String, dynamic> row in roomRows) {
+        final String roomId = row['id']?.toString() ?? '';
+        final String roomHash = row['room_hash']?.toString() ?? '';
+        final String participantId = await _resolveParticipantId(
+          roomId: roomId,
+          currentUserId: currentUserId,
           roomHash: roomHash,
-          isOfficial: participant.id == botUserId,
-          gracyId: participant.gracyId,
-          isOnline: participant.isOnline,
-        ),
-      );
-    }
+        );
+        final UserModel? participant = participants[participantId];
+        final Map<String, dynamic>? latest = latestByRoom[roomId];
 
-    chats.sort(
-      (ChatModel a, ChatModel b) => b.lastMessageAt.compareTo(a.lastMessageAt),
-    );
-    return chats;
+        if (participant == null) {
+          continue;
+        }
+
+        chats.add(
+          ChatModel(
+            id: roomId,
+            participantId: participantId,
+            lastMessage:
+                latest?['content']?.toString() ??
+                (participant.id == botUserId
+                    ? 'Official Gracy bot is ready.'
+                    : 'Start the conversation'),
+            lastMessageAt:
+                DateTime.tryParse(latest?['created_at']?.toString() ?? '') ??
+                DateTime.now(),
+            unreadCount: 0,
+            roomHash: roomHash,
+            isOfficial: participant.id == botUserId,
+            gracyId: participant.gracyId,
+            isOnline: participant.isOnline,
+            lastMessageStatus: _messageStatusFromRow(latest),
+          ),
+        );
+      }
+
+      chats.sort(
+        (ChatModel a, ChatModel b) => b.lastMessageAt.compareTo(a.lastMessageAt),
+      );
+      await _databaseService.cacheRecentChats(chats);
+      return chats;
+    } catch (_) {
+      return _databaseService.getCachedRecentChats();
+    }
   }
 
   Future<void> markMessagesAsRead({
@@ -604,6 +618,15 @@ class ChatRepository {
       avatarUrl: avatarUrl,
       gracyId: gracyId,
     );
+  }
+
+  MessageStatus _messageStatusFromRow(Map<String, dynamic>? row) {
+    final String status = row?['status']?.toString() ?? 'sent';
+    return switch (status) {
+      'read' => MessageStatus.read,
+      'delivered' => MessageStatus.delivered,
+      _ => MessageStatus.sent,
+    };
   }
 }
 

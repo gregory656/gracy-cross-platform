@@ -6,6 +6,7 @@ import 'package:go_router/go_router.dart';
 
 import '../../../core/constants/app_constants.dart';
 import '../../../core/router/app_router.dart';
+import '../../../core/router/shell_ui_provider.dart';
 import '../../../shared/models/chat_model.dart';
 import '../../../shared/models/message_model.dart';
 import '../../../shared/models/user_model.dart';
@@ -43,6 +44,21 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
   String? _replyToMessage;
   Timer? _readReceiptTimer;
 
+  void _syncShellNavigation(bool showThread) {
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) {
+        return;
+      }
+
+      final notifier = ref.read(shellNavigationVisibleProvider.notifier);
+      if (showThread) {
+        notifier.hide();
+      } else {
+        notifier.show();
+      }
+    });
+  }
+
   @override
   void dispose() {
     _botTypingTimer?.cancel();
@@ -50,6 +66,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
     _composerController.dispose();
     _searchController.dispose();
     _scrollController.dispose();
+    ref.read(shellNavigationVisibleProvider.notifier).show();
     super.dispose();
   }
 
@@ -196,6 +213,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
       userId: widget.userId,
     );
     final bool showThread = request.roomId != null || request.userId != null;
+    _syncShellNavigation(showThread);
     final AsyncValue<List<ChatModel>> recentChatsAsync = ref.watch(
       recentChatsProvider,
     );
@@ -361,7 +379,7 @@ class _ChatShell extends ConsumerWidget {
             ),
             const SizedBox(height: 10),
             Text(
-              'Start one-on-one chats by Gracy code. Rooms are stable, so the bot and real users land in the same recent chats flow.',
+              'Recent chats stay ready offline, and every room opens with the same fluid thread layout.',
               style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                 color: Colors.grey.shade400,
                 height: 1.45,
@@ -607,31 +625,43 @@ class _ThreadView extends StatelessWidget {
           Expanded(
             child: Container(
               margin: const EdgeInsets.symmetric(horizontal: 18),
-              decoration: BoxDecoration(
-                color: const Color(0xFF0A0A0A),
-                borderRadius: BorderRadius.circular(8),
-                border: Border.all(
-                  color: Colors.grey.shade800,
-                  width: 1,
-                ),
-              ),
-              child: ListView(
-                controller: scrollController,
-                padding: const EdgeInsets.symmetric(vertical: 16),
+              child: Stack(
                 children: <Widget>[
-                  ..._buildMessageGroup(),
-                  if (isBotTyping)
-                    Padding(
-                      padding: const EdgeInsets.only(top: 8),
-                      child: _TypingIndicator(
-                        name: thread.participant.fullName,
+                  Positioned.fill(
+                    child: ClipRRect(
+                      borderRadius: BorderRadius.circular(28),
+                      child: CustomPaint(painter: _ChatWallpaperPainter()),
+                    ),
+                  ),
+                  Container(
+                    decoration: BoxDecoration(
+                      color: const Color(0xFF090B0F).withValues(alpha: 0.9),
+                      borderRadius: BorderRadius.circular(28),
+                      border: Border.all(
+                        color: Colors.white.withValues(alpha: 0.06),
+                        width: 1,
                       ),
                     ),
+                  ),
+                  ListView(
+                    controller: scrollController,
+                    padding: const EdgeInsets.fromLTRB(0, 16, 0, 12),
+                    children: <Widget>[
+                      ..._buildMessageGroup(),
+                      if (isBotTyping)
+                        Padding(
+                          padding: const EdgeInsets.only(top: 8),
+                          child: _TypingIndicator(
+                            name: thread.participant.fullName,
+                          ),
+                        ),
+                    ],
+                  ),
                 ],
               ),
             ),
           ),
-          const SizedBox(height: 16),
+          const SizedBox(height: 12),
           IndustrialChatComposer(
             controller: composerController,
             onSend: onSend,
@@ -663,12 +693,9 @@ class _ThreadHeader extends StatelessWidget {
       margin: const EdgeInsets.symmetric(horizontal: 18),
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
       decoration: BoxDecoration(
-        color: const Color(0xFF1A1A1A),
-        borderRadius: BorderRadius.circular(8),
-        border: Border.all(
-          color: Colors.grey.shade800,
-          width: 1,
-        ),
+        color: const Color(0xFF111418),
+        borderRadius: BorderRadius.circular(24),
+        border: Border.all(color: Colors.white.withValues(alpha: 0.08)),
       ),
       child: Row(
         children: <Widget>[
@@ -779,11 +806,12 @@ class _TypingIndicator extends StatelessWidget {
         Container(
           padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
           decoration: BoxDecoration(
-            color: const Color(0xFF262626),
-            borderRadius: BorderRadius.circular(4),
-            border: Border.all(
-              color: Colors.grey.shade800,
-              width: 1,
+            color: const Color(0xFF171B20),
+            borderRadius: const BorderRadius.only(
+              topLeft: Radius.circular(20),
+              topRight: Radius.circular(20),
+              bottomLeft: Radius.circular(6),
+              bottomRight: Radius.circular(20),
             ),
           ),
           child: Row(
@@ -810,6 +838,41 @@ class _TypingIndicator extends StatelessWidget {
       ],
     );
   }
+}
+
+class _ChatWallpaperPainter extends CustomPainter {
+  @override
+  void paint(Canvas canvas, Size size) {
+    final Paint linePaint = Paint()
+      ..color = Colors.white.withValues(alpha: 0.028)
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 1.2;
+    final Paint bubblePaint = Paint()
+      ..color = const Color(0xFF007AFF).withValues(alpha: 0.035)
+      ..style = PaintingStyle.fill;
+
+    const double step = 92;
+    for (double x = -20; x < size.width + step; x += step) {
+      for (double y = -10; y < size.height + step; y += step) {
+        canvas.drawCircle(Offset(x + 18, y + 18), 10, bubblePaint);
+        canvas.drawArc(
+          Rect.fromCircle(center: Offset(x + 54, y + 56), radius: 13),
+          0.5,
+          4.6,
+          false,
+          linePaint,
+        );
+        canvas.drawLine(
+          Offset(x + 8, y + 68),
+          Offset(x + 30, y + 46),
+          linePaint,
+        );
+      }
+    }
+  }
+
+  @override
+  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
 }
 
 class _CenteredMessage extends StatelessWidget {

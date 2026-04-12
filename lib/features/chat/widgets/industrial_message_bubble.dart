@@ -127,17 +127,25 @@ class _IndustrialMessageBubbleState extends State<IndustrialMessageBubble>
   @override
   Widget build(BuildContext context) {
     final isMe = widget.message.isMe;
-    final bubbleColor = isMe 
-        ? const Color(0xFF1E1E1E) 
-        : const Color(0xFF262626);
-    
+    final bubbleColor = isMe
+        ? const Color(0xFF007AFF)
+        : const Color(0xFF16181C);
     final alignment = isMe ? CrossAxisAlignment.end : CrossAxisAlignment.start;
+    final mainAxisAlignment = isMe
+        ? MainAxisAlignment.end
+        : MainAxisAlignment.start;
 
     return Container(
-      margin: const EdgeInsets.symmetric(vertical: 4, horizontal: 18),
-      child: Column(
-        crossAxisAlignment: alignment,
+      margin: const EdgeInsets.symmetric(vertical: 4, horizontal: 16),
+      child: Row(
+        mainAxisAlignment: mainAxisAlignment,
+        crossAxisAlignment: CrossAxisAlignment.end,
         children: [
+          if (!isMe)
+            _BubbleTail(
+              color: bubbleColor,
+              isMe: false,
+            ),
           GestureDetector(
             onLongPress: _showContextMenu,
             onTapDown: (_) => _animationController.forward(),
@@ -150,19 +158,24 @@ class _IndustrialMessageBubbleState extends State<IndustrialMessageBubble>
                   scale: _scaleAnimation.value,
                   child: Container(
                     constraints: BoxConstraints(
-                      maxWidth: MediaQuery.of(context).size.width * 0.75,
+                      maxWidth: MediaQuery.of(context).size.width * 0.74,
                     ),
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 16,
-                      vertical: 12,
-                    ),
+                    padding: const EdgeInsets.fromLTRB(16, 12, 14, 8),
                     decoration: BoxDecoration(
                       color: bubbleColor,
-                      borderRadius: BorderRadius.circular(4),
-                      border: Border.all(
-                        color: Colors.grey.shade800,
-                        width: 1,
+                      borderRadius: BorderRadius.only(
+                        topLeft: const Radius.circular(20),
+                        topRight: const Radius.circular(20),
+                        bottomLeft: Radius.circular(isMe ? 20 : 6),
+                        bottomRight: Radius.circular(isMe ? 6 : 20),
                       ),
+                      boxShadow: <BoxShadow>[
+                        BoxShadow(
+                          color: Colors.black.withValues(alpha: 0.14),
+                          blurRadius: 18,
+                          offset: const Offset(0, 8),
+                        ),
+                      ],
                     ),
                     child: Column(
                       crossAxisAlignment: alignment,
@@ -171,8 +184,8 @@ class _IndustrialMessageBubbleState extends State<IndustrialMessageBubble>
                           widget.message.text,
                           style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                             color: Colors.white,
-                            fontSize: 16,
-                            height: 1.4,
+                            fontSize: 15.5,
+                            height: 1.42,
                           ),
                         ),
                         const SizedBox(height: 6),
@@ -180,9 +193,13 @@ class _IndustrialMessageBubbleState extends State<IndustrialMessageBubble>
                           mainAxisSize: MainAxisSize.min,
                           children: [
                             Text(
-                              TimezoneService.formatNairobiTime(widget.message.sentAt),
+                              TimezoneService.formatNairobiTime(
+                                widget.message.sentAt,
+                              ),
                               style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                                color: Colors.grey.shade400,
+                                color: isMe
+                                    ? Colors.white.withValues(alpha: 0.74)
+                                    : Colors.white54,
                                 fontSize: 11,
                               ),
                             ),
@@ -199,6 +216,11 @@ class _IndustrialMessageBubbleState extends State<IndustrialMessageBubble>
               },
             ),
           ),
+          if (isMe)
+            _BubbleTail(
+              color: bubbleColor,
+              isMe: true,
+            ),
         ],
       ),
     );
@@ -308,5 +330,57 @@ class _MessageActionSheet extends StatelessWidget {
         ),
       ),
     );
+  }
+}
+
+class _BubbleTail extends StatelessWidget {
+  const _BubbleTail({required this.color, required this.isMe});
+
+  final Color color;
+  final bool isMe;
+
+  @override
+  Widget build(BuildContext context) {
+    return CustomPaint(
+      size: const Size(10, 12),
+      painter: _BubbleTailPainter(color: color, isMe: isMe),
+    );
+  }
+}
+
+class _BubbleTailPainter extends CustomPainter {
+  const _BubbleTailPainter({required this.color, required this.isMe});
+
+  final Color color;
+  final bool isMe;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final Path path = Path();
+    if (isMe) {
+      path
+        ..moveTo(0, 0)
+        ..quadraticBezierTo(size.width * 0.35, size.height * 0.15, size.width, 2)
+        ..lineTo(size.width * 0.42, size.height)
+        ..quadraticBezierTo(size.width * 0.28, size.height * 0.66, 0, 0);
+    } else {
+      path
+        ..moveTo(size.width, 0)
+        ..quadraticBezierTo(size.width * 0.65, size.height * 0.15, 0, 2)
+        ..lineTo(size.width * 0.58, size.height)
+        ..quadraticBezierTo(size.width * 0.72, size.height * 0.66, size.width, 0);
+    }
+
+    canvas.drawPath(
+      path,
+      Paint()
+        ..color = color
+        ..style = PaintingStyle.fill,
+    );
+  }
+
+  @override
+  bool shouldRepaint(covariant _BubbleTailPainter oldDelegate) {
+    return oldDelegate.color != color || oldDelegate.isMe != isMe;
   }
 }

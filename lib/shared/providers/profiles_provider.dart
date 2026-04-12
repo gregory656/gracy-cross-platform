@@ -4,6 +4,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../core/constants.dart';
 import '../mock_data/mock_users.dart';
 import '../models/user_model.dart';
+import '../services/database_service.dart';
 
 final profilesDirectoryProvider = FutureProvider<List<UserModel>>((ref) async {
   if (!SupabaseConfig.isConfigured) {
@@ -17,23 +18,37 @@ final profilesDirectoryProvider = FutureProvider<List<UserModel>>((ref) async {
     return mockUsers;
   }
 
-  final List<dynamic> rows = await client
-      .from('profiles')
-      .select()
-      .order('username');
+  try {
+    final List<dynamic> rows = await client.from('profiles').select().order(
+      'username',
+    );
 
-  final List<UserModel> profiles = rows
-      .map(
-        (dynamic row) =>
-            _userFromProfile(Map<String, dynamic>.from(row as Map)),
-      )
-      .toList();
+    final List<UserModel> profiles = rows
+        .map(
+          (dynamic row) =>
+              _userFromProfile(Map<String, dynamic>.from(row as Map)),
+        )
+        .toList();
 
-  if (profiles.isEmpty) {
-    return mockUsers;
+    if (profiles.isNotEmpty) {
+      await DatabaseService.instance.cacheProfiles(profiles);
+      return profiles;
+    }
+  } catch (_) {
+    final List<UserModel> cachedProfiles = await DatabaseService.instance
+        .getCachedProfiles();
+    if (cachedProfiles.isNotEmpty) {
+      return cachedProfiles;
+    }
   }
 
-  return profiles;
+  final List<UserModel> cachedProfiles = await DatabaseService.instance
+      .getCachedProfiles();
+  if (cachedProfiles.isNotEmpty) {
+    return cachedProfiles;
+  }
+
+  return mockUsers;
 });
 
 final profileByIdProvider = FutureProvider.family<UserModel?, String>((

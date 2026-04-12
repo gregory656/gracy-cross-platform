@@ -11,6 +11,7 @@ class AuthState {
     required this.isAuthenticated,
     required this.isLoading,
     required this.isOnboardingComplete,
+    required this.isBootstrapping,
     this.userId,
     this.username,
     this.fullName,
@@ -26,6 +27,7 @@ class AuthState {
   final bool isAuthenticated;
   final bool isLoading;
   final bool isOnboardingComplete;
+  final bool isBootstrapping;
   final String? userId;
   final String? username;
   final String? fullName;
@@ -40,8 +42,9 @@ class AuthState {
   factory AuthState.initial() {
     return const AuthState(
       isAuthenticated: false,
-      isLoading: false,
+      isLoading: true,
       isOnboardingComplete: false,
+      isBootstrapping: true,
     );
   }
 
@@ -49,6 +52,7 @@ class AuthState {
     bool? isAuthenticated,
     bool? isLoading,
     bool? isOnboardingComplete,
+    bool? isBootstrapping,
     String? userId,
     String? username,
     String? fullName,
@@ -64,6 +68,7 @@ class AuthState {
       isAuthenticated: isAuthenticated ?? this.isAuthenticated,
       isLoading: isLoading ?? this.isLoading,
       isOnboardingComplete: isOnboardingComplete ?? this.isOnboardingComplete,
+      isBootstrapping: isBootstrapping ?? this.isBootstrapping,
       userId: userId ?? this.userId,
       username: username ?? this.username,
       fullName: fullName ?? this.fullName,
@@ -117,6 +122,7 @@ class AuthNotifier extends Notifier<AuthState> {
           isAuthenticated: onboardingComplete,
           isLoading: false,
           isOnboardingComplete: onboardingComplete,
+          isBootstrapping: false,
         );
         return;
       }
@@ -127,6 +133,7 @@ class AuthNotifier extends Notifier<AuthState> {
           isAuthenticated: onboardingComplete,
           isLoading: false,
           isOnboardingComplete: onboardingComplete,
+          isBootstrapping: false,
         );
         return;
       }
@@ -139,6 +146,7 @@ class AuthNotifier extends Notifier<AuthState> {
           isAuthenticated: false,
           isLoading: false,
           isOnboardingComplete: false,
+          isBootstrapping: false,
         );
         return;
       }
@@ -182,6 +190,7 @@ class AuthNotifier extends Notifier<AuthState> {
         isAuthenticated: onboardingComplete,
         isLoading: false,
         isOnboardingComplete: onboardingComplete,
+        isBootstrapping: false,
         userId: user.id,
         username: user.userMetadata?['username']?.toString(),
         fullName: fullName,
@@ -215,10 +224,11 @@ class AuthNotifier extends Notifier<AuthState> {
         await DatabaseService.instance.setOnboardingComplete(true);
 
         state = state.copyWith(
-          isAuthenticated: true,
-          isLoading: false,
-          isOnboardingComplete: true,
-          userId: 'gracy-$normalizedUsername',
+        isAuthenticated: true,
+        isLoading: false,
+        isOnboardingComplete: true,
+        isBootstrapping: false,
+        userId: 'gracy-$normalizedUsername',
           username: normalizedUsername,
           fullName: fullName.trim().isEmpty ? null : fullName.trim(),
           bio: bio.trim().isEmpty ? null : bio.trim(),
@@ -235,10 +245,11 @@ class AuthNotifier extends Notifier<AuthState> {
         await DatabaseService.instance.setOnboardingComplete(true);
 
         state = state.copyWith(
-          isAuthenticated: true,
-          isLoading: false,
-          isOnboardingComplete: true,
-          userId: 'gracy-$normalizedUsername',
+        isAuthenticated: true,
+        isLoading: false,
+        isOnboardingComplete: true,
+        isBootstrapping: false,
+        userId: 'gracy-$normalizedUsername',
           username: normalizedUsername,
           fullName: fullName.trim().isEmpty ? null : fullName.trim(),
           bio: bio.trim().isEmpty ? null : bio.trim(),
@@ -270,6 +281,7 @@ class AuthNotifier extends Notifier<AuthState> {
         isAuthenticated: true,
         isLoading: false,
         isOnboardingComplete: true,
+        isBootstrapping: false,
         userId: userId,
         username: normalizedUsername,
         fullName: fullName.trim().isEmpty ? null : fullName.trim(),
@@ -388,6 +400,7 @@ class AuthNotifier extends Notifier<AuthState> {
       isAuthenticated: true,
       isLoading: false,
       isOnboardingComplete: onboardingComplete,
+      isBootstrapping: false,
       userId: user.id,
       username: username,
       fullName: fullName,
@@ -435,7 +448,10 @@ class AuthNotifier extends Notifier<AuthState> {
     if (client != null) {
       await client.auth.signOut();
     }
-    state = AuthState.initial();
+    state = AuthState.initial().copyWith(
+      isLoading: false,
+      isBootstrapping: false,
+    );
   }
 }
 

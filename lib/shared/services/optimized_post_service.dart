@@ -5,7 +5,9 @@ import 'package:flutter_image_compress/flutter_image_compress.dart';
 import 'package:cloudinary_public/cloudinary_public.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+
 import '../models/post_model.dart';
+import 'database_service.dart';
 import '../../core/secrets.dart';
 
 class OptimizedPostService {
@@ -16,6 +18,7 @@ class OptimizedPostService {
 
   final _supabase = Supabase.instance.client;
   final _imagePicker = ImagePicker();
+  final DatabaseService _databaseService = DatabaseService.instance;
   static const int _targetImageWidth = 1080;
   static const int _targetImageHeight = 1080;
   static const int _targetImageQuality = 80;
@@ -71,10 +74,19 @@ class OptimizedPostService {
           )
           .toList(growable: false);
 
+      await _databaseService.cachePosts(posts);
       return posts;
     } catch (e) {
       _logSupabaseError('Error fetching posts', e);
-      return [];
+      final List<PostModel> cachedPosts = await _databaseService
+          .getCachedPosts();
+      if (cachedPosts.isEmpty) {
+        return [];
+      }
+
+      final int start = offset.clamp(0, cachedPosts.length);
+      final int end = (start + limit).clamp(0, cachedPosts.length);
+      return cachedPosts.sublist(start, end);
     }
   }
 
@@ -474,6 +486,12 @@ class OptimizedPostService {
       }, isLikedByCurrentUser: likeRecord != null);
     } catch (e) {
       _logSupabaseError('Failed to fetch post', e);
+      final PostModel? cachedPost = await _databaseService.getCachedPostById(
+        postId,
+      );
+      if (cachedPost != null) {
+        return cachedPost;
+      }
       throw Exception('Failed to fetch post: $e');
     }
   }
@@ -561,7 +579,7 @@ class OptimizedPostService {
         postIds,
       );
 
-      return postRows
+      final List<PostModel> posts = postRows
           .map(
             (Map<String, dynamic> row) => _mapPost({
               ...row,
@@ -569,9 +587,11 @@ class OptimizedPostService {
             }, isLikedByCurrentUser: likedPostIds.contains(row['id'])),
           )
           .toList(growable: false);
+      await _databaseService.cachePosts(posts);
+      return posts;
     } catch (e) {
       _logSupabaseError('Failed to fetch author posts', e);
-      return const <PostModel>[];
+      return _databaseService.getCachedPostsByAuthor(authorId);
     }
   }
 

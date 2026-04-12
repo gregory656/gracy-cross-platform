@@ -1,7 +1,10 @@
 import 'package:path/path.dart' as p;
 import 'package:sqflite/sqflite.dart';
 
+import '../models/chat_model.dart';
 import '../models/message_model.dart';
+import '../models/post_model.dart';
+import '../models/user_model.dart';
 
 class DatabaseService {
   DatabaseService._();
@@ -12,6 +15,9 @@ class DatabaseService {
   static const String _contactsTable = 'contacts';
   static const String _legacyMessagesTable = 'messages';
   static const String _chatCacheTable = 'chat_message_cache';
+  static const String _postsCacheTable = 'posts_cache';
+  static const String _profilesCacheTable = 'profiles_cache';
+  static const String _recentChatsCacheTable = 'recent_chats_cache';
 
   Database? _database;
 
@@ -25,10 +31,13 @@ class DatabaseService {
 
     _database = await openDatabase(
       dbPath,
-      version: 3,
+      version: 4,
       onCreate: (Database db, int version) async {
         await _createBaseTables(db);
         await _createChatCacheTable(db);
+        await _createPostCacheTable(db);
+        await _createProfilesCacheTable(db);
+        await _createRecentChatsCacheTable(db);
       },
       onUpgrade: (Database db, int oldVersion, int newVersion) async {
         if (oldVersion < 2) {
@@ -42,6 +51,12 @@ class DatabaseService {
 
         if (oldVersion < 3) {
           await _createChatCacheTable(db);
+        }
+
+        if (oldVersion < 4) {
+          await _createPostCacheTable(db);
+          await _createProfilesCacheTable(db);
+          await _createRecentChatsCacheTable(db);
         }
       },
     );
@@ -141,6 +156,153 @@ class DatabaseService {
     );
   }
 
+  Future<List<PostModel>> getCachedPosts() async {
+    final Database db = await database;
+    final List<Map<String, Object?>> rows = await db.query(
+      _postsCacheTable,
+      orderBy: 'created_at DESC',
+    );
+
+    return rows.map(_postFromRow).toList();
+  }
+
+  Future<PostModel?> getCachedPostById(String postId) async {
+    final Database db = await database;
+    final List<Map<String, Object?>> rows = await db.query(
+      _postsCacheTable,
+      where: 'post_id = ?',
+      whereArgs: <Object?>[postId],
+      limit: 1,
+    );
+
+    if (rows.isEmpty) {
+      return null;
+    }
+
+    return _postFromRow(rows.first);
+  }
+
+  Future<List<PostModel>> getCachedPostsByAuthor(String authorId) async {
+    final Database db = await database;
+    final List<Map<String, Object?>> rows = await db.query(
+      _postsCacheTable,
+      where: 'author_id = ?',
+      whereArgs: <Object?>[authorId],
+      orderBy: 'created_at DESC',
+    );
+
+    return rows.map(_postFromRow).toList();
+  }
+
+  Future<void> cachePosts(List<PostModel> posts) async {
+    final Database db = await database;
+    final Batch batch = db.batch();
+
+    for (final PostModel post in posts) {
+      batch.insert(_postsCacheTable, <String, Object?>{
+        'post_id': post.id,
+        'author_id': post.authorId,
+        'content': post.content,
+        'image_url': post.imageUrl,
+        'likes_count': post.likesCount,
+        'comments_count': post.commentsCount,
+        'view_count': post.viewCount,
+        'created_at': post.createdAt.toIso8601String(),
+        'updated_at': post.updatedAt?.toIso8601String(),
+        'author_name': post.authorName,
+        'author_avatar': post.authorAvatar,
+        'is_liked_by_current_user': post.isLikedByCurrentUser ? 1 : 0,
+        'likes_visible': post.likesVisible ? 1 : 0,
+        'cached_at': DateTime.now().toIso8601String(),
+      }, conflictAlgorithm: ConflictAlgorithm.replace);
+    }
+
+    await batch.commit(noResult: true);
+  }
+
+  Future<void> cacheProfiles(List<UserModel> profiles) async {
+    final Database db = await database;
+    final Batch batch = db.batch();
+
+    for (final UserModel profile in profiles) {
+      batch.insert(_profilesCacheTable, <String, Object?>{
+        'profile_id': profile.id,
+        'full_name': profile.fullName,
+        'username': profile.username,
+        'bio': profile.bio,
+        'year_of_study': profile.year,
+        'avatar_url': profile.avatarUrl,
+        'gracy_id': profile.gracyId,
+        'is_online': profile.isOnline ? 1 : 0,
+        'selected_theme': profile.selectedTheme,
+        'notifications_enabled': profile.notificationsEnabled ? 1 : 0,
+        'cached_at': DateTime.now().toIso8601String(),
+      }, conflictAlgorithm: ConflictAlgorithm.replace);
+    }
+
+    await batch.commit(noResult: true);
+  }
+
+  Future<List<UserModel>> getCachedProfiles() async {
+    final Database db = await database;
+    final List<Map<String, Object?>> rows = await db.query(
+      _profilesCacheTable,
+      orderBy: 'lower(username) ASC',
+    );
+
+    return rows.map(_userFromRow).toList();
+  }
+
+  Future<void> cacheRecentChats(List<ChatModel> chats) async {
+    final Database db = await database;
+    final Batch batch = db.batch();
+
+    for (final ChatModel chat in chats) {
+      batch.insert(_recentChatsCacheTable, <String, Object?>{
+        'room_id': chat.id,
+        'participant_id': chat.participantId,
+        'last_message': chat.lastMessage,
+        'last_message_at': chat.lastMessageAt.toIso8601String(),
+        'unread_count': chat.unreadCount,
+        'room_hash': chat.roomHash,
+        'is_official': chat.isOfficial ? 1 : 0,
+        'gracy_id': chat.gracyId,
+        'is_online': chat.isOnline ? 1 : 0,
+        'last_message_status': chat.lastMessageStatus.name,
+        'cached_at': DateTime.now().toIso8601String(),
+      }, conflictAlgorithm: ConflictAlgorithm.replace);
+    }
+
+    await batch.commit(noResult: true);
+  }
+
+  Future<List<ChatModel>> getCachedRecentChats() async {
+    final Database db = await database;
+    final List<Map<String, Object?>> rows = await db.query(
+      _recentChatsCacheTable,
+      orderBy: 'last_message_at DESC',
+    );
+
+    return rows.map((Map<String, Object?> row) {
+      return ChatModel(
+        id: row['room_id']?.toString() ?? '',
+        participantId: row['participant_id']?.toString() ?? '',
+        lastMessage: row['last_message']?.toString() ?? '',
+        lastMessageAt:
+            DateTime.tryParse(row['last_message_at']?.toString() ?? '') ??
+            DateTime.now(),
+        unreadCount: (row['unread_count'] as int?) ?? 0,
+        roomHash: row['room_hash']?.toString(),
+        isOfficial: (row['is_official'] as int? ?? 0) == 1,
+        gracyId: row['gracy_id']?.toString(),
+        isOnline: (row['is_online'] as int? ?? 0) == 1,
+        lastMessageStatus: _messageStatusFromString(
+          row['last_message_status']?.toString(),
+        ),
+      );
+    }).toList();
+  }
+
   Future<void> _createBaseTables(Database db) async {
     await db.execute('''
       CREATE TABLE $_appMetaTable (
@@ -190,5 +352,118 @@ class DatabaseService {
       CREATE INDEX IF NOT EXISTS idx_chat_message_cache_room_created
       ON $_chatCacheTable (room_id, created_at)
     ''');
+  }
+
+  Future<void> _createPostCacheTable(Database db) async {
+    await db.execute('''
+      CREATE TABLE IF NOT EXISTS $_postsCacheTable (
+        post_id TEXT PRIMARY KEY,
+        author_id TEXT NOT NULL,
+        content TEXT,
+        image_url TEXT,
+        likes_count INTEGER NOT NULL DEFAULT 0,
+        comments_count INTEGER NOT NULL DEFAULT 0,
+        view_count INTEGER NOT NULL DEFAULT 0,
+        created_at TEXT NOT NULL,
+        updated_at TEXT,
+        author_name TEXT,
+        author_avatar TEXT,
+        is_liked_by_current_user INTEGER NOT NULL DEFAULT 0,
+        likes_visible INTEGER NOT NULL DEFAULT 1,
+        cached_at TEXT NOT NULL
+      )
+    ''');
+  }
+
+  Future<void> _createProfilesCacheTable(Database db) async {
+    await db.execute('''
+      CREATE TABLE IF NOT EXISTS $_profilesCacheTable (
+        profile_id TEXT PRIMARY KEY,
+        full_name TEXT NOT NULL,
+        username TEXT NOT NULL,
+        bio TEXT,
+        year_of_study TEXT,
+        avatar_url TEXT,
+        gracy_id TEXT,
+        is_online INTEGER NOT NULL DEFAULT 0,
+        selected_theme TEXT,
+        notifications_enabled INTEGER NOT NULL DEFAULT 1,
+        cached_at TEXT NOT NULL
+      )
+    ''');
+  }
+
+  Future<void> _createRecentChatsCacheTable(Database db) async {
+    await db.execute('''
+      CREATE TABLE IF NOT EXISTS $_recentChatsCacheTable (
+        room_id TEXT PRIMARY KEY,
+        participant_id TEXT NOT NULL,
+        last_message TEXT NOT NULL,
+        last_message_at TEXT NOT NULL,
+        unread_count INTEGER NOT NULL DEFAULT 0,
+        room_hash TEXT,
+        is_official INTEGER NOT NULL DEFAULT 0,
+        gracy_id TEXT,
+        is_online INTEGER NOT NULL DEFAULT 0,
+        last_message_status TEXT,
+        cached_at TEXT NOT NULL
+      )
+    ''');
+  }
+
+  PostModel _postFromRow(Map<String, Object?> row) {
+    return PostModel(
+      id: row['post_id']?.toString() ?? '',
+      authorId: row['author_id']?.toString() ?? '',
+      imageUrl: row['image_url']?.toString(),
+      content: row['content']?.toString() ?? '',
+      likesCount: (row['likes_count'] as int?) ?? 0,
+      commentsCount: (row['comments_count'] as int?) ?? 0,
+      viewCount: (row['view_count'] as int?) ?? 0,
+      createdAt:
+          DateTime.tryParse(row['created_at']?.toString() ?? '') ??
+          DateTime.now(),
+      updatedAt: row['updated_at'] == null
+          ? null
+          : DateTime.tryParse(row['updated_at']!.toString()),
+      authorName: row['author_name']?.toString(),
+      authorAvatar: row['author_avatar']?.toString(),
+      isLikedByCurrentUser: (row['is_liked_by_current_user'] as int? ?? 0) == 1,
+      likesVisible: (row['likes_visible'] as int? ?? 1) == 1,
+    );
+  }
+
+  UserModel _userFromRow(Map<String, Object?> row) {
+    final String username = row['username']?.toString() ?? 'gracyuser';
+    final String fullName = row['full_name']?.toString() ?? username;
+
+    return UserModel(
+      id: row['profile_id']?.toString() ?? '',
+      fullName: fullName,
+      username: username.startsWith('@') ? username : '@$username',
+      age: 0,
+      role: UserRole.student,
+      courses: row['gracy_id'] == null
+          ? const <String>['Gracy member']
+          : <String>[row['gracy_id']!.toString()],
+      bio: row['bio']?.toString() ?? 'No bio yet.',
+      isOnline: (row['is_online'] as int? ?? 0) == 1,
+      location: 'Gracy network',
+      avatarSeed: username,
+      year: row['year_of_study']?.toString() ?? 'Not set',
+      avatarUrl: row['avatar_url']?.toString(),
+      gracyId: row['gracy_id']?.toString(),
+      selectedTheme: row['selected_theme']?.toString() ?? 'midnight',
+      notificationsEnabled:
+          (row['notifications_enabled'] as int? ?? 1) == 1,
+    );
+  }
+
+  MessageStatus _messageStatusFromString(String? value) {
+    return switch (value) {
+      'read' => MessageStatus.read,
+      'delivered' => MessageStatus.delivered,
+      _ => MessageStatus.sent,
+    };
   }
 }

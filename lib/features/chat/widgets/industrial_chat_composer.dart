@@ -53,26 +53,30 @@ class _IndustrialChatComposerState extends State<IndustrialChatComposer> {
   @override
   Widget build(BuildContext context) {
     return Container(
-      margin: const EdgeInsets.all(18),
+      margin: const EdgeInsets.fromLTRB(16, 10, 16, 16),
       decoration: BoxDecoration(
-        color: const Color(0xFF1A1A1A),
-        borderRadius: BorderRadius.circular(8),
-        border: Border.all(
-          color: Colors.grey.shade800,
-          width: 1,
-        ),
+        color: const Color(0xFF111418),
+        borderRadius: BorderRadius.circular(28),
+        border: Border.all(color: Colors.white.withValues(alpha: 0.08)),
+        boxShadow: <BoxShadow>[
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.26),
+            blurRadius: 28,
+            offset: const Offset(0, 14),
+          ),
+        ],
       ),
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
           if (widget.replyToMessage != null) ...[
             Container(
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+              padding: const EdgeInsets.fromLTRB(18, 14, 12, 10),
               decoration: BoxDecoration(
-                color: Colors.grey.shade900,
+                color: Colors.white.withValues(alpha: 0.03),
                 border: Border(
                   bottom: BorderSide(
-                    color: Colors.grey.shade800,
+                    color: Colors.white.withValues(alpha: 0.06),
                     width: 1,
                   ),
                 ),
@@ -89,7 +93,7 @@ class _IndustrialChatComposerState extends State<IndustrialChatComposer> {
                     child: Text(
                       'Replying to: ${widget.replyToMessage}',
                       style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                        color: Colors.cyan.shade400,
+                        color: Colors.cyan.shade300,
                         fontSize: 12,
                       ),
                       overflow: TextOverflow.ellipsis,
@@ -108,49 +112,103 @@ class _IndustrialChatComposerState extends State<IndustrialChatComposer> {
             ),
           ],
           Container(
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+            padding: const EdgeInsets.fromLTRB(10, 8, 8, 8),
             child: Row(
               children: [
+                _CircleActionButton(
+                  icon: Icons.add_rounded,
+                  onTap: () {
+                    HapticFeedback.selectionClick();
+                  },
+                ),
+                const SizedBox(width: 10),
                 Expanded(
-                  child: TextField(
-                    controller: widget.controller,
-                    style: const TextStyle(
-                      color: Colors.white,
-                      fontSize: 16,
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 16,
+                      vertical: 4,
                     ),
-                    decoration: const InputDecoration(
-                      hintText: 'Type a message...',
-                      hintStyle: TextStyle(
-                        color: Colors.grey,
+                    decoration: BoxDecoration(
+                      color: Colors.white.withValues(alpha: 0.05),
+                      borderRadius: BorderRadius.circular(22),
+                    ),
+                    child: TextField(
+                      controller: widget.controller,
+                      style: const TextStyle(
+                        color: Colors.white,
                         fontSize: 16,
                       ),
-                      border: InputBorder.none,
-                      contentPadding: EdgeInsets.zero,
+                      decoration: const InputDecoration(
+                        hintText: 'Type a message',
+                        hintStyle: TextStyle(
+                          color: Colors.grey,
+                          fontSize: 16,
+                        ),
+                        border: InputBorder.none,
+                        contentPadding: EdgeInsets.zero,
+                      ),
+                      maxLines: null,
+                      textCapitalization: TextCapitalization.sentences,
                     ),
-                    maxLines: null,
-                    textCapitalization: TextCapitalization.sentences,
                   ),
                 ),
                 const SizedBox(width: 12),
-                GestureDetector(
-                  onTap: _handleSend,
-                  child: Container(
-                    padding: const EdgeInsets.all(8),
-                    decoration: BoxDecoration(
-                      color: _isEmpty ? Colors.grey.shade800 : Colors.cyan,
-                      borderRadius: BorderRadius.circular(4),
-                    ),
-                    child: Icon(
-                      Icons.send_rounded,
-                      size: 20,
-                      color: Colors.white,
-                    ),
-                  ),
+                AnimatedSwitcher(
+                  duration: const Duration(milliseconds: 180),
+                  child: _isEmpty
+                      ? _CircleActionButton(
+                          key: const ValueKey<String>('mic'),
+                          icon: Icons.mic_rounded,
+                          backgroundColor: const Color(0xFF1B2128),
+                          iconColor: Colors.white70,
+                          onTap: () {
+                            HapticFeedback.selectionClick();
+                          },
+                        )
+                      : _CircleActionButton(
+                          key: const ValueKey<String>('send'),
+                          icon: Icons.send_rounded,
+                          backgroundColor: const Color(0xFF007AFF),
+                          iconColor: Colors.white,
+                          onTap: _handleSend,
+                        ),
                 ),
               ],
             ),
           ),
         ],
+      ),
+    );
+  }
+}
+
+class _CircleActionButton extends StatelessWidget {
+  const _CircleActionButton({
+    super.key,
+    required this.icon,
+    required this.onTap,
+    this.backgroundColor = const Color(0xFF1B2128),
+    this.iconColor = Colors.white70,
+  });
+
+  final IconData icon;
+  final VoidCallback onTap;
+  final Color backgroundColor;
+  final Color iconColor;
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        width: 42,
+        height: 42,
+        decoration: BoxDecoration(
+          color: backgroundColor,
+          shape: BoxShape.circle,
+        ),
+        alignment: Alignment.center,
+        child: Icon(icon, size: 22, color: iconColor),
       ),
     );
   }
