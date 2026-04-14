@@ -1,5 +1,6 @@
 import 'dart:async';
 
+import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -382,65 +383,49 @@ class _ViewToggle extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    
-    return Container(
-      height: 48,
-      decoration: BoxDecoration(
-        color: theme.colorScheme.surfaceContainerHighest,
-        borderRadius: BorderRadius.circular(24),
-        border: Border.all(
-          color: theme.dividerTheme.color ?? Colors.grey,
-          width: 1,
+    final Map<bool, Widget> segments = <bool, Widget>{
+      true: const Padding(
+        padding: EdgeInsets.symmetric(vertical: 10),
+        child: Text(
+          'All Posts',
+          style: TextStyle(fontSize: 15, fontWeight: FontWeight.w700),
         ),
       ),
-      child: Row(
-        children: [
-          Expanded(
-            child: GestureDetector(
-              onTap: showPosts ? null : onToggle,
-              child: Container(
-                height: double.infinity,
-                decoration: BoxDecoration(
-                  color: showPosts ? theme.colorScheme.primary : Colors.transparent,
-                  borderRadius: BorderRadius.circular(23),
-                ),
-                child: Center(
-                  child: Text(
-                    'Posts',
-                    style: TextStyle(
-                      color: showPosts ? theme.colorScheme.onPrimary : theme.colorScheme.onSurfaceVariant,
-                      fontWeight: FontWeight.w600,
-                      fontSize: 16,
-                    ),
-                  ),
-                ),
-              ),
-            ),
-          ),
-          Expanded(
-            child: GestureDetector(
-              onTap: !showPosts ? null : onToggle,
-              child: Container(
-                height: double.infinity,
-                decoration: BoxDecoration(
-                  color: !showPosts ? theme.colorScheme.primary : Colors.transparent,
-                  borderRadius: BorderRadius.circular(23),
-                ),
-                child: Center(
-                  child: Text(
-                    'Profiles',
-                    style: TextStyle(
-                      color: !showPosts ? theme.colorScheme.onPrimary : theme.colorScheme.onSurfaceVariant,
-                      fontWeight: FontWeight.w600,
-                      fontSize: 16,
-                    ),
-                  ),
-                ),
-              ),
-            ),
+      false: const Padding(
+        padding: EdgeInsets.symmetric(vertical: 10),
+        child: Text(
+          'Profiles',
+          style: TextStyle(fontSize: 15, fontWeight: FontWeight.w700),
+        ),
+      ),
+    };
+
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        color: const Color(0xFF0F1115),
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(color: Colors.white.withValues(alpha: 0.08)),
+        boxShadow: const <BoxShadow>[
+          BoxShadow(
+            color: Color(0x22007AFF),
+            blurRadius: 24,
+            offset: Offset(0, 10),
           ),
         ],
+      ),
+      child: Padding(
+        padding: const EdgeInsets.all(4),
+        child: CupertinoSlidingSegmentedControl<bool>(
+          groupValue: showPosts,
+          backgroundColor: Colors.transparent,
+          thumbColor: AppColors.electricBlue,
+          children: segments,
+          onValueChanged: (bool? value) {
+            if (value != null && value != showPosts) {
+              onToggle();
+            }
+          },
+        ),
       ),
     );
   }

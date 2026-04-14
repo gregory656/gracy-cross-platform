@@ -48,7 +48,7 @@ class PostsNotifier extends AsyncNotifier<List<PostModel>> {
   final List<PostModel> _posts = [];
   bool _hasMore = true;
   int _offset = 0;
-  static const int _limit = 20;
+  static const int _limit = 10;
 
   double _currentProgress = 0.0;
   String _currentStatus = '';
@@ -73,7 +73,9 @@ class PostsNotifier extends AsyncNotifier<List<PostModel>> {
 
     if (!_hasMore) return;
 
-    state = const AsyncValue.loading();
+    if (_posts.isEmpty) {
+      state = const AsyncValue.loading();
+    }
 
     try {
       final newPosts = await _postService.getPosts(

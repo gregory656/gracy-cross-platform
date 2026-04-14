@@ -419,6 +419,8 @@ class _GridPostTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final double manageButtonWidth = isOwner ? 70 : 0;
+
     return Stack(
       fit: StackFit.expand,
       children: <Widget>[
@@ -436,63 +438,60 @@ class _GridPostTile extends StatelessWidget {
           ),
         ),
         Positioned(
-          left: 8,
-          right: 8,
-          bottom: 8,
-          child: Row(
-            children: <Widget>[
-              Expanded(
-                child: Container(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 8,
-                    vertical: 6,
-                  ),
-                  decoration: BoxDecoration(
-                    color: Colors.black.withValues(alpha: 0.76),
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  child: Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: <Widget>[
-                      _GridStat(
-                        icon: Icons.favorite_border,
-                        label: post.likesVisible
-                            ? _formatCompactCount(post.likesCount)
-                            : 'Hidden',
-                      ),
-                      _GridStat(
-                        icon: Icons.analytics_outlined,
-                        label: _formatCompactCount(post.viewCount),
-                      ),
-                    ],
+          left: 4,
+          right: manageButtonWidth + 8,
+          bottom: 4,
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+            decoration: BoxDecoration(
+              color: Colors.black.withValues(alpha: 0.78),
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: Row(
+              children: <Widget>[
+                Expanded(
+                  child: _GridStat(
+                    icon: Icons.favorite_border,
+                    label: post.likesVisible
+                        ? _formatCompactCount(post.likesCount)
+                        : 'Hidden',
                   ),
                 ),
-              ),
-              if (isOwner) ...<Widget>[
-                const SizedBox(width: 6),
-                Material(
-                  color: AppColors.electricBlue,
-                  borderRadius: BorderRadius.circular(12),
-                  child: InkWell(
-                    onTap: onManage,
-                    borderRadius: BorderRadius.circular(12),
-                    child: const Padding(
-                      padding: EdgeInsets.symmetric(horizontal: 10, vertical: 8),
-                      child: Text(
-                        'Manage',
-                        style: TextStyle(
-                          color: AppColors.pureWhite,
-                          fontWeight: FontWeight.w800,
-                          fontSize: 12,
-                        ),
-                      ),
-                    ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: _GridStat(
+                    icon: Icons.analytics_outlined,
+                    label: _formatCompactCount(post.viewCount),
                   ),
                 ),
               ],
-            ],
+            ),
           ),
         ),
+        if (isOwner)
+          Positioned(
+            right: 4,
+            bottom: 4,
+            child: Material(
+              color: AppColors.electricBlue,
+              borderRadius: BorderRadius.circular(12),
+              child: InkWell(
+                onTap: onManage,
+                borderRadius: BorderRadius.circular(12),
+                child: const Padding(
+                  padding: EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                  child: Text(
+                    'Manage',
+                    style: TextStyle(
+                      color: AppColors.pureWhite,
+                      fontWeight: FontWeight.w800,
+                      fontSize: 12,
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          ),
       ],
     );
   }
@@ -684,16 +683,20 @@ class _GridStat extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Row(
-      mainAxisSize: MainAxisSize.min,
+      mainAxisSize: MainAxisSize.max,
       children: <Widget>[
         Icon(icon, size: 14, color: Colors.white),
         const SizedBox(width: 4),
-        Text(
-          label,
-          style: const TextStyle(
-            color: Colors.white,
-            fontWeight: FontWeight.w700,
-            fontSize: 11,
+        Expanded(
+          child: Text(
+            label,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: const TextStyle(
+              color: Colors.white,
+              fontWeight: FontWeight.w700,
+              fontSize: 11,
+            ),
           ),
         ),
       ],

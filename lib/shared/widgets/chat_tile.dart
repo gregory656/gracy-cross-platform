@@ -5,7 +5,6 @@ import '../../core/utils/date_formatters.dart';
 import '../models/chat_model.dart';
 import '../models/message_model.dart';
 import '../models/user_model.dart';
-import 'glass_card.dart';
 import 'user_avatar.dart';
 
 class ChatTile extends StatelessWidget {
@@ -22,92 +21,92 @@ class ChatTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return GlassCard(
-      onTap: onTap,
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-      borderRadius: 28,
-      gradient: LinearGradient(
-        begin: Alignment.topLeft,
-        end: Alignment.bottomRight,
-        colors: <Color>[
-          const Color(0xFF101214).withValues(alpha: 0.98),
-          const Color(0xFF151C24).withValues(alpha: 0.96),
-        ],
-      ),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.center,
-        children: <Widget>[
-          UserAvatar(user: user, size: 58, fontSize: 16),
-          const SizedBox(width: 14),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: <Widget>[
-                Row(
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: onTap,
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 12),
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.center,
+            children: <Widget>[
+              UserAvatar(user: user, size: 56, fontSize: 16, showRing: false),
+              const SizedBox(width: 14),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: <Widget>[
-                    Expanded(
-                      child: Row(
-                        children: <Widget>[
-                          Flexible(
-                            child: Text(
-                              user.fullName,
-                              overflow: TextOverflow.ellipsis,
-                              style: Theme.of(context).textTheme.titleMedium
-                                  ?.copyWith(
-                                    fontWeight: FontWeight.w800,
-                                    color: Colors.white,
-                                  ),
-                            ),
+                    Row(
+                      children: <Widget>[
+                        Expanded(
+                          child: Row(
+                            children: <Widget>[
+                              Flexible(
+                                child: Text(
+                                  user.fullName,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: Theme.of(context).textTheme.titleMedium
+                                      ?.copyWith(
+                                        fontWeight: FontWeight.w800,
+                                        color: Colors.white,
+                                      ),
+                                ),
+                              ),
+                              if (chat.isOfficial) ...<Widget>[
+                                const SizedBox(width: 8),
+                                const _VerifiedPill(),
+                              ],
+                            ],
                           ),
-                          if (chat.isOfficial) ...<Widget>[
-                            const SizedBox(width: 8),
-                            const _VerifiedPill(),
-                          ],
-                        ],
-                      ),
-                    ),
-                    const SizedBox(width: 12),
-                    Text(
-                      DateFormatters.chatPreviewTime.format(chat.lastMessageAt),
-                      style: Theme.of(context).textTheme.labelMedium?.copyWith(
-                        color: AppColors.textSecondary,
-                        fontWeight: FontWeight.w700,
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 8),
-                Row(
-                  children: <Widget>[
-                    if (chat.unreadCount == 0)
-                      _ReadReceipt(status: chat.lastMessageStatus),
-                    if (chat.unreadCount == 0) const SizedBox(width: 8),
-                    Expanded(
-                      child: Text(
-                        chat.lastMessage,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: Theme.of(context).textTheme.bodyLarge?.copyWith(
-                          color: Colors.white.withValues(alpha: 0.84),
-                          fontWeight: FontWeight.w500,
                         ),
-                      ),
+                        const SizedBox(width: 12),
+                        Text(
+                          DateFormatters.chatPreviewTime.format(
+                            chat.lastMessageAt,
+                          ),
+                          style: Theme.of(context).textTheme.labelMedium
+                              ?.copyWith(
+                                color: AppColors.textSecondary,
+                                fontWeight: FontWeight.w700,
+                              ),
+                        ),
+                      ],
                     ),
+                    const SizedBox(height: 7),
+                    Row(
+                      children: <Widget>[
+                        if (chat.unreadCount == 0)
+                          _ReadReceipt(status: chat.lastMessageStatus),
+                        if (chat.unreadCount == 0) const SizedBox(width: 8),
+                        Expanded(
+                          child: Text(
+                            chat.lastMessage,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: Theme.of(context).textTheme.bodyMedium
+                                ?.copyWith(
+                                  color: Colors.white70,
+                                  fontWeight: FontWeight.w500,
+                                ),
+                          ),
+                        ),
+                      ],
+                    ),
+                    if (chat.gracyId != null &&
+                        chat.gracyId!.isNotEmpty) ...<Widget>[
+                      const SizedBox(height: 9),
+                      _CodePill(code: chat.gracyId!),
+                    ],
                   ],
                 ),
-                if (chat.gracyId != null &&
-                    chat.gracyId!.isNotEmpty) ...<Widget>[
-                  const SizedBox(height: 10),
-                  _CodePill(code: chat.gracyId!),
-                ],
+              ),
+              if (chat.unreadCount > 0) ...<Widget>[
+                const SizedBox(width: 12),
+                _UnreadBadge(count: chat.unreadCount),
               ],
-            ),
+            ],
           ),
-          if (chat.unreadCount > 0) ...<Widget>[
-            const SizedBox(width: 12),
-            _UnreadBadge(count: chat.unreadCount),
-          ],
-        ],
+        ),
       ),
     );
   }

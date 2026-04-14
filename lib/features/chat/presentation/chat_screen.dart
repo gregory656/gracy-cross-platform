@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:share_plus/share_plus.dart';
 
 import '../../../core/constants/app_constants.dart';
 import '../../../core/router/app_router.dart';
@@ -16,6 +17,7 @@ import '../../../shared/widgets/chat_tile.dart';
 import '../../../shared/widgets/custom_button.dart';
 import '../../../shared/widgets/custom_text_field.dart';
 import '../../../shared/widgets/disappearing_messages_dialog.dart';
+import '../../../shared/widgets/report_reason_sheet.dart';
 import '../../../shared/widgets/user_avatar.dart';
 import '../data/chat_repository.dart';
 import '../providers/chat_providers.dart';
@@ -508,23 +510,33 @@ class _ChatShell extends ConsumerWidget {
                 }
 
                 return Column(
-                  children: chats.map((ChatModel chat) {
-                    final UserModel? user = profilesById[chat.participantId];
-                    if (user == null) {
-                      return const SizedBox.shrink();
-                    }
+                  children: <Widget>[
+                    for (int index = 0; index < chats.length; index++) ...<Widget>[
+                      Builder(
+                        builder: (BuildContext context) {
+                          final ChatModel chat = chats[index];
+                          final UserModel? user = profilesById[chat.participantId];
+                          if (user == null) {
+                            return const SizedBox.shrink();
+                          }
 
-                    return Padding(
-                      padding: const EdgeInsets.only(bottom: 14),
-                      child: ChatTile(
-                        chat: chat,
-                        user: user,
-                        onTap: () {
-                          context.go('${AppRoutePaths.chat}?chatId=${chat.id}');
+                          return ChatTile(
+                            chat: chat,
+                            user: user,
+                            onTap: () {
+                              context.go('${AppRoutePaths.chat}?chatId=${chat.id}');
+                            },
+                          );
                         },
                       ),
-                    );
-                  }).toList(),
+                      if (index != chats.length - 1)
+                        Divider(
+                          height: 1,
+                          thickness: 0.8,
+                          color: Colors.white.withValues(alpha: 0.10),
+                        ),
+                    ],
+                  ],
                 );
               },
               loading: () => const Padding(
@@ -685,17 +697,84 @@ class _ThreadHeader extends StatelessWidget {
   final VoidCallback onViewProfile;
   final VoidCallback? onBack;
 
+  Future<void> _handleMenuAction(
+    BuildContext context,
+    _ThreadMenuAction action,
+  ) async {
+    switch (action) {
+      case _ThreadMenuAction.blockUser:
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('${participant.fullName} has been blocked.')),
+        );
+      case _ThreadMenuAction.reportProfile:
+        final String? reason = await showReportReasonSheet(
+          context,
+          title: 'Report Profile',
+          subtitle:
+              'Tell us what feels wrong about this profile so we can review it.',
+        );
+        if (reason != null && context.mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('Profile reported for "$reason".')),
+          );
+        }
+      case _ThreadMenuAction.shareProfile:
+        await SharePlus.instance.share(
+          ShareParams(
+            text:
+                'Connect with ${participant.fullName} on Gracy${participant.gracyId == null ? '' : ' (${participant.gracyId})'}.',
+          ),
+        );
+      case _ThreadMenuAction.clearChat:
+        final bool shouldClear =
+            await showDialog<bool>(
+              context: context,
+              builder: (BuildContext dialogContext) {
+                return AlertDialog(
+                  backgroundColor: const Color(0xFF111418),
+                  title: const Text(
+                    'Clear chat?',
+                    style: TextStyle(color: Colors.white),
+                  ),
+                  content: Text(
+                    'This will remove the current conversation from your local view.',
+                    style: TextStyle(color: Colors.grey.shade300),
+                  ),
+                  actions: <Widget>[
+                    TextButton(
+                      onPressed: () => Navigator.of(dialogContext).pop(false),
+                      child: const Text('Cancel'),
+                    ),
+                    TextButton(
+                      onPressed: () => Navigator.of(dialogContext).pop(true),
+                      child: const Text('Clear'),
+                    ),
+                  ],
+                );
+              },
+            ) ??
+            false;
+
+        if (shouldClear && context.mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Chat cleared from local history.')),
+          );
+        }
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final bool isOfficial = participant.id == ChatRepository.botUserId;
 
     return Container(
-      margin: const EdgeInsets.symmetric(horizontal: 18),
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+      margin: const EdgeInsets.fromLTRB(18, 4, 18, 0),
+      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 4),
       decoration: BoxDecoration(
-        color: const Color(0xFF111418),
-        borderRadius: BorderRadius.circular(24),
-        border: Border.all(color: Colors.white.withValues(alpha: 0.08)),
+        color: const Color(0xFF0B0D10),
+        border: Border(
+          bottom: BorderSide(color: Colors.white12),
+        ),
       ),
       child: Row(
         children: <Widget>[
@@ -705,21 +784,33 @@ class _ThreadHeader extends StatelessWidget {
               icon: const Icon(Icons.arrow_back_rounded),
               color: Colors.white,
             ),
-            const SizedBox(width: 6),
-          ],
-          UserAvatar(user: participant, size: 40, fontSize: 14),
+              const SizedBox(width: 6),
+            ],
+          GestureDetector(
+            onTap: onViewProfile,
+            child: UserAvatar(
+              user: participant,
+              size: 38,
+              fontSize: 14,
+              showRing: false,
+            ),
+          ),
           const SizedBox(width: 12),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: <Widget>[
                 Row(
-                  children: [
-                    Text(
-                      participant.fullName,
-                      style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                        fontWeight: FontWeight.w700,
-                        color: Colors.white,
+                  children: <Widget>[
+                    Flexible(
+                      child: Text(
+                        participant.fullName,
+                        overflow: TextOverflow.ellipsis,
+                        style: Theme.of(context).textTheme.titleMedium
+                            ?.copyWith(
+                              fontWeight: FontWeight.w700,
+                              color: Colors.white,
+                            ),
                       ),
                     ),
                     if (isOfficial) ...<Widget>[
@@ -745,16 +836,48 @@ class _ThreadHeader extends StatelessWidget {
                   ],
                 ),
                 const SizedBox(height: 2),
-                Text(
-                  isOfficial ? 'Gracy Assistant' : 'Tap to view profile',
-                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                    color: Colors.grey.shade400,
+                GestureDetector(
+                  onTap: onViewProfile,
+                  child: Text(
+                    isOfficial ? 'Gracy Assistant' : 'Tap to view profile',
+                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                      color: Colors.grey.shade400,
+                    ),
                   ),
                 ),
               ],
             ),
           ),
-          const SizedBox(width: 8),
+          PopupMenuButton<_ThreadMenuAction>(
+            color: const Color(0xFF14181D),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(16),
+              side: BorderSide(color: Colors.white.withValues(alpha: 0.08)),
+            ),
+            onSelected: (_ThreadMenuAction action) {
+              _handleMenuAction(context, action);
+            },
+            itemBuilder: (BuildContext context) =>
+                const <PopupMenuEntry<_ThreadMenuAction>>[
+                  PopupMenuItem<_ThreadMenuAction>(
+                    value: _ThreadMenuAction.blockUser,
+                    child: Text('Block User'),
+                  ),
+                  PopupMenuItem<_ThreadMenuAction>(
+                    value: _ThreadMenuAction.reportProfile,
+                    child: Text('Report Profile'),
+                  ),
+                  PopupMenuItem<_ThreadMenuAction>(
+                    value: _ThreadMenuAction.shareProfile,
+                    child: Text('Share Profile'),
+                  ),
+                  PopupMenuItem<_ThreadMenuAction>(
+                    value: _ThreadMenuAction.clearChat,
+                    child: Text('Clear Chat'),
+                  ),
+                ],
+            icon: const Icon(Icons.more_vert_rounded, color: Colors.white70),
+          ),
           Consumer(
             builder: (context, ref, child) {
               return IconButton(
@@ -764,17 +887,19 @@ class _ThreadHeader extends StatelessWidget {
                     builder: (context) => const DisappearingMessagesDialog(),
                   );
                 },
-                icon: const Icon(Icons.timer_rounded),
-                color: Colors.grey.shade400,
-                tooltip: 'Disappearing Messages',
-              );
-            },
+                  icon: const Icon(Icons.timer_outlined),
+                  color: Colors.grey.shade500,
+                  tooltip: 'Disappearing Messages',
+                );
+              },
           ),
         ],
       ),
     );
   }
 }
+
+enum _ThreadMenuAction { blockUser, reportProfile, shareProfile, clearChat }
 
 class _TypingIndicator extends StatelessWidget {
   const _TypingIndicator({required this.name});
