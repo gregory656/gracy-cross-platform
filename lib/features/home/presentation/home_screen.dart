@@ -14,6 +14,7 @@ import '../../../shared/services/presence_service.dart';
 import '../../../shared/models/user_model.dart';
 import '../../../shared/models/post_model.dart';
 import '../../../shared/mock_data/mock_users.dart';
+import '../../../shared/widgets/user_avatar.dart';
 import '../../../shared/widgets/custom_text_field.dart';
 import '../../../shared/widgets/profile_card.dart';
 import '../widgets/home_header.dart';
@@ -92,7 +93,11 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
       backgroundColor: Theme.of(context).colorScheme.surface,
       body: SafeArea(
         child: _showPosts
-            ? _buildPostsView(postsAsync, headerUser)
+            ? _buildPostsView(
+                postsAsync,
+                headerUser,
+                profilesAsync.asData?.value ?? fallbackUsers,
+              )
             : profilesAsync.when(
                 loading: () => _buildDirectory(context, fallbackUsers, headerUser, query),
                 error: (Object error, StackTrace stackTrace) =>
@@ -202,11 +207,18 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     );
   }
 
-  Widget _buildPostsView(AsyncValue<List<PostModel>> postsAsync, UserModel headerUser) {
+  Widget _buildPostsView(
+    AsyncValue<List<PostModel>> postsAsync,
+    UserModel headerUser,
+    List<UserModel> users,
+  ) {
     final postsNotifier = ref.read(postsProvider.notifier);
     final uploadProgress = postsNotifier.progress;
     final uploadStatus = postsNotifier.status;
     final isUploading = uploadProgress > 0 && uploadProgress < 1;
+    final List<UserModel> activeUsers = users
+        .where((UserModel user) => user.id != headerUser.id && user.isOnline)
+        .toList(growable: false);
 
     return RefreshIndicator(
       onRefresh: () async {
@@ -216,17 +228,31 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
       child: CustomScrollView(
         controller: _scrollController,
         slivers: [
+          SliverPersistentHeader(
+            pinned: true,
+            delegate: _PinnedHomeHeaderDelegate(
+              child: Container(
+                color: Colors.black,
+                padding: const EdgeInsets.fromLTRB(20, 8, 20, 8),
+                alignment: Alignment.bottomCenter,
+                child: HomeHeader(user: headerUser),
+              ),
+            ),
+          ),
           SliverPadding(
-            padding: AppConstants.screenPadding,
+            padding: const EdgeInsets.fromLTRB(20, 8, 20, 0),
             sliver: SliverToBoxAdapter(
               child: Column(
-                children: [
-                  HomeHeader(
-                    user: headerUser,
-                    action: const CreatePostButton(),
+                children: <Widget>[
+                  _StoriesRow(currentUser: headerUser, activeUsers: activeUsers),
+                  const SizedBox(height: 14),
+                  CreatePostButton(
+                    expanded: true,
+                    promptText:
+                        "What's on your mind, ${_firstName(headerUser.fullName)}?",
                   ),
-                  const SizedBox(height: 18),
-                  if (isUploading) ...[
+                  const SizedBox(height: 16),
+                  if (isUploading) ...<Widget>[
                     ClipRRect(
                       borderRadius: BorderRadius.circular(999),
                       child: LinearProgressIndicator(
@@ -249,15 +275,6 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                     ),
                     const SizedBox(height: 16),
                   ],
-                  _ViewToggle(
-                    showPosts: _showPosts,
-                    onToggle: () {
-                      setState(() {
-                        _showPosts = !_showPosts;
-                      });
-                    },
-                  ),
-                  const SizedBox(height: 16),
                 ],
               ),
             ),
@@ -428,6 +445,157 @@ class _ViewToggle extends StatelessWidget {
         ),
       ),
     );
+  }
+}
+
+class _StoriesRow extends StatelessWidget {
+  const _StoriesRow({
+    required this.currentUser,
+    required this.activeUsers,
+  });
+
+  final UserModel currentUser;
+  final List<UserModel> activeUsers;
+
+  @override
+  Widget build(BuildContext context) {
+    return SizedBox(
+      height: 98,
+      child: ListView.separated(
+        scrollDirection: Axis.horizontal,
+        itemCount: activeUsers.length + 1,
+        separatorBuilder: (_, _) => const SizedBox(width: 14),
+        itemBuilder: (BuildContext context, int index) {
+          if (index == 0) {
+            return _StoryAvatar(
+              user: currentUser,
+              label: 'Create',
+              isCreateStory: true,
+            );
+          }
+
+          final UserModel user = activeUsers[index - 1];
+          return _StoryAvatar(user: user, label: _firstName(user.fullName));
+        },
+      ),
+    );
+  }
+}
+
+class _StoryAvatar extends StatelessWidget {
+  const _StoryAvatar({
+    required this.user,
+    required this.label,
+    this.isCreateStory = false,
+  });
+
+  final UserModel user;
+  final String label;
+  final bool isCreateStory;
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: () {
+        if (!isCreateStory) {
+          context.go('${AppRoutePaths.profile}?userId=${user.id}');
+        }
+      },
+      child: SizedBox(
+        width: 72,
+        child: Column(
+          children: <Widget>[
+            Stack(
+              clipBehavior: Clip.none,
+              children: <Widget>[
+                Container(
+                  padding: const EdgeInsets.all(2.5),
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    border: Border.all(
+                      color: isCreateStory
+                          ? AppColors.electricBlue.withValues(alpha: 0.85)
+                          : Colors.white.withValues(alpha: 0.82),
+                    ),
+                  ),
+                  child: UserAvatar(
+                    user: user,
+                    size: 58,
+                    fontSize: 16,
+                    showRing: false,
+                    showOnlineIndicator: !isCreateStory,
+                  ),
+                ),
+                Positioned(
+                  right: -1,
+                  bottom: -1,
+                  child: Container(
+                      width: 18,
+                      height: 18,
+                      decoration: BoxDecoration(
+                        color: isCreateStory
+                            ? AppColors.electricBlue
+                            : const Color(0xFF4CAF50),
+                        shape: BoxShape.circle,
+                        border: Border.all(color: Colors.black, width: 2),
+                      ),
+                    child: isCreateStory
+                        ? const Icon(
+                            Icons.add,
+                            size: 10,
+                            color: Colors.white,
+                          )
+                        : null,
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 8),
+            Text(
+              label,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              textAlign: TextAlign.center,
+              style: Theme.of(context).textTheme.labelMedium?.copyWith(
+                color: Colors.white,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+String _firstName(String fullName) {
+  final List<String> parts = fullName.trim().split(RegExp(r'\s+'));
+  return parts.isEmpty || parts.first.isEmpty ? 'you' : parts.first;
+}
+
+class _PinnedHomeHeaderDelegate extends SliverPersistentHeaderDelegate {
+  const _PinnedHomeHeaderDelegate({required this.child});
+
+  final Widget child;
+
+  @override
+  Widget build(
+    BuildContext context,
+    double shrinkOffset,
+    bool overlapsContent,
+  ) {
+    return child;
+  }
+
+  @override
+  double get maxExtent => 92;
+
+  @override
+  double get minExtent => 92;
+
+  @override
+  bool shouldRebuild(covariant _PinnedHomeHeaderDelegate oldDelegate) {
+    return oldDelegate.child != child;
   }
 }
 

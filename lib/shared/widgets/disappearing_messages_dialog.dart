@@ -12,8 +12,14 @@ class DisappearingMessagesDialog extends ConsumerWidget {
 
     return AlertDialog(
       title: Row(
+        mainAxisSize: MainAxisSize.min,
         children: [
-          const Text('Disappearing Messages'),
+          const Expanded(
+            child: Text(
+              'Disappearing Messages',
+              overflow: TextOverflow.ellipsis,
+            ),
+          ),
           const SizedBox(width: 8),
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
@@ -32,49 +38,61 @@ class DisappearingMessagesDialog extends ConsumerWidget {
           ),
         ],
       ),
-      content: Column(
-        mainAxisSize: MainAxisSize.min,
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          const Text(
-            'Set a timer for messages to disappear after they\'ve been seen.',
-            style: TextStyle(fontSize: 14),
-          ),
-          const SizedBox(height: 16),
-          ...DisappearingDuration.values.map((duration) {
-            final isSelected = duration == currentDuration;
+      content: SizedBox(
+        width: 320,
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text(
+              'Set a timer for messages to disappear after they\'ve been seen.',
+              style: TextStyle(fontSize: 14),
+            ),
+            const SizedBox(height: 16),
+            ...DisappearingDuration.values.map((duration) {
+              final isSelected = duration == currentDuration;
 
-            return ListTile(
-              contentPadding: EdgeInsets.zero,
-              onTap: () {
-                ref.read(disappearingMessagesProvider.notifier).setDuration(
-                  duration,
-                );
-                Navigator.of(context).pop();
-                ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(
-                    content: Text(
-                      'Disappearing messages set to ${duration.label}',
+              return ListTile(
+                contentPadding: EdgeInsets.zero,
+                minLeadingWidth: 24,
+                horizontalTitleGap: 8,
+                onTap: () {
+                  ref.read(disappearingMessagesProvider.notifier).setDuration(
+                    duration,
+                  );
+                  Navigator.of(context).pop();
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      content: Text(
+                        'Disappearing messages set to ${duration.label}',
+                      ),
+                      behavior: SnackBarBehavior.floating,
                     ),
-                    behavior: SnackBarBehavior.floating,
-                  ),
-                );
-              },
-              leading: Icon(
-                isSelected
-                    ? Icons.radio_button_checked
-                    : Icons.radio_button_off,
-                color: isSelected
-                    ? Theme.of(context).colorScheme.primary
-                    : Theme.of(context).colorScheme.onSurfaceVariant,
-              ),
-              title: Text(duration.label),
-              subtitle: duration == DisappearingDuration.off
-                  ? const Text('Messages will not disappear')
-                  : Text('Messages disappear after ${duration.label}'),
-            );
-          }),
-        ],
+                  );
+                },
+                leading: Icon(
+                  isSelected
+                      ? Icons.radio_button_checked
+                      : Icons.radio_button_off,
+                  color: isSelected
+                      ? Theme.of(context).colorScheme.primary
+                      : Theme.of(context).colorScheme.onSurfaceVariant,
+                ),
+                title: Text(
+                  duration.label,
+                  overflow: TextOverflow.ellipsis,
+                ),
+                subtitle: Text(
+                  duration == DisappearingDuration.off
+                      ? 'Messages will not disappear'
+                      : 'Messages disappear after ${duration.label}',
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                ),
+              );
+            }),
+          ],
+        ),
       ),
       actions: [
         TextButton(

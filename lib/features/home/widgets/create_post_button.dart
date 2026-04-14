@@ -5,7 +5,14 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../providers/post_providers.dart';
 
 class CreatePostButton extends ConsumerStatefulWidget {
-  const CreatePostButton({super.key});
+  const CreatePostButton({
+    super.key,
+    this.expanded = false,
+    this.promptText,
+  });
+
+  final bool expanded;
+  final String? promptText;
 
   @override
   ConsumerState<CreatePostButton> createState() => _CreatePostButtonState();
@@ -460,6 +467,53 @@ class _CreatePostButtonState extends ConsumerState<CreatePostButton> {
     final postsAsync = ref.watch(postsProvider);
     final isUploading = postsAsync is AsyncLoading ||
         (postsAsync.hasValue && ref.read(postsProvider.notifier).progress > 0);
+
+    if (widget.expanded) {
+      return Material(
+        color: Colors.transparent,
+        child: InkWell(
+          onTap: isUploading ? null : _showCreatePostDialog,
+          borderRadius: BorderRadius.circular(28),
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+            decoration: BoxDecoration(
+              color: const Color(0xFF1A1A1A),
+              borderRadius: BorderRadius.circular(28),
+              border: Border.all(color: Colors.white.withValues(alpha: 0.08)),
+            ),
+            child: Row(
+              children: <Widget>[
+                Expanded(
+                  child: Text(
+                    widget.promptText ?? "What's on your mind?",
+                    style: TextStyle(
+                      color: Colors.grey[400],
+                      fontSize: 15,
+                      fontWeight: FontWeight.w500,
+                    ),
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Container(
+                  width: 34,
+                  height: 34,
+                  decoration: BoxDecoration(
+                    color: _fabColor.withValues(alpha: 0.16),
+                    shape: BoxShape.circle,
+                  ),
+                  child: const Icon(
+                    Icons.image_outlined,
+                    size: 18,
+                    color: _fabColor,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      );
+    }
 
     return Material(
       color: Colors.transparent,

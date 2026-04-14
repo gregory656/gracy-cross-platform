@@ -3,6 +3,7 @@ import 'dart:io';
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:dio/dio.dart';
@@ -11,6 +12,7 @@ import 'package:image_gallery_saver/image_gallery_saver.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:share_plus/share_plus.dart';
 import '../../../core/router/shell_ui_provider.dart';
+import '../../../core/theme/app_colors.dart';
 import '../../../core/utils/elite_animations.dart';
 import '../../../shared/models/post_model.dart';
 import '../../../shared/providers/auth_provider.dart';
@@ -137,6 +139,30 @@ class _PostCardState extends ConsumerState<PostCard> {
     );
   }
 
+  Future<void> _copyPostLink() async {
+    await Clipboard.setData(
+      ClipboardData(text: 'https://gracy.app/posts/${widget.post.id}'),
+    );
+
+    if (!mounted) {
+      return;
+    }
+
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('Post link copied.')),
+    );
+  }
+
+  void _hidePost() {
+    setState(() {
+      _isHiddenByReport = true;
+    });
+
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('Post hidden from your feed.')),
+    );
+  }
+
   Future<void> _showComments() async {
     ref.read(shellNavigationVisibleProvider.notifier).hide();
     try {
@@ -174,9 +200,29 @@ class _PostCardState extends ConsumerState<PostCard> {
   bool get _hasSavableMedia => widget.post.imageUrl?.isNotEmpty == true;
 
   Future<void> _showPostActions(bool canManagePost) async {
-    final bool canReportPost = !canManagePost;
-    if (_isDeleting ||
-        (!canManagePost && !_hasSavableMedia && !canReportPost)) {
+    if (_isDeleting) {
+      return;
+    }
+
+    if (!canManagePost) {
+      await showModalBottomSheet<void>(
+        context: context,
+        backgroundColor: Colors.transparent,
+        builder: (BuildContext sheetContext) => _ViewerPostActionSheet(
+          onHide: () async {
+            Navigator.of(sheetContext).pop();
+            _hidePost();
+          },
+          onReport: () async {
+            Navigator.of(sheetContext).pop();
+            await _reportPost();
+          },
+          onCopyLink: () async {
+            Navigator.of(sheetContext).pop();
+            await _copyPostLink();
+          },
+        ),
+      );
       return;
     }
 
@@ -195,17 +241,21 @@ class _PostCardState extends ConsumerState<PostCard> {
           Navigator.of(sheetContext).pop();
           await _confirmDeletePost();
         },
-        likesVisible: widget.post.likesVisible,
-        onToggleLikesVisibility: () async {
-          Navigator.of(sheetContext).pop();
-          await _toggleLikesVisibility();
-        },
-        onSaveToGallery: _saveToGallery,
-        canReportPost: canReportPost,
-        onReport: () async {
-          Navigator.of(sheetContext).pop();
-          await _reportPost();
-        },
+          likesVisible: widget.post.likesVisible,
+          onToggleLikesVisibility: () async {
+            Navigator.of(sheetContext).pop();
+            await _toggleLikesVisibility();
+          },
+          onCopyLink: () async {
+            Navigator.of(sheetContext).pop();
+            await _copyPostLink();
+          },
+          onSaveToGallery: _saveToGallery,
+          canReportPost: false,
+          onReport: () async {
+            Navigator.of(sheetContext).pop();
+            await _reportPost();
+          },
       ),
     );
   }
@@ -507,24 +557,23 @@ class _PostCardState extends ConsumerState<PostCard> {
     }
 
     return Container(
-      margin: const EdgeInsets.only(bottom: 16),
+      margin: const EdgeInsets.only(bottom: 8),
       decoration: BoxDecoration(
-        color: theme.colorScheme.surface,
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(
-          color: theme.dividerTheme.color ?? const Color(0xFF333333),
-          width: 1,
+        color: Colors.black,
+        border: Border(
+          bottom: BorderSide(
+            color: theme.dividerTheme.color ?? const Color(0xFF222222),
+            width: 0.8,
+          ),
         ),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          // Header
+        children: <Widget>[
           Padding(
-            padding: const EdgeInsets.all(16),
+            padding: const EdgeInsets.fromLTRB(12, 14, 12, 10),
             child: Row(
-              children: [
-                // Avatar
+              children: <Widget>[
                 Container(
                   width: 40,
                   height: 40,
@@ -556,11 +605,10 @@ class _PostCardState extends ConsumerState<PostCard> {
                         ),
                 ),
                 const SizedBox(width: 12),
-                // Author info
                 Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
+                    children: <Widget>[
                       Text(
                         widget.post.authorName ?? 'Unknown User',
                         style: theme.textTheme.titleMedium?.copyWith(
@@ -578,28 +626,26 @@ class _PostCardState extends ConsumerState<PostCard> {
                     ],
                   ),
                 ),
-                if (canManagePost || _hasSavableMedia || !canManagePost)
-                  IconButton(
-                    onPressed: () => _showPostActions(canManagePost),
-                    style: IconButton.styleFrom(
-                      minimumSize: const Size(36, 36),
-                      padding: EdgeInsets.zero,
-                      tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                    ),
-                    icon: Icon(
-                      Icons.more_horiz,
-                      color: theme.colorScheme.onSurfaceVariant,
-                      size: 20,
-                    ),
+                IconButton(
+                  onPressed: () => _showPostActions(canManagePost),
+                  style: IconButton.styleFrom(
+                    minimumSize: const Size(36, 36),
+                    padding: EdgeInsets.zero,
+                    tapTargetSize: MaterialTapTargetSize.shrinkWrap,
                   ),
+                  icon: Icon(
+                    Icons.more_horiz,
+                    color: theme.colorScheme.onSurfaceVariant,
+                    size: 20,
+                  ),
+                ),
               ],
             ),
           ),
 
-          // Content
           if (widget.post.content.isNotEmpty)
             Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 16),
+              padding: const EdgeInsets.symmetric(horizontal: 12),
               child: Text(
                 widget.post.content,
                 style: theme.textTheme.bodyMedium?.copyWith(
@@ -609,62 +655,55 @@ class _PostCardState extends ConsumerState<PostCard> {
               ),
             ),
 
-          // Image
           if (widget.post.imageUrl != null && widget.post.imageUrl!.isNotEmpty)
             Padding(
               padding: const EdgeInsets.only(top: 12),
-              child: ClipRRect(
-                borderRadius: const BorderRadius.vertical(
-                  bottom: Radius.circular(12),
-                ),
-                child: CachedNetworkImage(
-                  imageUrl: widget.post.optimizedImageUrl,
-                  fit: BoxFit.cover,
-                  width: double.infinity,
+              child: CachedNetworkImage(
+                imageUrl: widget.post.optimizedImageUrl,
+                fit: BoxFit.cover,
+                width: double.infinity,
+                height: 300,
+                placeholder: (context, url) => Container(
                   height: 300,
-                  placeholder: (context, url) => Container(
-                    height: 300,
-                    color: theme.colorScheme.surfaceContainerHighest,
-                    child: Center(
-                      child: CircularProgressIndicator(
-                        valueColor: AlwaysStoppedAnimation<Color>(
-                          theme.colorScheme.primary,
-                        ),
+                  color: theme.colorScheme.surfaceContainerHighest,
+                  child: Center(
+                    child: CircularProgressIndicator(
+                      valueColor: AlwaysStoppedAnimation<Color>(
+                        theme.colorScheme.primary,
                       ),
                     ),
                   ),
-                  errorWidget: (context, url, error) => Container(
-                    height: 300,
-                    color: theme.colorScheme.surfaceContainerHighest,
-                    child: Center(
-                      child: Column(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          Icon(
-                            Icons.broken_image,
+                ),
+                errorWidget: (context, url, error) => Container(
+                  height: 300,
+                  color: theme.colorScheme.surfaceContainerHighest,
+                  child: Center(
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: <Widget>[
+                        Icon(
+                          Icons.broken_image,
+                          color: theme.colorScheme.onSurfaceVariant,
+                          size: 48,
+                        ),
+                        const SizedBox(height: 8),
+                        Text(
+                          'Image unavailable',
+                          style: theme.textTheme.bodyMedium?.copyWith(
                             color: theme.colorScheme.onSurfaceVariant,
-                            size: 48,
                           ),
-                          const SizedBox(height: 8),
-                          Text(
-                            'Image unavailable',
-                            style: theme.textTheme.bodyMedium?.copyWith(
-                              color: theme.colorScheme.onSurfaceVariant,
-                            ),
-                          ),
-                        ],
-                      ),
+                        ),
+                      ],
                     ),
                   ),
                 ),
               ),
             ),
 
-          // Engagement Bar
           Padding(
-            padding: const EdgeInsets.all(16),
+            padding: const EdgeInsets.fromLTRB(12, 14, 12, 14),
             child: Row(
-              children: [
+              children: <Widget>[
                 Expanded(
                   child: Center(
                     child: _EngagementButton(
@@ -678,7 +717,7 @@ class _PostCardState extends ConsumerState<PostCard> {
                       isActive: widget.post.isLikedByCurrentUser,
                       isLoading: _isLiking,
                       onPressed: _toggleLike,
-                      activeColor: Colors.red,
+                      activeColor: AppColors.electricBlue,
                     ),
                   ),
                 ),
@@ -829,6 +868,7 @@ class _PostActionSheet extends StatelessWidget {
     required this.onEdit,
     required this.onDelete,
     required this.onToggleLikesVisibility,
+    required this.onCopyLink,
     required this.onSaveToGallery,
     required this.onReport,
   });
@@ -844,6 +884,7 @@ class _PostActionSheet extends StatelessWidget {
   final Future<void> Function() onEdit;
   final Future<void> Function() onDelete;
   final Future<void> Function() onToggleLikesVisibility;
+  final Future<void> Function() onCopyLink;
   final Future<void> Function() onSaveToGallery;
   final Future<void> Function() onReport;
 
@@ -914,10 +955,17 @@ class _PostActionSheet extends StatelessWidget {
                 if (canManagePost)
                   const Divider(height: 1, color: _borderColor),
               ],
-              if (canManagePost) ...[
-                _ActionTile(
-                  icon: Icons.edit_outlined,
-                  label: 'Edit Post',
+                if (canManagePost) ...[
+                  _ActionTile(
+                    icon: Icons.link_rounded,
+                    label: 'Copy Link',
+                    color: Colors.white,
+                    onTap: onCopyLink,
+                  ),
+                  const Divider(height: 1, color: _borderColor),
+                  _ActionTile(
+                    icon: Icons.edit_outlined,
+                    label: 'Edit Post',
                   color: Colors.white,
                   onTap: onEdit,
                 ),
@@ -938,6 +986,73 @@ class _PostActionSheet extends StatelessWidget {
                   onTap: onDelete,
                 ),
               ],
+              const SizedBox(height: 8),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _ViewerPostActionSheet extends StatelessWidget {
+  const _ViewerPostActionSheet({
+    required this.onHide,
+    required this.onReport,
+    required this.onCopyLink,
+  });
+
+  final Future<void> Function() onHide;
+  final Future<void> Function() onReport;
+  final Future<void> Function() onCopyLink;
+
+  @override
+  Widget build(BuildContext context) {
+    final viewPadding = MediaQuery.of(context).viewPadding;
+
+    return SafeArea(
+      top: false,
+      child: Padding(
+        padding: EdgeInsets.fromLTRB(12, 0, 12, viewPadding.bottom + 12),
+        child: Material(
+          color: const Color(0xFF1A1A1A),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(24),
+            side: const BorderSide(color: Color(0xFF333333)),
+          ),
+          clipBehavior: Clip.antiAlias,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: <Widget>[
+              Container(
+                width: 44,
+                height: 4,
+                margin: const EdgeInsets.only(top: 12, bottom: 8),
+                decoration: BoxDecoration(
+                  color: Colors.white24,
+                  borderRadius: BorderRadius.circular(999),
+                ),
+              ),
+              _ActionTile(
+                icon: Icons.hide_source_outlined,
+                label: 'Hide Post',
+                color: Colors.white,
+                onTap: onHide,
+              ),
+              const Divider(height: 1, color: Color(0xFF333333)),
+              _ActionTile(
+                icon: Icons.link_rounded,
+                label: 'Copy Link',
+                color: Colors.white,
+                onTap: onCopyLink,
+              ),
+              const Divider(height: 1, color: Color(0xFF333333)),
+              _ActionTile(
+                icon: Icons.outlined_flag_rounded,
+                label: 'Report Post',
+                color: AppColors.error,
+                onTap: onReport,
+              ),
               const SizedBox(height: 8),
             ],
           ),

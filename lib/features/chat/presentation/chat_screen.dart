@@ -3,7 +3,6 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
-import 'package:share_plus/share_plus.dart';
 
 import '../../../core/constants/app_constants.dart';
 import '../../../core/router/app_router.dart';
@@ -697,70 +696,102 @@ class _ThreadHeader extends StatelessWidget {
   final VoidCallback onViewProfile;
   final VoidCallback? onBack;
 
-  Future<void> _handleMenuAction(
-    BuildContext context,
-    _ThreadMenuAction action,
-  ) async {
-    switch (action) {
-      case _ThreadMenuAction.blockUser:
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('${participant.fullName} has been blocked.')),
-        );
-      case _ThreadMenuAction.reportProfile:
-        final String? reason = await showReportReasonSheet(
-          context,
-          title: 'Report Profile',
-          subtitle:
-              'Tell us what feels wrong about this profile so we can review it.',
-        );
-        if (reason != null && context.mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text('Profile reported for "$reason".')),
-          );
-        }
-      case _ThreadMenuAction.shareProfile:
-        await SharePlus.instance.share(
-          ShareParams(
-            text:
-                'Connect with ${participant.fullName} on Gracy${participant.gracyId == null ? '' : ' (${participant.gracyId})'}.',
+  Future<void> _showThreadMenu(BuildContext context) async {
+    await showModalBottomSheet<void>(
+      context: context,
+      backgroundColor: Colors.transparent,
+      builder: (BuildContext sheetContext) {
+        return SafeArea(
+          top: false,
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(12, 0, 12, 12),
+            child: Material(
+              color: const Color(0xFF14181D),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(24),
+                side: BorderSide(color: Colors.white.withValues(alpha: 0.08)),
+              ),
+              clipBehavior: Clip.antiAlias,
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: <Widget>[
+                  Container(
+                    width: 44,
+                    height: 4,
+                    margin: const EdgeInsets.only(top: 12, bottom: 8),
+                    decoration: BoxDecoration(
+                      color: Colors.white24,
+                      borderRadius: BorderRadius.circular(999),
+                    ),
+                  ),
+                  _ThreadActionTile(
+                    icon: Icons.account_circle_outlined,
+                    label: 'View Profile',
+                    onTap: () {
+                      Navigator.of(sheetContext).pop();
+                      onViewProfile();
+                    },
+                  ),
+                  const Divider(height: 1, color: Color(0xFF2A2E34)),
+                  _ThreadActionTile(
+                    icon: Icons.search_rounded,
+                    label: 'Search Conversation',
+                    onTap: () {
+                      Navigator.of(sheetContext).pop();
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(
+                          content: Text('Conversation search is queued next.'),
+                        ),
+                      );
+                    },
+                  ),
+                  const Divider(height: 1, color: Color(0xFF2A2E34)),
+                  _ThreadActionTile(
+                    icon: Icons.notifications_off_outlined,
+                    label: 'Mute Notifications',
+                    onTap: () {
+                      Navigator.of(sheetContext).pop();
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(
+                          content: Text(
+                            'Notifications muted for ${participant.fullName}.',
+                          ),
+                        ),
+                      );
+                    },
+                  ),
+                  const Divider(height: 1, color: Color(0xFF2A2E34)),
+                  _ThreadActionTile(
+                    icon: Icons.outlined_flag_rounded,
+                    label: 'Block / Report',
+                    color: const Color(0xFFFF5C5C),
+                    onTap: () async {
+                      Navigator.of(sheetContext).pop();
+                      final String? reason = await showReportReasonSheet(
+                        context,
+                        title: 'Report Profile',
+                        subtitle:
+                            'Choose what feels wrong so we can review this profile.',
+                      );
+                      if (reason != null && context.mounted) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(
+                            content: Text(
+                              'Reported ${participant.fullName} for "$reason".',
+                            ),
+                          ),
+                        );
+                      }
+                    },
+                  ),
+                  const SizedBox(height: 8),
+                ],
+              ),
+            ),
           ),
         );
-      case _ThreadMenuAction.clearChat:
-        final bool shouldClear =
-            await showDialog<bool>(
-              context: context,
-              builder: (BuildContext dialogContext) {
-                return AlertDialog(
-                  backgroundColor: const Color(0xFF111418),
-                  title: const Text(
-                    'Clear chat?',
-                    style: TextStyle(color: Colors.white),
-                  ),
-                  content: Text(
-                    'This will remove the current conversation from your local view.',
-                    style: TextStyle(color: Colors.grey.shade300),
-                  ),
-                  actions: <Widget>[
-                    TextButton(
-                      onPressed: () => Navigator.of(dialogContext).pop(false),
-                      child: const Text('Cancel'),
-                    ),
-                    TextButton(
-                      onPressed: () => Navigator.of(dialogContext).pop(true),
-                      child: const Text('Clear'),
-                    ),
-                  ],
-                );
-              },
-            ) ??
-            false;
-
-        if (shouldClear && context.mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('Chat cleared from local history.')),
-          );
-        }
-    }
+      },
+    );
   }
 
   @override
@@ -784,8 +815,8 @@ class _ThreadHeader extends StatelessWidget {
               icon: const Icon(Icons.arrow_back_rounded),
               color: Colors.white,
             ),
-              const SizedBox(width: 6),
-            ],
+            const SizedBox(width: 6),
+          ],
           GestureDetector(
             onTap: onViewProfile,
             child: UserAvatar(
@@ -848,35 +879,9 @@ class _ThreadHeader extends StatelessWidget {
               ],
             ),
           ),
-          PopupMenuButton<_ThreadMenuAction>(
-            color: const Color(0xFF14181D),
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(16),
-              side: BorderSide(color: Colors.white.withValues(alpha: 0.08)),
-            ),
-            onSelected: (_ThreadMenuAction action) {
-              _handleMenuAction(context, action);
-            },
-            itemBuilder: (BuildContext context) =>
-                const <PopupMenuEntry<_ThreadMenuAction>>[
-                  PopupMenuItem<_ThreadMenuAction>(
-                    value: _ThreadMenuAction.blockUser,
-                    child: Text('Block User'),
-                  ),
-                  PopupMenuItem<_ThreadMenuAction>(
-                    value: _ThreadMenuAction.reportProfile,
-                    child: Text('Report Profile'),
-                  ),
-                  PopupMenuItem<_ThreadMenuAction>(
-                    value: _ThreadMenuAction.shareProfile,
-                    child: Text('Share Profile'),
-                  ),
-                  PopupMenuItem<_ThreadMenuAction>(
-                    value: _ThreadMenuAction.clearChat,
-                    child: Text('Clear Chat'),
-                  ),
-                ],
-            icon: const Icon(Icons.more_vert_rounded, color: Colors.white70),
+          IconButton(
+            onPressed: () => _showThreadMenu(context),
+            icon: const Icon(Icons.more_horiz_rounded, color: Colors.white70),
           ),
           Consumer(
             builder: (context, ref, child) {
@@ -887,11 +892,11 @@ class _ThreadHeader extends StatelessWidget {
                     builder: (context) => const DisappearingMessagesDialog(),
                   );
                 },
-                  icon: const Icon(Icons.timer_outlined),
-                  color: Colors.grey.shade500,
-                  tooltip: 'Disappearing Messages',
-                );
-              },
+                icon: const Icon(Icons.timer_outlined),
+                color: Colors.grey.shade500,
+                tooltip: 'Disappearing Messages',
+              );
+            },
           ),
         ],
       ),
@@ -899,7 +904,34 @@ class _ThreadHeader extends StatelessWidget {
   }
 }
 
-enum _ThreadMenuAction { blockUser, reportProfile, shareProfile, clearChat }
+class _ThreadActionTile extends StatelessWidget {
+  const _ThreadActionTile({
+    required this.icon,
+    required this.label,
+    required this.onTap,
+    this.color = Colors.white,
+  });
+
+  final IconData icon;
+  final String label;
+  final VoidCallback onTap;
+  final Color color;
+
+  @override
+  Widget build(BuildContext context) {
+    return ListTile(
+      leading: Icon(icon, color: color),
+      title: Text(
+        label,
+        style: Theme.of(context).textTheme.titleSmall?.copyWith(
+          color: color,
+          fontWeight: FontWeight.w700,
+        ),
+      ),
+      onTap: onTap,
+    );
+  }
+}
 
 class _TypingIndicator extends StatelessWidget {
   const _TypingIndicator({required this.name});
