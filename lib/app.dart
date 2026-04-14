@@ -16,7 +16,7 @@ class GracyApp extends ConsumerWidget {
     return MaterialApp.router(
       debugShowCheckedModeBanner: false,
       title: 'Gracy',
-      theme: themeName.toLowerCase() == 'light' ? AppTheme.lightTheme() : AppTheme.darkTheme(),
+      theme: AppTheme.resolveTheme(themeName),
       routerConfig: router,
     );
   }

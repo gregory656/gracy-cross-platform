@@ -443,6 +443,10 @@ class AuthNotifier extends Notifier<AuthState> {
     } catch (_) {}
   }
 
+  void syncSelectedTheme(String themeName) {
+    state = state.copyWith(selectedTheme: themeName);
+  }
+
   Future<void> logout() async {
     final SupabaseClient? client = _client;
     if (client != null) {

@@ -23,16 +23,39 @@ class HomeHeader extends StatelessWidget {
         Row(
           children: <Widget>[
             Flexible(
-              child: FittedBox(
-                fit: BoxFit.scaleDown,
-                alignment: Alignment.centerLeft,
-                child: Text(
-                  'GRACY',
-                  style: Theme.of(context).textTheme.headlineLarge?.copyWith(
-                    fontSize: 34,
-                    fontWeight: FontWeight.w900,
-                    letterSpacing: 2.0,
-                    color: Theme.of(context).colorScheme.onSurface,
+              child: ShaderMask(
+                shaderCallback: (Rect bounds) {
+                  final bool isLight =
+                      Theme.of(context).brightness == Brightness.light;
+                  return LinearGradient(
+                    colors: isLight
+                        ? <Color>[
+                            const Color(0xFF0F1720),
+                            const Color(0xFF0F8B8D),
+                          ]
+                        : <Color>[
+                            Colors.white,
+                            AppColors.electricBlue,
+                          ],
+                  ).createShader(bounds);
+                },
+                child: FittedBox(
+                  fit: BoxFit.scaleDown,
+                  alignment: Alignment.centerLeft,
+                  child: Text(
+                    'GRACY',
+                    style: Theme.of(context).textTheme.headlineLarge?.copyWith(
+                      fontSize: 34,
+                      fontWeight: FontWeight.w900,
+                      letterSpacing: 2.4,
+                      color: Colors.white,
+                      shadows: <Shadow>[
+                        Shadow(
+                          color: AppColors.electricBlue.withValues(alpha: 0.20),
+                          blurRadius: 14,
+                        ),
+                      ],
+                    ),
                   ),
                 ),
               ),

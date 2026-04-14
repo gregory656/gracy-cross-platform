@@ -1,6 +1,7 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
+import '../../core/theme/app_theme.dart';
 import 'auth_provider.dart';
 
 final themeProvider = NotifierProvider<ThemeNotifier, String>(
@@ -9,7 +10,7 @@ final themeProvider = NotifierProvider<ThemeNotifier, String>(
 
 final isDarkModeProvider = Provider<bool>((ref) {
   final theme = ref.watch(themeProvider);
-  return theme.toLowerCase() != 'light';
+  return !AppTheme.isLightThemeName(theme);
 });
 
 final ghostModeProvider = Provider<bool>((ref) {
@@ -25,6 +26,7 @@ class ThemeNotifier extends Notifier<String> {
 
   Future<void> setTheme(String themeName) async {
     state = themeName;
+    ref.read(authNotifierProvider.notifier).syncSelectedTheme(themeName);
 
     final userId = ref.read(currentUserProvider)?.id;
     if (userId == null) return;
@@ -40,8 +42,9 @@ class ThemeNotifier extends Notifier<String> {
   }
 
   Future<void> toggleDarkLightMode() async {
-    final currentTheme = state;
-    final newTheme = currentTheme.toLowerCase() == 'light' ? 'dark' : 'light';
+    final String newTheme = AppTheme.isLightThemeName(state)
+        ? 'midnight'
+        : 'classic';
     await setTheme(newTheme);
   }
 
