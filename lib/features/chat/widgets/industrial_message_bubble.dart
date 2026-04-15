@@ -19,11 +19,14 @@ class IndustrialMessageBubble extends StatefulWidget {
   final VoidCallback onDelete;
 
   @override
-  State<IndustrialMessageBubble> createState() => _IndustrialMessageBubbleState();
+  State<IndustrialMessageBubble> createState() =>
+      _IndustrialMessageBubbleState();
 }
 
 class _IndustrialMessageBubbleState extends State<IndustrialMessageBubble>
     with SingleTickerProviderStateMixin {
+  static const Color _electricBlue = Color(0xFF007AFF);
+
   late AnimationController _animationController;
   late Animation<double> _scaleAnimation;
 
@@ -89,62 +92,34 @@ class _IndustrialMessageBubbleState extends State<IndustrialMessageBubble>
     final Color tickColor = switch (widget.message.status) {
       MessageStatus.sent => Colors.grey.shade600,
       MessageStatus.delivered => Colors.grey.shade600,
-      MessageStatus.read => Colors.cyan,
+      MessageStatus.read => _electricBlue,
     };
+    final IconData statusIcon = widget.message.status == MessageStatus.sent
+        ? Icons.done_rounded
+        : Icons.done_all_rounded;
 
-    final IconData firstTick = switch (widget.message.status) {
-      MessageStatus.sent => Icons.check,
-      MessageStatus.delivered => Icons.check,
-      MessageStatus.read => Icons.check,
-    };
-
-    final IconData? secondTick = switch (widget.message.status) {
-      MessageStatus.sent => null,
-      MessageStatus.delivered => Icons.check,
-      MessageStatus.read => Icons.check,
-    };
-
-    return Row(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        Icon(
-          firstTick,
-          size: 14,
-          color: tickColor,
-        ),
-        if (secondTick != null) ...[
-          const SizedBox(width: 2),
-          Icon(
-            secondTick,
-            size: 14,
-            color: tickColor,
-          ),
-        ],
-      ],
-    );
+    return Icon(statusIcon, size: 14, color: tickColor);
   }
 
   @override
   Widget build(BuildContext context) {
     final isMe = widget.message.isMe;
-    final bubbleColor = isMe
-        ? const Color(0xFF007AFF)
-        : const Color(0xFF16181C);
+    final bubbleColor = isMe ? _electricBlue : const Color(0xFF111318);
     final alignment = isMe ? CrossAxisAlignment.end : CrossAxisAlignment.start;
     final mainAxisAlignment = isMe
         ? MainAxisAlignment.end
         : MainAxisAlignment.start;
 
     return Container(
-      margin: const EdgeInsets.symmetric(vertical: 4, horizontal: 16),
+      margin: const EdgeInsets.symmetric(vertical: 3, horizontal: 14),
       child: Row(
         mainAxisAlignment: mainAxisAlignment,
         crossAxisAlignment: CrossAxisAlignment.end,
         children: [
           if (!isMe)
-            _BubbleTail(
-              color: bubbleColor,
-              isMe: false,
+            Transform.translate(
+              offset: const Offset(4, 0),
+              child: _BubbleTail(color: bubbleColor, isMe: false),
             ),
           GestureDetector(
             onLongPress: _showContextMenu,
@@ -164,16 +139,16 @@ class _IndustrialMessageBubbleState extends State<IndustrialMessageBubble>
                     decoration: BoxDecoration(
                       color: bubbleColor,
                       borderRadius: BorderRadius.only(
-                        topLeft: const Radius.circular(20),
-                        topRight: const Radius.circular(20),
-                        bottomLeft: Radius.circular(isMe ? 20 : 6),
-                        bottomRight: Radius.circular(isMe ? 6 : 20),
+                        topLeft: const Radius.circular(22),
+                        topRight: const Radius.circular(22),
+                        bottomLeft: Radius.circular(isMe ? 22 : 8),
+                        bottomRight: Radius.circular(isMe ? 8 : 22),
                       ),
                       boxShadow: <BoxShadow>[
                         BoxShadow(
-                          color: Colors.black.withValues(alpha: 0.14),
-                          blurRadius: 18,
-                          offset: const Offset(0, 8),
+                          color: Colors.black.withValues(alpha: 0.12),
+                          blurRadius: 14,
+                          offset: const Offset(0, 6),
                         ),
                       ],
                     ),
@@ -182,11 +157,12 @@ class _IndustrialMessageBubbleState extends State<IndustrialMessageBubble>
                       children: [
                         Text(
                           widget.message.text,
-                          style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                            color: Colors.white,
-                            fontSize: 15.5,
-                            height: 1.42,
-                          ),
+                          style: Theme.of(context).textTheme.bodyMedium
+                              ?.copyWith(
+                                color: Colors.white,
+                                fontSize: 15.5,
+                                height: 1.42,
+                              ),
                         ),
                         const SizedBox(height: 6),
                         Row(
@@ -196,12 +172,13 @@ class _IndustrialMessageBubbleState extends State<IndustrialMessageBubble>
                               TimezoneService.formatNairobiTime(
                                 widget.message.sentAt,
                               ),
-                              style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                                color: isMe
-                                    ? Colors.white.withValues(alpha: 0.74)
-                                    : Colors.white54,
-                                fontSize: 11,
-                              ),
+                              style: Theme.of(context).textTheme.bodySmall
+                                  ?.copyWith(
+                                    color: isMe
+                                        ? Colors.white.withValues(alpha: 0.74)
+                                        : Colors.white54,
+                                    fontSize: 11,
+                                  ),
                             ),
                             if (isMe) ...[
                               const SizedBox(width: 6),
@@ -217,9 +194,9 @@ class _IndustrialMessageBubbleState extends State<IndustrialMessageBubble>
             ),
           ),
           if (isMe)
-            _BubbleTail(
-              color: bubbleColor,
-              isMe: true,
+            Transform.translate(
+              offset: const Offset(-4, 0),
+              child: _BubbleTail(color: bubbleColor, isMe: true),
             ),
         ],
       ),
@@ -360,7 +337,12 @@ class _BubbleTailPainter extends CustomPainter {
     if (isMe) {
       path
         ..moveTo(0, 0)
-        ..quadraticBezierTo(size.width * 0.35, size.height * 0.15, size.width, 2)
+        ..quadraticBezierTo(
+          size.width * 0.35,
+          size.height * 0.15,
+          size.width,
+          2,
+        )
         ..lineTo(size.width * 0.42, size.height)
         ..quadraticBezierTo(size.width * 0.28, size.height * 0.66, 0, 0);
     } else {
@@ -368,7 +350,12 @@ class _BubbleTailPainter extends CustomPainter {
         ..moveTo(size.width, 0)
         ..quadraticBezierTo(size.width * 0.65, size.height * 0.15, 0, 2)
         ..lineTo(size.width * 0.58, size.height)
-        ..quadraticBezierTo(size.width * 0.72, size.height * 0.66, size.width, 0);
+        ..quadraticBezierTo(
+          size.width * 0.72,
+          size.height * 0.66,
+          size.width,
+          0,
+        );
     }
 
     canvas.drawPath(

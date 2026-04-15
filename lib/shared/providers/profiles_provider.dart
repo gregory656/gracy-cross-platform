@@ -19,9 +19,11 @@ final profilesDirectoryProvider = FutureProvider<List<UserModel>>((ref) async {
   }
 
   try {
-    final List<dynamic> rows = await client.from('profiles').select().order(
-      'username',
-    );
+    final List<dynamic> rows = await client
+        .from('profiles')
+        .select()
+        .order('username')
+        .timeout(const Duration(seconds: 3));
 
     final List<UserModel> profiles = rows
         .map(

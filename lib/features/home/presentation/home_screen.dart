@@ -45,12 +45,22 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
         PresenceService.instance.markOnline(userId);
         // Trigger contact sync
         _triggerContactSync();
-        // Load initial posts
-        ref.read(postsProvider.notifier).refresh();
+        _primeHomeData();
       }
     });
 
     _scrollController.addListener(_onScroll);
+  }
+
+  Future<void> _primeHomeData() async {
+    try {
+      await Future.wait<Object?>(<Future<Object?>>[
+        ref.read(profilesDirectoryProvider.future),
+        ref.read(postsProvider.future),
+      ]);
+    } catch (_) {
+      // Let the individual providers surface cached data or their own errors.
+    }
   }
 
   Future<void> _triggerContactSync() async {

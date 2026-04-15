@@ -93,6 +93,10 @@ class PostsNotifier extends AsyncNotifier<List<PostModel>> {
 
       state = AsyncValue.data(List.from(_posts));
     } catch (e, stackTrace) {
+      if (_posts.isNotEmpty) {
+        state = AsyncValue.data(List<PostModel>.from(_posts));
+        return;
+      }
       state = AsyncValue.error(e, stackTrace);
     }
   }

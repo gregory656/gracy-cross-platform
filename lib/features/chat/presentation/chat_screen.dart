@@ -13,7 +13,6 @@ import '../../../shared/models/user_model.dart';
 import '../../../shared/providers/auth_provider.dart';
 import '../../../shared/providers/profiles_provider.dart';
 import '../../../shared/widgets/chat_tile.dart';
-import '../../../shared/widgets/custom_button.dart';
 import '../../../shared/widgets/custom_text_field.dart';
 import '../../../shared/widgets/disappearing_messages_dialog.dart';
 import '../../../shared/widgets/report_reason_sheet.dart';
@@ -44,6 +43,9 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
   int _lastMessageCount = 0;
   String? _replyToMessage;
   Timer? _readReceiptTimer;
+  Timer? _deliveryReceiptTimer;
+  String? _lastDeliverySignature;
+  String? _lastReadSignature;
 
   void _syncShellNavigation(bool showThread) {
     WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -64,6 +66,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
   void dispose() {
     _botTypingTimer?.cancel();
     _readReceiptTimer?.cancel();
+    _deliveryReceiptTimer?.cancel();
     _composerController.dispose();
     _searchController.dispose();
     _scrollController.dispose();
@@ -120,20 +123,63 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
   }
 
   void _markMessagesAsRead(ChatThread thread) {
-    final String? currentUserId = ref.read(authNotifierProvider).userId;
-    if (currentUserId == null) return;
-
     _readReceiptTimer?.cancel();
     _readReceiptTimer = Timer(const Duration(milliseconds: 500), () async {
       try {
-        await ref.read(chatRepositoryProvider).markMessagesAsRead(
-          roomId: thread.roomId,
-          userId: thread.participant.id,
-        );
+        await ref
+            .read(chatRepositoryProvider)
+            .markMessagesAsRead(
+              roomId: thread.roomId,
+              userId: thread.participant.id,
+            );
       } catch (error) {
         // Silently fail for read receipts
       }
     });
+  }
+
+  void _markMessagesAsDelivered(ChatThread thread) {
+    _deliveryReceiptTimer?.cancel();
+    _deliveryReceiptTimer = Timer(const Duration(milliseconds: 120), () async {
+      try {
+        await ref
+            .read(chatRepositoryProvider)
+            .markMessagesAsDelivered(
+              roomId: thread.roomId,
+              userId: thread.participant.id,
+            );
+      } catch (_) {
+        // Silently fail for delivery receipts.
+      }
+    });
+  }
+
+  void _syncReceiptState(ChatThread thread, List<MessageModel> messages) {
+    final Iterable<MessageModel> incomingMessages = messages.where(
+      (MessageModel message) => !message.isMe,
+    );
+    final int sentIncomingCount = incomingMessages
+        .where((MessageModel message) => message.status == MessageStatus.sent)
+        .length;
+    final int unreadIncomingCount = incomingMessages
+        .where((MessageModel message) => message.status != MessageStatus.read)
+        .length;
+
+    final String deliverySignature = '${thread.roomId}:$sentIncomingCount';
+    if (sentIncomingCount > 0 && deliverySignature != _lastDeliverySignature) {
+      _lastDeliverySignature = deliverySignature;
+      _markMessagesAsDelivered(thread);
+    } else if (sentIncomingCount == 0) {
+      _lastDeliverySignature = deliverySignature;
+    }
+
+    final String readSignature = '${thread.roomId}:$unreadIncomingCount';
+    if (unreadIncomingCount > 0 && readSignature != _lastReadSignature) {
+      _lastReadSignature = readSignature;
+      _markMessagesAsRead(thread);
+    } else if (unreadIncomingCount == 0) {
+      _lastReadSignature = readSignature;
+    }
   }
 
   void _handleReply(MessageModel message) {
@@ -222,6 +268,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
     if (!showThread) {
       return Scaffold(
         backgroundColor: Colors.black,
+        resizeToAvoidBottomInset: true,
         body: _ChatShell(
           currentUserName: authState.fullName ?? 'Gracy User',
           currentUserCode: authState.gracyId,
@@ -238,6 +285,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
 
     return Scaffold(
       backgroundColor: Colors.black,
+      resizeToAvoidBottomInset: true,
       body: LayoutBuilder(
         builder: (BuildContext context, BoxConstraints constraints) {
           final bool showSidebar = constraints.maxWidth >= 980;
@@ -268,14 +316,12 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
                         );
                       }
 
-                      // Mark messages as read when thread is opened
-                      _markMessagesAsRead(thread);
-
                       final AsyncValue<List<MessageModel>> messagesAsync = ref
                           .watch(messagesProvider(thread.roomId));
 
                       return messagesAsync.when(
                         data: (List<MessageModel> messages) {
+                          _syncReceiptState(thread, messages);
                           _maybeScrollToBottom(
                             messages.length + (_isBotTyping ? 1 : 0),
                           );
@@ -370,113 +416,18 @@ class _ChatShell extends ConsumerWidget {
         child: ListView(
           padding: EdgeInsets.all(dense ? 18 : AppConstants.pagePadding),
           children: <Widget>[
-            Text(
-              'Direct line',
-              style: Theme.of(context).textTheme.headlineMedium?.copyWith(
-                fontWeight: FontWeight.w900,
-                letterSpacing: -0.8,
-                color: Colors.white,
-              ),
-            ),
-            const SizedBox(height: 10),
-            Text(
-              'Recent chats stay ready offline, and every room opens with the same fluid thread layout.',
-              style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                color: Colors.grey.shade400,
-                height: 1.45,
-              ),
-            ),
-            const SizedBox(height: 22),
-            Container(
-              padding: const EdgeInsets.all(20),
-              decoration: BoxDecoration(
-                color: const Color(0xFF1A1A1A),
-                borderRadius: BorderRadius.circular(12),
-                border: Border.all(
-                  color: Colors.grey.shade800,
-                  width: 1,
-                ),
-              ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: <Widget>[
-                  Row(
-                    children: <Widget>[
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: <Widget>[
-                            Text(
-                              currentUserName,
-                              style: Theme.of(context).textTheme.titleLarge
-                                  ?.copyWith(
-                                    fontWeight: FontWeight.w800,
-                                    color: Colors.white,
-                                  ),
-                            ),
-                            const SizedBox(height: 6),
-                            Text(
-                              currentUserCode == null
-                                  ? 'Your Gracy code will appear here after onboarding.'
-                                  : 'Your code: $currentUserCode',
-                              style: Theme.of(context).textTheme.bodyMedium
-                                  ?.copyWith(color: Colors.grey.shade400),
-                            ),
-                          ],
-                        ),
-                      ),
-                      Container(
-                        padding: const EdgeInsets.all(14),
-                        decoration: BoxDecoration(
-                          color: Colors.cyan.withValues(alpha: 0.2),
-                          borderRadius: BorderRadius.circular(20),
-                          border: Border.all(
-                            color: Colors.cyan.withValues(alpha: 0.4),
-                          ),
-                        ),
-                        child: const Icon(
-                          Icons.forum_rounded,
-                          color: Colors.cyan,
-                        ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 18),
-                  CustomTextField(
-                    controller: startChatController,
-                    hintText:
-                        'Paste a Gracy code, e.g. ${ChatRepository.botGracyCode}',
-                    prefixIcon: Icons.alternate_email_rounded,
-                  ),
-                  const SizedBox(height: 14),
-                  Row(
-                    children: <Widget>[
-                      Expanded(
-                        child: CustomButton(
-                          label: isStarting ? 'Opening...' : 'Start Chat',
-                          icon: Icons.arrow_forward_rounded,
-                          onPressed: isStarting ? () {} : onStartChat,
-                          fullWidth: true,
-                        ),
-                      ),
-                    ],
-                  ),
-                ],
-              ),
-            ),
-            const SizedBox(height: 24),
             Row(
               children: <Widget>[
-                Text(
-                  'Recent chats',
-                  style: Theme.of(
-                    context,
-                  ).textTheme.titleLarge?.copyWith(
-                    fontWeight: FontWeight.w800,
-                    color: Colors.white,
+                Expanded(
+                  child: Text(
+                    'Recent chats',
+                    style: Theme.of(context).textTheme.headlineSmall?.copyWith(
+                      fontWeight: FontWeight.w900,
+                      letterSpacing: -0.6,
+                      color: Colors.white,
+                    ),
                   ),
                 ),
-                const Spacer(),
                 Container(
                   padding: const EdgeInsets.symmetric(
                     horizontal: 10,
@@ -485,7 +436,9 @@ class _ChatShell extends ConsumerWidget {
                   decoration: BoxDecoration(
                     color: Colors.cyan.withValues(alpha: 0.2),
                     borderRadius: BorderRadius.circular(999),
-                    border: Border.all(color: Colors.cyan.withValues(alpha: 0.4)),
+                    border: Border.all(
+                      color: Colors.cyan.withValues(alpha: 0.4),
+                    ),
                   ),
                   child: Text(
                     'Live',
@@ -496,6 +449,64 @@ class _ChatShell extends ConsumerWidget {
                   ),
                 ),
               ],
+            ),
+            const SizedBox(height: 14),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+              decoration: BoxDecoration(
+                color: const Color(0xFF14171C),
+                borderRadius: BorderRadius.circular(18),
+              ),
+              child: Row(
+                children: <Widget>[
+                  Expanded(
+                    child: CustomTextField(
+                      controller: startChatController,
+                      hintText:
+                          currentUserCode == null
+                          ? 'Enter a Gracy code'
+                          : 'Invite with a Gracy code',
+                      prefixIcon: Icons.search_rounded,
+                    ),
+                  ),
+                  const SizedBox(width: 10),
+                  Material(
+                    color: Colors.transparent,
+                    child: InkWell(
+                      onTap: isStarting ? null : onStartChat,
+                      borderRadius: BorderRadius.circular(16),
+                      child: Ink(
+                        width: 48,
+                        height: 48,
+                        decoration: BoxDecoration(
+                          gradient: const LinearGradient(
+                            colors: <Color>[
+                              Color(0xFF00C2FF),
+                              Color(0xFF007AFF),
+                            ],
+                          ),
+                          borderRadius: BorderRadius.circular(16),
+                        ),
+                        child: Icon(
+                          isStarting
+                              ? Icons.hourglass_top_rounded
+                              : Icons.add_rounded,
+                          color: Colors.black,
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              currentUserCode == null
+                  ? currentUserName
+                  : '$currentUserName • $currentUserCode',
+              style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                color: Colors.grey.shade500,
+              ),
             ),
             const SizedBox(height: 14),
             recentChatsAsync.when(
@@ -510,11 +521,16 @@ class _ChatShell extends ConsumerWidget {
 
                 return Column(
                   children: <Widget>[
-                    for (int index = 0; index < chats.length; index++) ...<Widget>[
+                    for (
+                      int index = 0;
+                      index < chats.length;
+                      index++
+                    ) ...<Widget>[
                       Builder(
                         builder: (BuildContext context) {
                           final ChatModel chat = chats[index];
-                          final UserModel? user = profilesById[chat.participantId];
+                          final UserModel? user =
+                              profilesById[chat.participantId];
                           if (user == null) {
                             return const SizedBox.shrink();
                           }
@@ -523,7 +539,9 @@ class _ChatShell extends ConsumerWidget {
                             chat: chat,
                             user: user,
                             onTap: () {
-                              context.go('${AppRoutePaths.chat}?chatId=${chat.id}');
+                              context.go(
+                                '${AppRoutePaths.chat}?chatId=${chat.id}',
+                              );
                             },
                           );
                         },
@@ -632,52 +650,68 @@ class _ThreadView extends StatelessWidget {
             onBack: onBack,
             onViewProfile: onViewProfile,
           ),
-          const SizedBox(height: 16),
           Expanded(
             child: Container(
-              margin: const EdgeInsets.symmetric(horizontal: 18),
-              child: Stack(
+              margin: const EdgeInsets.fromLTRB(18, 10, 18, 0),
+              decoration: BoxDecoration(
+                color: const Color(0xFF090B0F).withValues(alpha: 0.9),
+                borderRadius: BorderRadius.circular(28),
+                border: Border.all(
+                  color: Colors.white.withValues(alpha: 0.06),
+                  width: 1,
+                ),
+              ),
+              clipBehavior: Clip.antiAlias,
+              child: Column(
                 children: <Widget>[
-                  Positioned.fill(
-                    child: ClipRRect(
-                      borderRadius: BorderRadius.circular(28),
-                      child: CustomPaint(painter: _ChatWallpaperPainter()),
+                  Expanded(
+                    child: Stack(
+                      children: <Widget>[
+                        Positioned.fill(
+                          child: CustomPaint(painter: _ChatWallpaperPainter()),
+                        ),
+                        ListView(
+                          controller: scrollController,
+                          padding: const EdgeInsets.fromLTRB(0, 16, 0, 0),
+                          children: <Widget>[
+                            ..._buildMessageGroup(),
+                            if (isBotTyping)
+                              Padding(
+                                padding: const EdgeInsets.only(top: 8),
+                                child: _TypingIndicator(
+                                  name: thread.participant.fullName,
+                                ),
+                              ),
+                          ],
+                        ),
+                      ],
                     ),
                   ),
                   Container(
+                    padding: EdgeInsets.only(
+                      left: 12,
+                      right: 12,
+                      top: 10,
+                      bottom: 12 + MediaQuery.of(context).viewInsets.bottom,
+                    ),
                     decoration: BoxDecoration(
-                      color: const Color(0xFF090B0F).withValues(alpha: 0.9),
-                      borderRadius: BorderRadius.circular(28),
-                      border: Border.all(
-                        color: Colors.white.withValues(alpha: 0.06),
-                        width: 1,
+                      color: const Color(0xFF0B0E12),
+                      border: Border(
+                        top: BorderSide(
+                          color: Colors.white.withValues(alpha: 0.06),
+                        ),
                       ),
                     ),
-                  ),
-                  ListView(
-                    controller: scrollController,
-                    padding: const EdgeInsets.fromLTRB(0, 16, 0, 12),
-                    children: <Widget>[
-                      ..._buildMessageGroup(),
-                      if (isBotTyping)
-                        Padding(
-                          padding: const EdgeInsets.only(top: 8),
-                          child: _TypingIndicator(
-                            name: thread.participant.fullName,
-                          ),
-                        ),
-                    ],
+                    child: IndustrialChatComposer(
+                      controller: composerController,
+                      onSend: onSend,
+                      replyToMessage: replyToMessage,
+                      onCancelReply: onCancelReply,
+                    ),
                   ),
                 ],
               ),
             ),
-          ),
-          const SizedBox(height: 12),
-          IndustrialChatComposer(
-            controller: composerController,
-            onSend: onSend,
-            replyToMessage: replyToMessage,
-            onCancelReply: onCancelReply,
           ),
         ],
       ),
@@ -803,9 +837,7 @@ class _ThreadHeader extends StatelessWidget {
       padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 4),
       decoration: BoxDecoration(
         color: const Color(0xFF0B0D10),
-        border: Border(
-          bottom: BorderSide(color: Colors.white12),
-        ),
+        border: Border(bottom: BorderSide(color: Colors.white12)),
       ),
       child: Row(
         children: <Widget>[
@@ -857,10 +889,11 @@ class _ThreadHeader extends StatelessWidget {
                         ),
                         child: Text(
                           'Official',
-                          style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                            color: Colors.black,
-                            fontWeight: FontWeight.bold,
-                          ),
+                          style: Theme.of(context).textTheme.labelSmall
+                              ?.copyWith(
+                                color: Colors.black,
+                                fontWeight: FontWeight.bold,
+                              ),
                         ),
                       ),
                     ],
@@ -976,9 +1009,9 @@ class _TypingIndicator extends StatelessWidget {
             children: <Widget>[
               Text(
                 '$name is typing',
-                style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                  color: Colors.grey.shade400,
-                ),
+                style: Theme.of(
+                  context,
+                ).textTheme.bodyMedium?.copyWith(color: Colors.grey.shade400),
               ),
               const SizedBox(width: 8),
               const SizedBox(
@@ -1063,9 +1096,9 @@ class _CenteredMessage extends StatelessWidget {
             const SizedBox(height: 8),
             Text(
               subtitle,
-              style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                color: Colors.grey.shade400,
-              ),
+              style: Theme.of(
+                context,
+              ).textTheme.bodyMedium?.copyWith(color: Colors.grey.shade400),
               textAlign: TextAlign.center,
             ),
           ],

@@ -108,11 +108,16 @@ class AuthNotifier extends Notifier<AuthState> {
 
   void _bootstrap() {
     Future<void>(() async {
+      final DateTime startedAt = DateTime.now();
       bool onboardingComplete = false;
 
       try {
         onboardingComplete = await DatabaseService.instance
-            .isOnboardingComplete();
+            .isOnboardingComplete()
+            .timeout(
+              const Duration(milliseconds: 450),
+              onTimeout: () => false,
+            );
       } catch (_) {
         onboardingComplete = false;
       }
@@ -166,7 +171,11 @@ class AuthNotifier extends Notifier<AuthState> {
               'full_name,bio,year_of_study,gracy_id,username,selected_theme,notifications_enabled,avatar_url',
             )
             .eq('id', user.id)
-            .maybeSingle();
+            .maybeSingle()
+            .timeout(
+              const Duration(milliseconds: 1200),
+              onTimeout: () => null,
+            );
 
         if (profile != null) {
           fullName = profile['full_name']?.toString();
@@ -184,6 +193,14 @@ class AuthNotifier extends Notifier<AuthState> {
         }
       } catch (_) {
         // If the profile row is unavailable, fall back to auth metadata only.
+      }
+
+      final int elapsedMs = DateTime.now().difference(startedAt).inMilliseconds;
+      const int minimumSplashMs = 1500;
+      if (elapsedMs < minimumSplashMs) {
+        await Future<void>.delayed(
+          Duration(milliseconds: minimumSplashMs - elapsedMs),
+        );
       }
 
       state = state.copyWith(

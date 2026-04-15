@@ -67,17 +67,9 @@ class _IndustrialChatComposerState extends State<IndustrialChatComposer> {
   @override
   Widget build(BuildContext context) {
     return Container(
-      margin: const EdgeInsets.fromLTRB(16, 10, 16, 16),
       decoration: BoxDecoration(
-        color: const Color(0xFF111418),
-        borderRadius: BorderRadius.circular(28),
-        boxShadow: <BoxShadow>[
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.26),
-            blurRadius: 28,
-            offset: const Offset(0, 14),
-          ),
-        ],
+        color: const Color(0xFF111318),
+        borderRadius: BorderRadius.circular(30),
       ),
       child: Column(
         mainAxisSize: MainAxisSize.min,
@@ -125,70 +117,69 @@ class _IndustrialChatComposerState extends State<IndustrialChatComposer> {
             ),
           ],
           Container(
-            padding: const EdgeInsets.fromLTRB(10, 8, 8, 8),
+            padding: const EdgeInsets.fromLTRB(12, 10, 10, 10),
             child: Row(
               children: [
                 _CircleActionButton(
-                  icon: Icons.add_rounded,
+                  icon: Icons.attach_file_rounded,
                   onTap: _showComingSoonMessage,
                 ),
                 const SizedBox(width: 10),
                 Expanded(
-                  child: TextField(
-                    controller: widget.controller,
-                    style: const TextStyle(
-                      color: Colors.white,
-                      fontSize: 16,
+                  child: Container(
+                    constraints: const BoxConstraints(minHeight: 45),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFF1A1A1A),
+                      borderRadius: BorderRadius.circular(999),
                     ),
-                    decoration: InputDecoration(
-                      hintText: 'Type a message',
-                      hintStyle: const TextStyle(
-                        color: Colors.grey,
-                        fontSize: 16,
-                      ),
-                      filled: true,
-                      fillColor: Colors.white.withValues(alpha: 0.04),
-                      enabledBorder: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(22),
-                        borderSide: const BorderSide(
-                          color: Color(0xFF007AFF),
-                          width: 1.5,
+                    child: Row(
+                      children: [
+                        const SizedBox(width: 4),
+                        Expanded(
+                          child: TextField(
+                            controller: widget.controller,
+                            style: const TextStyle(
+                              color: Colors.white,
+                              fontSize: 16,
+                            ),
+                            decoration: InputDecoration(
+                              hintText: 'Message',
+                              hintStyle: const TextStyle(
+                                color: Colors.grey,
+                                fontSize: 16,
+                              ),
+                              border: InputBorder.none,
+                              isDense: true,
+                              contentPadding: const EdgeInsets.symmetric(
+                                horizontal: 14,
+                                vertical: 12,
+                              ),
+                            ),
+                            minLines: 1,
+                            maxLines: 5,
+                            textCapitalization: TextCapitalization.sentences,
+                            scrollPhysics: const BouncingScrollPhysics(),
+                          ),
                         ),
-                      ),
-                      focusedBorder: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(22),
-                        borderSide: const BorderSide(
-                          color: Color(0xFF007AFF),
-                          width: 1.5,
+                        _CircleActionButton(
+                          icon: Icons.camera_alt_rounded,
+                          backgroundColor: Colors.transparent,
+                          iconColor: Colors.white60,
+                          onTap: _showComingSoonMessage,
                         ),
-                      ),
-                      border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(22),
-                        borderSide: const BorderSide(
-                          color: Color(0xFF007AFF),
-                          width: 1.5,
-                        ),
-                      ),
-                      contentPadding: const EdgeInsets.symmetric(
-                        horizontal: 18,
-                        vertical: 14,
-                      ),
+                      ],
                     ),
-                    minLines: 1,
-                    maxLines: 6,
-                    textCapitalization: TextCapitalization.sentences,
-                    scrollPhysics: const BouncingScrollPhysics(),
                   ),
                 ),
-                const SizedBox(width: 12),
+                const SizedBox(width: 10),
                 AnimatedSwitcher(
                   duration: const Duration(milliseconds: 180),
                   child: _isEmpty
                       ? _CircleActionButton(
                           key: const ValueKey<String>('mic'),
                           icon: Icons.mic_rounded,
-                          backgroundColor: const Color(0xFF1B2128),
-                          iconColor: Colors.white70,
+                          backgroundColor: const Color(0xFF111922),
+                          iconColor: Colors.white60,
                           onTap: () {
                             HapticFeedback.selectionClick();
                           },
@@ -226,17 +217,21 @@ class _CircleActionButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return GestureDetector(
-      onTap: onTap,
-      child: Container(
-        width: 42,
-        height: 42,
-        decoration: BoxDecoration(
-          color: backgroundColor,
-          shape: BoxShape.circle,
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(999),
+        child: Container(
+          width: 42,
+          height: 42,
+          decoration: BoxDecoration(
+            color: backgroundColor,
+            shape: BoxShape.circle,
+          ),
+          alignment: Alignment.center,
+          child: Icon(icon, size: 22, color: iconColor),
         ),
-        alignment: Alignment.center,
-        child: Icon(icon, size: 22, color: iconColor),
       ),
     );
   }

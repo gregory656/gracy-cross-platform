@@ -74,6 +74,16 @@ class OptimizedPostService {
           )
           .toList(growable: false);
 
+      if (posts.isEmpty) {
+        final List<PostModel> cachedPosts = await _databaseService
+            .getCachedPosts();
+        if (cachedPosts.isNotEmpty) {
+          final int start = offset.clamp(0, cachedPosts.length);
+          final int end = (start + limit).clamp(0, cachedPosts.length);
+          return cachedPosts.sublist(start, end);
+        }
+      }
+
       await _databaseService.cachePosts(posts);
       return posts;
     } catch (e) {

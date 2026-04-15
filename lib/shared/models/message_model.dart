@@ -68,10 +68,10 @@ class MessageModel {
       senderUsername: senderUsername,
       isOfficial: isOfficial,
       status: status,
-      deliveredAt: row['delivered_at'] != null 
+      deliveredAt: row['delivered_at'] != null
           ? DateTime.tryParse(row['delivered_at'].toString())
           : null,
-      readAt: row['read_at'] != null 
+      readAt: row['read_at'] != null
           ? DateTime.tryParse(row['read_at'].toString())
           : null,
       replyToId: row['reply_to_id']?.toString(),
@@ -113,7 +113,7 @@ class MessageModel {
   // Get status tick icons for display
   List<IconData> get statusTicks {
     if (!isMe) return [];
-    
+
     switch (status) {
       case MessageStatus.sent:
         return [Icons.done];
@@ -127,14 +127,14 @@ class MessageModel {
   // Get status color
   String get statusColorHex {
     if (!isMe) return '';
-    
+
     switch (status) {
       case MessageStatus.sent:
         return '#8E8E93'; // Gray
       case MessageStatus.delivered:
         return '#8E8E93'; // Gray
       case MessageStatus.read:
-        return '#30D158'; // Green/Cyan
+        return '#007AFF'; // Electric Blue
     }
   }
 }
