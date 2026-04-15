@@ -30,6 +30,7 @@ dependencies:
   flutter_image_compress: ^2.3.0
   image_cropper: ^12.1.1
   dio: ^5.7.0
+  flutter_secure_storage: ^9.2.4
   image_gallery_saver:
     path: third_party/image_gallery_saver
 

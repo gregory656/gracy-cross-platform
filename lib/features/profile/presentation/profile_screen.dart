@@ -7,12 +7,16 @@ import '../../../core/constants/app_constants.dart';
 import '../../../core/router/app_router.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../shared/models/post_model.dart';
+import '../../../shared/models/stored_account.dart';
 import '../../../shared/models/user_model.dart';
+import '../../../shared/providers/account_switcher_provider.dart';
 import '../../../shared/providers/auth_provider.dart';
 import '../../../shared/providers/mock_providers.dart';
 import '../../../shared/providers/profiles_provider.dart';
+import '../../../shared/widgets/user_avatar.dart';
 import '../../home/providers/post_providers.dart';
 import '../../home/widgets/post_card.dart';
+import '../../onboarding/presentation/landing_screen.dart';
 import '../../settings/presentation/edit_profile_screen.dart';
 
 class ProfileScreen extends ConsumerWidget {
@@ -48,7 +52,29 @@ class ProfileScreen extends ConsumerWidget {
         backgroundColor: AppColors.onyx,
         appBar: AppBar(
           backgroundColor: AppColors.onyx,
-          title: Text(user.username),
+          title: isOwner
+              ? InkWell(
+                  onTap: () => _showAccountSwitcherSheet(context, ref),
+                  borderRadius: BorderRadius.circular(999),
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 6,
+                      vertical: 4,
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: <Widget>[
+                        Flexible(child: Text(user.username)),
+                        const SizedBox(width: 4),
+                        const Icon(
+                          Icons.keyboard_arrow_down_rounded,
+                          color: Colors.white,
+                        ),
+                      ],
+                    ),
+                  ),
+                )
+              : Text(user.username),
           leading: IconButton(
             onPressed: () {
               if (context.canPop()) {
@@ -94,6 +120,9 @@ class ProfileScreen extends ConsumerWidget {
                           ),
                         );
                     },
+                    onAvatarLongPress: isOwner
+                        ? () => _showAccountSwitcherSheet(context, ref)
+                        : null,
                   ),
                 ),
               ),
@@ -148,12 +177,14 @@ class _ProfileHeader extends ConsumerWidget {
     required this.isOwner,
     required this.onPrimaryAction,
     required this.onSecondaryAction,
+    this.onAvatarLongPress,
   });
 
   final UserModel user;
   final bool isOwner;
   final VoidCallback onPrimaryAction;
   final VoidCallback onSecondaryAction;
+  final VoidCallback? onAvatarLongPress;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -179,7 +210,10 @@ class _ProfileHeader extends ConsumerWidget {
                 Row(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: <Widget>[
-                    _CircularProfileImage(user: user, size: 92),
+                    GestureDetector(
+                      onLongPress: onAvatarLongPress,
+                      child: _CircularProfileImage(user: user, size: 92),
+                    ),
                     const SizedBox(width: 16),
                     Expanded(
                       child: Column(
@@ -296,6 +330,266 @@ class _ProfileHeader extends ConsumerWidget {
           ),
         ),
       ],
+    );
+  }
+}
+
+Future<void> _showAccountSwitcherSheet(BuildContext context, WidgetRef ref) async {
+  final String? activeUserId = ref.read(authNotifierProvider).userId;
+
+  await showModalBottomSheet<void>(
+    context: context,
+    backgroundColor: Colors.transparent,
+    isScrollControlled: true,
+    builder: (BuildContext sheetContext) {
+      return Consumer(
+        builder: (
+          BuildContext sheetBodyContext,
+          WidgetRef ref,
+          Widget? child,
+        ) {
+          final AsyncValue<List<StoredAccount>> switchableAccounts = ref.watch(
+            switchableAccountsProvider,
+          );
+
+          return SafeArea(
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(12, 0, 12, 12),
+              child: Material(
+                color: const Color(0xFF121212),
+                borderRadius: BorderRadius.circular(28),
+                child: switchableAccounts.when(
+                  data: (List<StoredAccount> accounts) {
+                    return Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: <Widget>[
+                        const SizedBox(height: 12),
+                        Container(
+                          width: 44,
+                          height: 4,
+                          decoration: BoxDecoration(
+                            color: Colors.white24,
+                            borderRadius: BorderRadius.circular(999),
+                          ),
+                        ),
+                        const SizedBox(height: 14),
+                        Padding(
+                          padding: const EdgeInsets.symmetric(horizontal: 20),
+                          child: Row(
+                            children: <Widget>[
+                              Text(
+                                'Account Switcher',
+                                style: Theme.of(sheetBodyContext)
+                                    .textTheme
+                                    .titleLarge
+                                    ?.copyWith(
+                                      color: Colors.white,
+                                      fontWeight: FontWeight.w900,
+                                    ),
+                              ),
+                            ],
+                          ),
+                        ),
+                        const SizedBox(height: 8),
+                        ConstrainedBox(
+                          constraints: BoxConstraints(
+                            maxHeight:
+                                MediaQuery.of(sheetBodyContext).size.height *
+                                0.62,
+                          ),
+                          child: ListView(
+                            shrinkWrap: true,
+                            children: <Widget>[
+                              for (final StoredAccount account in accounts)
+                                _SavedAccountTile(
+                                  account: account,
+                                  isActive: account.userId == activeUserId,
+                                  onTap: () async {
+                                    Navigator.of(sheetContext).pop();
+                                    final AccountSwitchResult result = await ref
+                                        .read(
+                                          accountSwitcherControllerProvider
+                                              .notifier,
+                                        )
+                                        .switchToAccount(account);
+                                    if (!sheetBodyContext.mounted) {
+                                      return;
+                                    }
+                                    ScaffoldMessenger.of(sheetBodyContext)
+                                      ..clearSnackBars()
+                                      ..showSnackBar(
+                                        SnackBar(
+                                          content: Text(
+                                            result.message ??
+                                                (result.success
+                                                    ? 'Account switched.'
+                                                    : 'Unable to switch accounts.'),
+                                          ),
+                                          behavior: SnackBarBehavior.floating,
+                                        ),
+                                      );
+                                  },
+                                ),
+                              Padding(
+                                padding: const EdgeInsets.fromLTRB(16, 8, 16, 18),
+                                child: SizedBox(
+                                  height: 52,
+                                  child: TextButton.icon(
+                                    onPressed: () async {
+                                      Navigator.of(sheetContext).pop();
+                                      await ref
+                                          .read(
+                                            accountSwitcherControllerProvider
+                                                .notifier,
+                                          )
+                                          .saveAndSwitchToLogin();
+                                      if (!sheetBodyContext.mounted) {
+                                        return;
+                                      }
+                                      await Navigator.of(sheetBodyContext).push(
+                                        MaterialPageRoute<void>(
+                                          builder: (BuildContext context) {
+                                            return const LandingScreen();
+                                          },
+                                        ),
+                                      );
+                                    },
+                                    style: TextButton.styleFrom(
+                                      backgroundColor: Colors.white,
+                                      foregroundColor: Colors.black,
+                                      shape: RoundedRectangleBorder(
+                                        borderRadius: BorderRadius.circular(18),
+                                      ),
+                                    ),
+                                    icon: const Icon(Icons.add_rounded),
+                                    label: const Text(
+                                      'Add Account',
+                                      style: TextStyle(
+                                        fontWeight: FontWeight.w800,
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
+                    );
+                  },
+                  loading: () => const SizedBox(
+                    height: 220,
+                    child: Center(child: CircularProgressIndicator()),
+                  ),
+                  error: (Object error, StackTrace stackTrace) => SizedBox(
+                    height: 220,
+                    child: Center(
+                      child: Padding(
+                        padding: const EdgeInsets.all(24),
+                        child: Text(
+                          error.toString(),
+                          style: const TextStyle(color: Colors.white70),
+                          textAlign: TextAlign.center,
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          );
+        },
+      );
+    },
+  );
+}
+
+class _SavedAccountTile extends StatelessWidget {
+  const _SavedAccountTile({
+    required this.account,
+    required this.isActive,
+    required this.onTap,
+  });
+
+  final StoredAccount account;
+  final bool isActive;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return ListTile(
+      onTap: onTap,
+      contentPadding: const EdgeInsets.symmetric(horizontal: 18, vertical: 4),
+      leading: Stack(
+        clipBehavior: Clip.none,
+        children: <Widget>[
+          UserAvatar(
+            user: UserModel(
+              id: account.userId ?? account.key,
+              fullName: account.displayName,
+              username: account.subtitle,
+              age: 0,
+              role: UserRole.student,
+              courses: const <String>[],
+              bio: '',
+              isOnline: true,
+              location: 'Gracy network',
+              avatarSeed: account.userId ?? account.key,
+              year: 'Not set',
+              avatarUrl: account.avatarUrl,
+            ),
+            size: 48,
+            fontSize: 16,
+            showRing: false,
+            showOnlineIndicator: false,
+          ),
+          if (isActive)
+            Positioned(
+              right: -1,
+              bottom: -1,
+              child: Container(
+                width: 18,
+                height: 18,
+                decoration: BoxDecoration(
+                  color: const Color(0xFF20C45A),
+                  shape: BoxShape.circle,
+                  border: Border.all(color: const Color(0xFF121212), width: 2),
+                ),
+                child: const Icon(
+                  Icons.check,
+                  size: 10,
+                  color: Colors.white,
+                ),
+              ),
+            ),
+        ],
+      ),
+      title: Text(
+        account.displayName,
+        style: const TextStyle(
+          color: Colors.white,
+          fontWeight: FontWeight.w800,
+        ),
+      ),
+      subtitle: Text(
+        account.subtitle,
+        style: const TextStyle(
+          color: Colors.white70,
+          fontWeight: FontWeight.w500,
+        ),
+      ),
+      trailing: isActive
+          ? const Text(
+              'Active',
+              style: TextStyle(
+                color: Color(0xFF20C45A),
+                fontWeight: FontWeight.w800,
+              ),
+            )
+          : const Icon(
+              Icons.swap_horiz_rounded,
+              color: Colors.white54,
+            ),
     );
   }
 }

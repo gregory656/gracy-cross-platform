@@ -1,10 +1,14 @@
+import 'dart:convert';
+
 import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../../core/constants.dart';
+import '../models/stored_account.dart';
 import '../models/user_model.dart';
 import 'profiles_provider.dart';
+import '../services/account_vault.dart';
 import '../services/database_service.dart';
 
 class AuthState {
@@ -23,6 +27,7 @@ class AuthState {
     this.errorMessage,
     this.selectedTheme = 'midnight',
     this.notificationsEnabled = true,
+    this.isAddingAccount = false,
   });
 
   final bool isAuthenticated;
@@ -39,6 +44,7 @@ class AuthState {
   final String? errorMessage;
   final String selectedTheme;
   final bool notificationsEnabled;
+  final bool isAddingAccount;
 
   factory AuthState.initial() {
     return const AuthState(
@@ -64,6 +70,7 @@ class AuthState {
     String? errorMessage,
     String? selectedTheme,
     bool? notificationsEnabled,
+    bool? isAddingAccount,
   }) {
     return AuthState(
       isAuthenticated: isAuthenticated ?? this.isAuthenticated,
@@ -80,6 +87,7 @@ class AuthState {
       errorMessage: errorMessage,
       selectedTheme: selectedTheme ?? this.selectedTheme,
       notificationsEnabled: notificationsEnabled ?? this.notificationsEnabled,
+      isAddingAccount: isAddingAccount ?? this.isAddingAccount,
     );
   }
 }
@@ -157,45 +165,6 @@ class AuthNotifier extends Notifier<AuthState> {
         return;
       }
 
-      String? fullName;
-      String? bio;
-      String? yearOfStudy;
-      String? gracyId;
-      String? avatarUrl;
-      String selectedTheme = 'midnight';
-      bool notificationsEnabled = true;
-
-      try {
-        final Map<String, dynamic>? profile = await client
-            .from('profiles')
-            .select(
-              'full_name,bio,year_of_study,gracy_id,username,selected_theme,notifications_enabled,avatar_url',
-            )
-            .eq('id', user.id)
-            .maybeSingle()
-            .timeout(
-              const Duration(milliseconds: 1200),
-              onTimeout: () => null,
-            );
-
-        if (profile != null) {
-          fullName = profile['full_name']?.toString();
-          bio = profile['bio']?.toString();
-          yearOfStudy = profile['year_of_study']?.toString();
-          gracyId = profile['gracy_id']?.toString();
-          avatarUrl = profile['avatar_url']?.toString();
-          selectedTheme = profile['selected_theme']?.toString() ?? 'midnight';
-          notificationsEnabled = profile['notifications_enabled'] == true;
-          
-          if (gracyId != null || fullName != null) {
-             onboardingComplete = true;
-             await DatabaseService.instance.setOnboardingComplete(true);
-          }
-        }
-      } catch (_) {
-        // If the profile row is unavailable, fall back to auth metadata only.
-      }
-
       final int elapsedMs = DateTime.now().difference(startedAt).inMilliseconds;
       const int minimumSplashMs = 1500;
       if (elapsedMs < minimumSplashMs) {
@@ -203,21 +172,10 @@ class AuthNotifier extends Notifier<AuthState> {
           Duration(milliseconds: minimumSplashMs - elapsedMs),
         );
       }
-
-      state = state.copyWith(
-        isAuthenticated: onboardingComplete,
-        isLoading: false,
-        isOnboardingComplete: onboardingComplete,
-        isBootstrapping: false,
-        userId: user.id,
-        username: user.userMetadata?['username']?.toString(),
-        fullName: fullName,
-        bio: bio,
-        yearOfStudy: yearOfStudy,
-        gracyId: gracyId,
-        avatarUrl: avatarUrl,
-        selectedTheme: selectedTheme,
-        notificationsEnabled: notificationsEnabled,
+      await _applyAuthenticatedUser(
+        user,
+        preserveLoading: false,
+        preserveAddingAccount: state.isAddingAccount,
       );
       debugPrint(
         'Auth bootstrap: session=true onboardingComplete=$onboardingComplete userId=${user.id}',
@@ -306,7 +264,9 @@ class AuthNotifier extends Notifier<AuthState> {
         bio: bio.trim().isEmpty ? null : bio.trim(),
         yearOfStudy: yearOfStudy.trim().isEmpty ? null : yearOfStudy.trim(),
         gracyId: gracyId,
+        isAddingAccount: false,
       );
+      await _persistCurrentAccount();
       debugPrint('Auth complete: authenticated=true userId=$userId');
       return true;
     } on AuthException catch (error) {
@@ -388,45 +348,7 @@ class AuthNotifier extends Notifier<AuthState> {
     }
     
     // Check if profile exists
-    bool onboardingComplete = false;
-    String? fullName, bio, yearOfStudy, gracyId;
-    String? avatarUrl;
-    String username = user.userMetadata?['username']?.toString() ?? 'gracyuser';
-
-    try {
-      final Map<String, dynamic>? profile = await _client!
-          .from('profiles')
-          .select()
-          .eq('id', user.id)
-          .maybeSingle();
-
-      if (profile != null && (profile['gracy_id'] != null || profile['full_name'] != null)) {
-        onboardingComplete = true;
-        fullName = profile['full_name']?.toString();
-        bio = profile['bio']?.toString();
-        yearOfStudy = profile['year_of_study']?.toString();
-        gracyId = profile['gracy_id']?.toString();
-        avatarUrl = profile['avatar_url']?.toString();
-        username = profile['username']?.toString() ?? username;
-        await DatabaseService.instance.setOnboardingComplete(true);
-      } else {
-        await DatabaseService.instance.setOnboardingComplete(false);
-      }
-    } catch (_) {}
-
-    state = state.copyWith(
-      isAuthenticated: true,
-      isLoading: false,
-      isOnboardingComplete: onboardingComplete,
-      isBootstrapping: false,
-      userId: user.id,
-      username: username,
-      fullName: fullName,
-      bio: bio,
-      yearOfStudy: yearOfStudy,
-      gracyId: gracyId,
-      avatarUrl: avatarUrl,
-    );
+    await _applyAuthenticatedUser(user);
     return true;
   }
 
@@ -458,6 +380,10 @@ class AuthNotifier extends Notifier<AuthState> {
           .from('profiles')
           .update(payload)
           .eq('id', userId);
+      await _persistCurrentAccount(
+        fullNameOverride: fullName,
+        avatarUrlOverride: avatarUrl ?? state.avatarUrl,
+      );
     } catch (_) {}
   }
 
@@ -465,15 +391,153 @@ class AuthNotifier extends Notifier<AuthState> {
     state = state.copyWith(selectedTheme: themeName);
   }
 
+  void enterAccountAddMode() {
+    state = state.copyWith(
+      isAddingAccount: true,
+      errorMessage: null,
+    );
+  }
+
+  Future<void> reloadFromCurrentSession() async {
+    final SupabaseClient? client = _client;
+    final User? user = client?.auth.currentUser;
+    if (user == null) {
+      state = AuthState.initial().copyWith(
+        isLoading: false,
+        isBootstrapping: false,
+      );
+      return;
+    }
+
+    await _applyAuthenticatedUser(user, preserveLoading: false);
+  }
+
   Future<void> logout() async {
+    final String? activeKey = _activeAccountKey;
     final SupabaseClient? client = _client;
     if (client != null) {
       await client.auth.signOut();
+    }
+    if (activeKey != null) {
+      await AccountVault.instance.removeAccount(activeKey);
     }
     state = AuthState.initial().copyWith(
       isLoading: false,
       isBootstrapping: false,
     );
+  }
+
+  Future<void> _applyAuthenticatedUser(
+    User user, {
+    bool preserveLoading = false,
+    bool preserveAddingAccount = false,
+  }) async {
+    bool hasProfileRow = false;
+    bool onboardingComplete = false;
+    String? fullName;
+    String? bio;
+    String? yearOfStudy;
+    String? gracyId;
+    String? avatarUrl;
+    String username = user.userMetadata?['username']?.toString() ?? 'gracyuser';
+    String selectedTheme = 'midnight';
+    bool notificationsEnabled = true;
+
+    try {
+      final Map<String, dynamic>? profile = await _client!
+          .from('profiles')
+          .select(
+            'full_name,bio,year_of_study,gracy_id,username,selected_theme,notifications_enabled,avatar_url',
+          )
+          .eq('id', user.id)
+          .maybeSingle()
+          .timeout(
+            const Duration(milliseconds: 1200),
+            onTimeout: () => null,
+          );
+
+      if (profile != null) {
+        hasProfileRow = true;
+        fullName = profile['full_name']?.toString();
+        bio = profile['bio']?.toString();
+        yearOfStudy = profile['year_of_study']?.toString();
+        gracyId = profile['gracy_id']?.toString();
+        avatarUrl = profile['avatar_url']?.toString();
+        username = profile['username']?.toString() ?? username;
+        selectedTheme = profile['selected_theme']?.toString() ?? 'midnight';
+        notificationsEnabled = profile['notifications_enabled'] == true;
+      }
+    } catch (_) {
+      // Fall back to auth metadata only if the profile query is unavailable.
+    }
+
+    onboardingComplete = hasProfileRow ||
+        (gracyId?.trim().isNotEmpty == true) ||
+        (fullName?.trim().isNotEmpty == true);
+    await DatabaseService.instance.setOnboardingComplete(onboardingComplete);
+
+    state = state.copyWith(
+      isAuthenticated: true,
+      isLoading: preserveLoading ? state.isLoading : false,
+      isOnboardingComplete: onboardingComplete,
+      isBootstrapping: false,
+      userId: user.id,
+      username: username,
+      fullName: fullName,
+      bio: bio,
+      yearOfStudy: yearOfStudy,
+      gracyId: gracyId,
+      avatarUrl: avatarUrl,
+      selectedTheme: selectedTheme,
+      notificationsEnabled: notificationsEnabled,
+      isAddingAccount: preserveAddingAccount ? state.isAddingAccount : false,
+      errorMessage: null,
+    );
+
+    await _persistCurrentAccount();
+  }
+
+  Future<void> _persistCurrentAccount({
+    String? fullNameOverride,
+    String? avatarUrlOverride,
+  }) async {
+    final SupabaseClient? client = _client;
+    final Session? session = client?.auth.currentSession;
+    final User? user = session?.user;
+    final String? key = _activeAccountKey;
+    if (session == null || user == null || key == null) {
+      return;
+    }
+
+    final String? username = state.username?.trim().isNotEmpty == true
+        ? state.username!.trim()
+        : user.userMetadata?['username']?.toString();
+
+    final StoredAccount account = StoredAccount(
+      key: key,
+      sessionJson: jsonEncode(session.toJson()),
+      userId: state.userId ?? user.id,
+      email: user.email,
+      username: username,
+      fullName: fullNameOverride ?? state.fullName,
+      avatarUrl: avatarUrlOverride ?? state.avatarUrl,
+      savedAt: DateTime.now(),
+    );
+    await AccountVault.instance.upsertAccount(account);
+  }
+
+  String? get _activeAccountKey {
+    final String? userId = state.userId?.trim();
+    if (userId != null && userId.isNotEmpty) {
+      return userId;
+    }
+
+    final String? email = _client?.auth.currentUser?.email?.trim();
+    if (email != null && email.isNotEmpty) {
+      return email;
+    }
+
+    return null;
   }
 }
 

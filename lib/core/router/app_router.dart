@@ -73,7 +73,11 @@ final appRouterProvider = Provider<GoRouter>((ref) {
       }
 
       // 3. Auth && Profile Complete -> Should skip onboarding/welcome
-      if (authenticated && completed && (isWelcomeRoute || isOnboardingRoute)) {
+      if (
+        authenticated &&
+        completed &&
+        (isWelcomeRoute || isOnboardingRoute)
+      ) {
         return AppRoutePaths.home;
       }
 

@@ -173,7 +173,7 @@ class ChatRepository {
       final List<dynamic> rows = await _client
           .from(_messagesTable)
           .select(
-            'id,room_id,sender_id,content,created_at,status,delivered_at,read_at,reply_to_id',
+            'id,room_id,sender_id,content,created_at,status,delivered_at,read_at',
           )
           .eq('room_id', roomId)
           .order('created_at');
@@ -385,7 +385,7 @@ class ChatRepository {
         : ((await _client
                       .from(_messagesTable)
                       .select(
-                        'id,room_id,sender_id,content,created_at,status,delivered_at,read_at,reply_to_id',
+                        'id,room_id,sender_id,content,created_at,status,delivered_at,read_at',
                       )
                       .inFilter('room_id', roomIds)
                       .order('created_at', ascending: false))
