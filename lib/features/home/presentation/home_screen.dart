@@ -90,12 +90,20 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final AuthState authState = ref.watch(authNotifierProvider);
     final AsyncValue<List<UserModel>> profilesAsync = ref.watch(
       profilesDirectoryProvider,
     );
     final List<UserModel> fallbackUsers = mockUsers;
-    final UserModel headerUser =
-        ref.watch(currentUserProvider) ?? fallbackUsers.first;
+    final UserModel? currentUser = ref.watch(resolvedCurrentUserProvider);
+    final List<UserModel> availableProfiles =
+        profilesAsync.asData?.value ?? fallbackUsers;
+    final UserModel headerUser = _resolveHeaderUser(
+      authState: authState,
+      currentUser: currentUser,
+      profiles: availableProfiles,
+      fallbackUsers: fallbackUsers,
+    );
     final String query = _query.toLowerCase().trim();
     final postsAsync = ref.watch(postsProvider);
 
@@ -117,6 +125,36 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
               ),
       ),
     );
+  }
+
+  UserModel _resolveHeaderUser({
+    required AuthState authState,
+    required UserModel? currentUser,
+    required List<UserModel> profiles,
+    required List<UserModel> fallbackUsers,
+  }) {
+    final String? userId = authState.userId;
+    if (userId != null) {
+      for (final UserModel profile in profiles) {
+        if (profile.id == userId) {
+          if (currentUser == null) {
+            return profile;
+          }
+
+          return currentUser.copyWith(
+            fullName: profile.fullName,
+            username: profile.username,
+            bio: profile.bio,
+            year: profile.year,
+            avatarSeed: profile.avatarSeed,
+            avatarUrl: profile.avatarUrl ?? currentUser.avatarUrl,
+            gracyId: profile.gracyId ?? currentUser.gracyId,
+          );
+        }
+      }
+    }
+
+    return currentUser ?? fallbackUsers.first;
   }
 
   Widget _buildDirectory(

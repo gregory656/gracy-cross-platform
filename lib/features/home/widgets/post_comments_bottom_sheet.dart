@@ -93,7 +93,7 @@ class _PostCommentsBottomSheetState
       return;
     }
 
-    final currentUser = ref.read(currentUserProvider);
+    final currentUser = ref.read(resolvedCurrentUserProvider);
     final String tempId = 'temp-${_uuid.v4()}';
     final PostCommentModel optimisticComment = PostCommentModel(
       id: tempId,

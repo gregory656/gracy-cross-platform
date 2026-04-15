@@ -4,6 +4,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../../core/constants.dart';
 import '../models/user_model.dart';
+import 'profiles_provider.dart';
 import '../services/database_service.dart';
 
 class AuthState {
@@ -511,4 +512,35 @@ final currentUserProvider = Provider<UserModel?>((ref) {
     selectedTheme: authState.selectedTheme,
     notificationsEnabled: authState.notificationsEnabled,
   );
+});
+
+final resolvedCurrentUserProvider = Provider<UserModel?>((ref) {
+  final UserModel? currentUser = ref.watch(currentUserProvider);
+  final List<UserModel>? profiles = ref.watch(profilesDirectoryProvider).asData?.value;
+
+  if (currentUser == null) {
+    return null;
+  }
+
+  if (profiles == null || profiles.isEmpty) {
+    return currentUser;
+  }
+
+  for (final UserModel profile in profiles) {
+    if (profile.id == currentUser.id) {
+      return currentUser.copyWith(
+        fullName: profile.fullName,
+        username: profile.username,
+        bio: profile.bio,
+        year: profile.year,
+        avatarSeed: profile.avatarSeed,
+        avatarUrl: profile.avatarUrl ?? currentUser.avatarUrl,
+        gracyId: profile.gracyId ?? currentUser.gracyId,
+        selectedTheme: profile.selectedTheme,
+        notificationsEnabled: profile.notificationsEnabled,
+      );
+    }
+  }
+
+  return currentUser;
 });

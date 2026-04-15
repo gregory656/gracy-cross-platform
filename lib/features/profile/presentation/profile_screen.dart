@@ -23,7 +23,7 @@ class ProfileScreen extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final List<UserModel> users = ref.watch(mockUsersProvider);
-    final UserModel? currentUser = ref.watch(currentUserProvider);
+    final UserModel? currentUser = ref.watch(resolvedCurrentUserProvider);
     final AsyncValue<UserModel?> profileAsync = userId == null
         ? const AsyncData<UserModel?>(null)
         : ref.watch(profileByIdProvider(userId!));

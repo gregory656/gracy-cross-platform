@@ -45,12 +45,31 @@ class AppShellScaffold extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final bool showNavigation = ref.watch(shellNavigationVisibleProvider);
+    final shellNavigationController = ref.read(
+      shellNavigationVisibleProvider.notifier,
+    );
 
     return Scaffold(
       extendBody: true,
-      body: child,
-      bottomNavigationBar: showNavigation
-          ? NavigationBarTheme(
+      body: Listener(
+        behavior: HitTestBehavior.translucent,
+        onPointerDown: (_) {
+          if (!showNavigation) {
+            shellNavigationController.show();
+          }
+        },
+        child: child,
+      ),
+      bottomNavigationBar: AnimatedSlide(
+        duration: const Duration(milliseconds: 180),
+        curve: Curves.easeOutCubic,
+        offset: showNavigation ? Offset.zero : const Offset(0, 1.15),
+        child: AnimatedOpacity(
+          duration: const Duration(milliseconds: 180),
+          opacity: showNavigation ? 1 : 0,
+          child: IgnorePointer(
+            ignoring: !showNavigation,
+            child: NavigationBarTheme(
               data: NavigationBarThemeData(
                 backgroundColor: AppColors.background.withValues(alpha: 0.88),
                 indicatorColor: AppColors.accentCyan.withValues(alpha: 0.16),
@@ -65,8 +84,10 @@ class AppShellScaffold extends ConsumerWidget {
               ),
               child: NavigationBar(
                 selectedIndex: _selectedIndex(context),
-                onDestinationSelected: (int index) =>
-                    _onDestinationSelected(context, index),
+                onDestinationSelected: (int index) {
+                  shellNavigationController.show();
+                  _onDestinationSelected(context, index);
+                },
                 destinations: const <NavigationDestination>[
                   NavigationDestination(
                     icon: Icon(Icons.home_rounded),
@@ -86,8 +107,10 @@ class AppShellScaffold extends ConsumerWidget {
                   ),
                 ],
               ),
-            )
-          : null,
+            ),
+          ),
+        ),
+      ),
     );
   }
 }

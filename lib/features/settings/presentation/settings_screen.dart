@@ -20,7 +20,7 @@ class SettingsScreen extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final UserModel? currentUser = ref.watch(currentUserProvider);
+    final UserModel? currentUser = ref.watch(resolvedCurrentUserProvider);
     if (currentUser == null) {
       return const Center(child: CircularProgressIndicator());
     }
