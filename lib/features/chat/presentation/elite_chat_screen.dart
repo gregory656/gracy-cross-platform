@@ -5,6 +5,7 @@ import '../providers/elite_chat_providers.dart';
 import '../widgets/elite_message_bubble.dart';
 import '../widgets/elite_long_press_menu.dart';
 import '../widgets/nairobi_date_header.dart';
+import '../widgets/elite_chat_composer.dart';
 import '../../../shared/models/message_model.dart';
 import '../../../shared/services/nairobi_timezone_service.dart';
 import '../../../core/theme/app_colors.dart';
@@ -229,76 +230,16 @@ class _EliteChatScreenState extends ConsumerState<EliteChatScreen>
 
   Widget _buildMessageComposer() {
     return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: AppColors.onyx,
-        border: Border(
-          top: BorderSide(
-            color: AppColors.borderGray,
-            width: 1,
-          ),
-        ),
-      ),
+      color: Colors.black, // Force black background to pop the pill
       child: Column(
         children: [
           // Reply preview
           _buildReplyPreview(),
           
           // Message input
-          Row(
-            children: [
-              Expanded(
-                child: Container(
-                  decoration: BoxDecoration(
-                    color: AppColors.industrialGray,
-                    borderRadius: BorderRadius.circular(4),
-                    border: Border.all(
-                      color: AppColors.borderGray,
-                      width: 1,
-                    ),
-                  ),
-                  child: TextField(
-                    controller: _messageController,
-                    style: const TextStyle(
-                      color: AppColors.pureWhite,
-                      fontSize: 16,
-                    ),
-                    decoration: const InputDecoration(
-                      hintText: 'Type a message...',
-                      hintStyle: TextStyle(
-                        color: AppColors.lightGray,
-                        fontSize: 16,
-                      ),
-                      border: InputBorder.none,
-                      contentPadding: EdgeInsets.symmetric(
-                        horizontal: 16,
-                        vertical: 12,
-                      ),
-                    ),
-                    maxLines: null,
-                    textInputAction: TextInputAction.send,
-                    onSubmitted: (_) => _handleSendMessage(),
-                  ),
-                ),
-              ),
-              const SizedBox(width: 8),
-              EliteAnimatedButton(
-                onPressed: _handleSendMessage,
-                hapticType: HapticType.medium,
-                child: Container(
-                  padding: const EdgeInsets.all(12),
-                  decoration: BoxDecoration(
-                    color: AppColors.electricBlue,
-                    borderRadius: BorderRadius.circular(4),
-                  ),
-                  child: const Icon(
-                    Icons.send,
-                    color: AppColors.pureWhite,
-                    size: 20,
-                  ),
-                ),
-              ),
-            ],
+          EliteChatComposer(
+            controller: _messageController,
+            onSend: _handleSendMessage,
           ),
         ],
       ),
