@@ -75,9 +75,9 @@ class ChatTile extends StatelessWidget {
                     const SizedBox(height: 7),
                     Row(
                       children: <Widget>[
-                        if (chat.unreadCount == 0)
+                        if (chat.unreadCount == 0 && chat.isLastMessageMine)
                           _ReadReceipt(status: chat.lastMessageStatus),
-                        if (chat.unreadCount == 0) const SizedBox(width: 8),
+                        if (chat.unreadCount == 0 && chat.isLastMessageMine) const SizedBox(width: 8),
                         Expanded(
                           child: Text(
                             chat.lastMessage,

@@ -76,7 +76,7 @@ class OptimizedPostService {
 
       if (posts.isEmpty) {
         final List<PostModel> cachedPosts = await _databaseService
-            .getCachedPosts();
+            .getCachedPosts(userId);
         if (cachedPosts.isNotEmpty) {
           final int start = offset.clamp(0, cachedPosts.length);
           final int end = (start + limit).clamp(0, cachedPosts.length);
@@ -84,12 +84,13 @@ class OptimizedPostService {
         }
       }
 
-      await _databaseService.cachePosts(posts);
+      await _databaseService.cachePosts(posts, userId);
       return posts;
     } catch (e) {
       _logSupabaseError('Error fetching posts', e);
-      final List<PostModel> cachedPosts = await _databaseService
-          .getCachedPosts();
+      final String? fallbackUserId = _supabase.auth.currentUser?.id;
+      final List<PostModel> cachedPosts = fallbackUserId != null ? await _databaseService
+          .getCachedPosts(fallbackUserId) : [];
       if (cachedPosts.isEmpty) {
         return [];
       }
@@ -496,8 +497,12 @@ class OptimizedPostService {
       }, isLikedByCurrentUser: likeRecord != null);
     } catch (e) {
       _logSupabaseError('Failed to fetch post', e);
+      final String? userId = _supabase.auth.currentUser?.id;
+      if (userId == null) throw Exception('Failed to fetch post: $e');
+
       final PostModel? cachedPost = await _databaseService.getCachedPostById(
         postId,
+        userId,
       );
       if (cachedPost != null) {
         return cachedPost;
@@ -597,11 +602,14 @@ class OptimizedPostService {
             }, isLikedByCurrentUser: likedPostIds.contains(row['id'])),
           )
           .toList(growable: false);
-      await _databaseService.cachePosts(posts);
+      if (currentUserId != null) {
+        await _databaseService.cachePosts(posts, currentUserId);
+      }
       return posts;
     } catch (e) {
       _logSupabaseError('Failed to fetch author posts', e);
-      return _databaseService.getCachedPostsByAuthor(authorId);
+      final String? fallbackUserId = _supabase.auth.currentUser?.id;
+      return fallbackUserId != null ? _databaseService.getCachedPostsByAuthor(authorId, fallbackUserId) : [];
     }
   }
 

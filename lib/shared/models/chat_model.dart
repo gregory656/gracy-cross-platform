@@ -12,6 +12,7 @@ class ChatModel {
     this.gracyId,
     this.isOnline = false,
     this.lastMessageStatus = MessageStatus.sent,
+    this.isLastMessageMine = true,
   });
 
   final String id;
@@ -24,4 +25,5 @@ class ChatModel {
   final String? gracyId;
   final bool isOnline;
   final MessageStatus lastMessageStatus;
+  final bool isLastMessageMine;
 }

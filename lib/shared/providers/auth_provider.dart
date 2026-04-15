@@ -153,7 +153,20 @@ class AuthNotifier extends Notifier<AuthState> {
       }
 
       final Session? session = client.auth.currentSession;
-      final User? user = session?.user;
+      User? user = session?.user;
+
+      if (user == null) {
+        final List<StoredAccount> accounts = await AccountVault.instance.readAccounts();
+        if (accounts.isNotEmpty) {
+          final StoredAccount lastAccount = accounts.first;
+          try {
+            final AuthResponse res = await client.auth.recoverSession(lastAccount.sessionJson);
+            user = res.user;
+          } catch (e) {
+            debugPrint('Failed to recover session: $e');
+          }
+        }
+      }
 
       if (user == null) {
         state = state.copyWith(
@@ -432,8 +445,10 @@ class AuthNotifier extends Notifier<AuthState> {
     bool preserveLoading = false,
     bool preserveAddingAccount = false,
   }) async {
+    final List<StoredAccount> accounts = await AccountVault.instance.readAccounts();
+    final bool hasAccountInVault = accounts.any((a) => a.userId == user.id);
+    bool onboardingComplete = hasAccountInVault || await DatabaseService.instance.isOnboardingComplete();
     bool hasProfileRow = false;
-    bool onboardingComplete = false;
     String? fullName;
     String? bio;
     String? yearOfStudy;
@@ -471,10 +486,19 @@ class AuthNotifier extends Notifier<AuthState> {
       // Fall back to auth metadata only if the profile query is unavailable.
     }
 
-    onboardingComplete = hasProfileRow ||
-        (gracyId?.trim().isNotEmpty == true) ||
-        (fullName?.trim().isNotEmpty == true);
-    await DatabaseService.instance.setOnboardingComplete(onboardingComplete);
+    final StoredAccount? currentAccount = accounts.where((a) => a.userId == user.id).firstOrNull;
+    if (avatarUrl == null && currentAccount != null) {
+      avatarUrl = currentAccount.avatarUrl;
+    }
+
+    if (!onboardingComplete) {
+      onboardingComplete = hasProfileRow ||
+          (gracyId?.trim().isNotEmpty == true) ||
+          (fullName?.trim().isNotEmpty == true);
+      if (onboardingComplete) {
+        await DatabaseService.instance.setOnboardingComplete(true);
+      }
+    }
 
     state = state.copyWith(
       isAuthenticated: true,

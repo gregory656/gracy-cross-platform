@@ -18,6 +18,11 @@ final profilesDirectoryProvider = FutureProvider<List<UserModel>>((ref) async {
     return mockUsers;
   }
 
+  final String ownerId = client.auth.currentUser?.id ?? '';
+  if (ownerId.isEmpty) {
+    return mockUsers;
+  }
+
   try {
     final List<dynamic> rows = await client
         .from('profiles')
@@ -33,19 +38,19 @@ final profilesDirectoryProvider = FutureProvider<List<UserModel>>((ref) async {
         .toList();
 
     if (profiles.isNotEmpty) {
-      await DatabaseService.instance.cacheProfiles(profiles);
+      await DatabaseService.instance.cacheProfiles(profiles, ownerId);
       return profiles;
     }
   } catch (_) {
     final List<UserModel> cachedProfiles = await DatabaseService.instance
-        .getCachedProfiles();
+        .getCachedProfiles(ownerId);
     if (cachedProfiles.isNotEmpty) {
       return cachedProfiles;
     }
   }
 
   final List<UserModel> cachedProfiles = await DatabaseService.instance
-      .getCachedProfiles();
+      .getCachedProfiles(ownerId);
   if (cachedProfiles.isNotEmpty) {
     return cachedProfiles;
   }

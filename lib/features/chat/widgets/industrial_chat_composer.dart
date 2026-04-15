@@ -67,23 +67,21 @@ class _IndustrialChatComposerState extends State<IndustrialChatComposer> {
   @override
   Widget build(BuildContext context) {
     return Container(
-      decoration: BoxDecoration(
-        color: const Color(0xFF111318),
-        borderRadius: BorderRadius.circular(30),
-      ),
+      color: Colors.black,
+      padding: const EdgeInsets.all(8.0),
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
           if (widget.replyToMessage != null) ...[
             Container(
               padding: const EdgeInsets.fromLTRB(18, 14, 12, 10),
+              margin: const EdgeInsets.only(bottom: 8),
               decoration: BoxDecoration(
                 color: Colors.white.withValues(alpha: 0.03),
-                border: Border(
-                  bottom: BorderSide(
-                    color: Colors.white.withValues(alpha: 0.06),
-                    width: 1,
-                  ),
+                borderRadius: BorderRadius.circular(16),
+                border: Border.all(
+                  color: Colors.white.withValues(alpha: 0.06),
+                  width: 1,
                 ),
               ),
               child: Row(
@@ -116,84 +114,80 @@ class _IndustrialChatComposerState extends State<IndustrialChatComposer> {
               ),
             ),
           ],
-          Container(
-            padding: const EdgeInsets.fromLTRB(12, 10, 10, 10),
-            child: Row(
-              children: [
-                _CircleActionButton(
-                  icon: Icons.attach_file_rounded,
-                  onTap: _showComingSoonMessage,
-                ),
-                const SizedBox(width: 10),
-                Expanded(
-                  child: Container(
-                    constraints: const BoxConstraints(minHeight: 45),
-                    decoration: BoxDecoration(
-                      color: const Color(0xFF1A1A1A),
-                      borderRadius: BorderRadius.circular(999),
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.end,
+            children: [
+              Expanded(
+                child: TextField(
+                  controller: widget.controller,
+                  style: const TextStyle(
+                    color: Colors.black87,
+                    fontSize: 16,
+                  ),
+                  cursorColor: const Color(0xFF007AFF),
+                  decoration: InputDecoration(
+                    hintText: 'Message',
+                    hintStyle: const TextStyle(
+                      color: Colors.black54,
+                      fontSize: 16,
                     ),
-                    child: Row(
-                      children: [
-                        const SizedBox(width: 4),
-                        Expanded(
-                          child: TextField(
-                            controller: widget.controller,
-                            style: const TextStyle(
-                              color: Colors.white,
-                              fontSize: 16,
-                            ),
-                            decoration: InputDecoration(
-                              hintText: 'Message',
-                              hintStyle: const TextStyle(
-                                color: Colors.grey,
-                                fontSize: 16,
-                              ),
-                              border: InputBorder.none,
-                              isDense: true,
-                              contentPadding: const EdgeInsets.symmetric(
-                                horizontal: 14,
-                                vertical: 12,
-                              ),
-                            ),
-                            minLines: 1,
-                            maxLines: 5,
-                            textCapitalization: TextCapitalization.sentences,
-                            scrollPhysics: const BouncingScrollPhysics(),
-                          ),
-                        ),
-                        _CircleActionButton(
-                          icon: Icons.camera_alt_rounded,
-                          backgroundColor: Colors.transparent,
-                          iconColor: Colors.white60,
-                          onTap: _showComingSoonMessage,
-                        ),
-                      ],
+                    filled: true,
+                    fillColor: const Color(0xFFF2F2F7),
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(24),
+                      borderSide: BorderSide.none,
+                    ),
+                    focusedBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(24),
+                      borderSide: BorderSide.none,
+                    ),
+                    enabledBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(24),
+                      borderSide: BorderSide.none,
+                    ),
+                    contentPadding: const EdgeInsets.symmetric(
+                      horizontal: 20,
+                      vertical: 12,
                     ),
                   ),
+                  minLines: 1,
+                  maxLines: 5,
+                  textCapitalization: TextCapitalization.sentences,
+                  scrollPhysics: const BouncingScrollPhysics(),
                 ),
-                const SizedBox(width: 10),
-                AnimatedSwitcher(
-                  duration: const Duration(milliseconds: 180),
-                  child: _isEmpty
-                      ? _CircleActionButton(
-                          key: const ValueKey<String>('mic'),
-                          icon: Icons.mic_rounded,
-                          backgroundColor: const Color(0xFF111922),
-                          iconColor: Colors.white60,
-                          onTap: () {
-                            HapticFeedback.selectionClick();
-                          },
-                        )
-                      : _CircleActionButton(
-                          key: const ValueKey<String>('send'),
-                          icon: Icons.send_rounded,
-                          backgroundColor: const Color(0xFF007AFF),
-                          iconColor: Colors.white,
-                          onTap: _handleSend,
-                        ),
-                ),
-              ],
-            ),
+              ),
+              const SizedBox(width: 8),
+              AnimatedSwitcher(
+                duration: const Duration(milliseconds: 200),
+                transitionBuilder: (child, animation) {
+                  return ScaleTransition(
+                    scale: animation,
+                    child: FadeTransition(
+                      opacity: animation,
+                      child: child,
+                    ),
+                  );
+                },
+                child: _isEmpty
+                    ? _CircleActionButton(
+                        key: const ValueKey<String>('mic'),
+                        icon: Icons.mic_rounded,
+                        backgroundColor: const Color(0xFF007AFF),
+                        iconColor: Colors.white,
+                        onTap: () {
+                          HapticFeedback.selectionClick();
+                          _showComingSoonMessage();
+                        },
+                      )
+                    : _CircleActionButton(
+                        key: const ValueKey<String>('send'),
+                        icon: Icons.send_rounded,
+                        backgroundColor: const Color(0xFF007AFF),
+                        iconColor: Colors.white,
+                        onTap: _handleSend,
+                      ),
+              ),
+            ],
           ),
         ],
       ),

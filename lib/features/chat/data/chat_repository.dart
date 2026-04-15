@@ -91,13 +91,25 @@ class ChatRepository {
     }
 
     final String roomHash = buildRoomHash(currentUserId, participantId);
-    final Map<String, dynamic> roomRow = await _client
+    
+    final Map<String, dynamic>? existingRoom = await _client
         .from(_roomsTable)
-        .upsert(<String, dynamic>{
-          'room_hash': roomHash,
-        }, onConflict: 'room_hash')
         .select('id,room_hash')
-        .single();
+        .eq('room_hash', roomHash)
+        .maybeSingle();
+
+    final Map<String, dynamic> roomRow;
+    if (existingRoom != null) {
+      roomRow = existingRoom;
+    } else {
+      roomRow = await _client
+          .from(_roomsTable)
+          .insert(<String, dynamic>{
+            'room_hash': roomHash,
+          })
+          .select('id,room_hash')
+          .single();
+    }
 
     final String roomId = roomRow['id']?.toString() ?? '';
     if (roomId.isEmpty) {
@@ -222,7 +234,7 @@ class ChatRepository {
           )
           .toList();
 
-      await _databaseService.cacheMessages(roomId: roomId, messages: messages);
+      await _databaseService.cacheMessages(roomId: roomId, messages: messages, ownerId: currentUserId);
       hasDeliveredMessages = messages.isNotEmpty;
 
       if (!controller.isClosed) {
@@ -346,7 +358,7 @@ class ChatRepository {
         currentUserId,
       ).timeout(const Duration(seconds: 3));
     } catch (_) {
-      final List<ChatModel> cached = await _databaseService.getCachedRecentChats();
+      final List<ChatModel> cached = await _databaseService.getCachedRecentChats(currentUserId);
       return cached;
     }
   }
@@ -434,6 +446,7 @@ class ChatRepository {
           gracyId: participant.gracyId,
           isOnline: participant.isOnline,
           lastMessageStatus: _messageStatusFromRow(latest),
+          isLastMessageMine: latest?['sender_id'] == currentUserId,
         ),
       );
     }
@@ -441,7 +454,7 @@ class ChatRepository {
     chats.sort(
       (ChatModel a, ChatModel b) => b.lastMessageAt.compareTo(a.lastMessageAt),
     );
-    await _databaseService.cacheRecentChats(chats);
+    await _databaseService.cacheRecentChats(chats, currentUserId);
     return chats;
   }
 
