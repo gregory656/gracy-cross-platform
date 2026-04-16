@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
@@ -88,6 +89,63 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     }
   }
 
+  Future<void> _handleBackNavigation() async {
+    if (!_showPosts) {
+      setState(() {
+        _showPosts = true;
+      });
+      return;
+    }
+
+    final bool shouldExit = await _showExitDialog() ?? false;
+    if (shouldExit) {
+      await SystemNavigator.pop();
+    }
+  }
+
+  Future<bool?> _showExitDialog() {
+    return showDialog<bool>(
+      context: context,
+      builder: (BuildContext dialogContext) {
+        return AlertDialog(
+          backgroundColor: const Color(0xFF0B0D10),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(24),
+            side: BorderSide(color: Colors.white.withValues(alpha: 0.08)),
+          ),
+          title: const Text(
+            'Leaving Gracy?',
+            style: TextStyle(
+              color: Colors.white,
+              fontWeight: FontWeight.w900,
+            ),
+          ),
+          content: const Text(
+            'Are you sure?',
+            style: TextStyle(color: Colors.white70),
+          ),
+          actions: <Widget>[
+            TextButton(
+              onPressed: () => Navigator.of(dialogContext).pop(false),
+              child: const Text(
+                'No',
+                style: TextStyle(color: Colors.white70),
+              ),
+            ),
+            FilledButton(
+              onPressed: () => Navigator.of(dialogContext).pop(true),
+              style: FilledButton.styleFrom(
+                backgroundColor: AppColors.electricBlue,
+                foregroundColor: Colors.white,
+              ),
+              child: const Text('Yes'),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final AuthState authState = ref.watch(authNotifierProvider);
@@ -107,22 +165,34 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     final String query = _query.toLowerCase().trim();
     final postsAsync = ref.watch(postsProvider);
 
-    return Scaffold(
-      backgroundColor: Theme.of(context).colorScheme.surface,
-      body: SafeArea(
-        child: _showPosts
-            ? _buildPostsView(
-                postsAsync,
-                headerUser,
-                profilesAsync.asData?.value ?? fallbackUsers,
-              )
-            : profilesAsync.when(
-                loading: () => _buildDirectory(context, fallbackUsers, headerUser, query),
-                error: (Object error, StackTrace stackTrace) =>
-                    _buildDirectory(context, fallbackUsers, headerUser, query),
-                data: (List<UserModel> users) =>
-                    _buildDirectory(context, users, headerUser, query),
-              ),
+    return PopScope(
+      canPop: false,
+      onPopInvokedWithResult: (
+        bool didPop,
+        Object? result,
+      ) async {
+        if (didPop) {
+          return;
+        }
+        await _handleBackNavigation();
+      },
+      child: Scaffold(
+        backgroundColor: Theme.of(context).colorScheme.surface,
+        body: SafeArea(
+          child: _showPosts
+              ? _buildPostsView(
+                  postsAsync,
+                  headerUser,
+                  profilesAsync.asData?.value ?? fallbackUsers,
+                )
+              : profilesAsync.when(
+                  loading: () => _buildDirectory(context, fallbackUsers, headerUser, query),
+                  error: (Object error, StackTrace stackTrace) =>
+                      _buildDirectory(context, fallbackUsers, headerUser, query),
+                  data: (List<UserModel> users) =>
+                      _buildDirectory(context, users, headerUser, query),
+                ),
+        ),
       ),
     );
   }
@@ -240,13 +310,19 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
           ...filteredUsers.map((UserModel user) {
             return Padding(
               padding: const EdgeInsets.only(bottom: 16),
-              child: ProfileCard(
+                child: ProfileCard(
                 user: user,
                 onTap: () {
-                  context.go('${AppRoutePaths.profile}?userId=${user.id}');
+                  context.push('${AppRoutePaths.profile}?userId=${user.id}');
                 },
                 onPrimaryAction: () {
-                  context.go('${AppRoutePaths.chat}?userId=${user.id}');
+                  context.push(
+                    AppRoutePaths.chatByUser(
+                      userId: user.id,
+                      receiverName: user.fullName,
+                      receiverAvatar: user.avatarUrl,
+                    ),
+                  );
                 },
               ),
             );
@@ -546,7 +622,7 @@ class _StoryAvatar extends StatelessWidget {
     return GestureDetector(
       onTap: () {
         if (!isCreateStory) {
-          context.go('${AppRoutePaths.profile}?userId=${user.id}');
+          context.push('${AppRoutePaths.profile}?userId=${user.id}');
         }
       },
       child: SizedBox(

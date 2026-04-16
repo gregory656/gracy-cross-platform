@@ -43,21 +43,16 @@ class MessageModel {
     required bool isOfficial,
   }) {
     final String statusStr = row['status']?.toString() ?? 'sent';
+    final bool isRead = row['is_read'] == true || statusStr == 'read';
+    final bool isDelivered =
+        row['delivered_at'] != null || statusStr == 'delivered';
     MessageStatus status = MessageStatus.sent;
-    switch (statusStr) {
-      case 'pending':
-        status = MessageStatus.pending;
-        break;
-      case 'delivered':
-        status = MessageStatus.delivered;
-        break;
-      case 'read':
-        status = MessageStatus.read;
-        break;
-      case 'sent':
-      default:
-        status = MessageStatus.sent;
-        break;
+    if (statusStr == 'pending') {
+      status = MessageStatus.pending;
+    } else if (isRead) {
+      status = MessageStatus.read;
+    } else if (isDelivered) {
+      status = MessageStatus.delivered;
     }
 
     return MessageModel(

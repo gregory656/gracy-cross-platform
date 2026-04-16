@@ -9,6 +9,7 @@ import '../../../shared/models/post_model.dart';
 import '../../../shared/providers/auth_provider.dart';
 import '../../../shared/services/nairobi_timezone_service.dart';
 import '../../../shared/widgets/report_reason_sheet.dart';
+import '../../../shared/widgets/top_overlay_sheet.dart';
 import '../providers/post_providers.dart';
 
 class PostCommentsBottomSheet extends ConsumerStatefulWidget {
@@ -446,9 +447,8 @@ class _PostCommentsBottomSheetState
       return;
     }
 
-    await showModalBottomSheet<void>(
+    await showTopOverlaySheet<void>(
       context: context,
-      backgroundColor: Colors.transparent,
       builder: (BuildContext context) => _CommentModerationSheet(
         isWriter: isWriter,
         isPostOwner: isPostOwner,
@@ -470,9 +470,8 @@ class _PostCommentsBottomSheetState
   }
 
   Future<void> _showReportActions(PostCommentModel comment) async {
-    await showModalBottomSheet<void>(
+    await showTopOverlaySheet<void>(
       context: context,
-      backgroundColor: Colors.transparent,
       builder: (BuildContext context) => _CommentReportSheet(
         onReport: () {
           Navigator.of(context).pop();

@@ -13,11 +13,13 @@ class ChatTile extends StatelessWidget {
     required this.chat,
     required this.user,
     required this.onTap,
+    this.onLongPress,
   });
 
   final ChatModel chat;
   final UserModel user;
   final VoidCallback onTap;
+  final VoidCallback? onLongPress;
 
   @override
   Widget build(BuildContext context) {
@@ -25,6 +27,7 @@ class ChatTile extends StatelessWidget {
       color: Colors.transparent,
       child: InkWell(
         onTap: onTap,
+        onLongPress: onLongPress,
         child: Padding(
           padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 12),
           child: Row(

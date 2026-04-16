@@ -185,6 +185,20 @@ class DatabaseService {
     );
   }
 
+  Future<void> markCachedMessagesAsRead({
+    required String roomId,
+    required String ownerId,
+    required String senderId,
+  }) async {
+    final Database db = await database;
+    await db.update(
+      _chatCacheTable,
+      <String, Object?>{'status': 'read'},
+      where: 'room_id = ? AND owner_id = ? AND sender_id = ? AND status != ?',
+      whereArgs: <Object?>[roomId, ownerId, senderId, 'read'],
+    );
+  }
+
   Future<List<PostModel>> getCachedPosts(String ownerId) async {
     final Database db = await database;
     final List<Map<String, Object?>> rows = await db.query(
@@ -341,6 +355,23 @@ class DatabaseService {
         isLastMessageMine: (row['is_last_message_mine'] as int? ?? 0) == 1,
       );
     }).toList();
+  }
+
+  Future<void> markRecentChatAsRead({
+    required String roomId,
+    required String ownerId,
+  }) async {
+    final Database db = await database;
+    await db.update(
+      _recentChatsCacheTable,
+      <String, Object?>{
+        'unread_count': 0,
+        'last_message_status': 'read',
+        'cached_at': DateTime.now().toIso8601String(),
+      },
+      where: 'room_id = ? AND owner_id = ?',
+      whereArgs: <Object?>[roomId, ownerId],
+    );
   }
 
   Future<void> _createBaseTables(Database db) async {

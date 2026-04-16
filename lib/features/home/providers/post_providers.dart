@@ -83,6 +83,7 @@ class PostsNotifier extends AsyncNotifier<List<PostModel>> {
         limit: _limit,
         offset: _offset,
       );
+      ref.read(offlineBannerProvider.notifier).resetOfflineCachedContentNotice();
 
       if (refresh) {
         _posts.clear();
@@ -95,7 +96,7 @@ class PostsNotifier extends AsyncNotifier<List<PostModel>> {
       state = AsyncValue.data(List.from(_posts));
     } catch (e, stackTrace) {
       if (_posts.isNotEmpty) {
-        ref.read(offlineBannerProvider.notifier).showOfflineCachedContent();
+        ref.read(offlineBannerProvider.notifier).showOfflineCachedContentOnce();
         state = AsyncValue.data(List<PostModel>.from(_posts));
         return;
       }

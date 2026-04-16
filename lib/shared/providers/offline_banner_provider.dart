@@ -9,6 +9,7 @@ final offlineBannerProvider =
 
 class OfflineBannerController extends Notifier<String?> {
   Timer? _clearTimer;
+  bool _hasShownOfflineCachedNotice = false;
 
   @override
   String? build() {
@@ -26,6 +27,18 @@ class OfflineBannerController extends Notifier<String?> {
 
   void showOfflineCachedContent() {
     show('Offline: Showing cached content.');
+  }
+
+  void showOfflineCachedContentOnce() {
+    if (_hasShownOfflineCachedNotice) {
+      return;
+    }
+    _hasShownOfflineCachedNotice = true;
+    showOfflineCachedContent();
+  }
+
+  void resetOfflineCachedContentNotice() {
+    _hasShownOfflineCachedNotice = false;
   }
 
   void clear() {

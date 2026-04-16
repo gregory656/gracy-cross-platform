@@ -137,35 +137,71 @@ class ChatRepository {
     required String currentUserId,
     String? roomId,
     String? userId,
+    String? receiverName,
+    String? receiverAvatar,
   }) async {
     if (roomId != null && roomId.trim().isNotEmpty) {
-      final Map<String, dynamic> roomRow = await _client
+      final Map<String, dynamic>? roomRow = await _client
           .from(_roomsTable)
           .select('id,room_hash')
           .eq('id', roomId)
-          .single();
+          .maybeSingle();
+      if (roomRow == null) {
+        throw const ChatRepositoryException(
+          'This conversation is no longer available.',
+        );
+      }
       final String roomHash = roomRow['room_hash']?.toString() ?? '';
       final String participantId = await _resolveParticipantId(
         roomId: roomId,
         currentUserId: currentUserId,
         roomHash: roomHash,
       );
+      final String safeParticipantId = participantId.trim().isNotEmpty
+          ? participantId
+          : (userId ?? '');
       await _ensureRoomMembers(
         roomId: roomId,
-        userIds: <String>[currentUserId, participantId],
+        userIds: <String>[
+          currentUserId,
+          if (safeParticipantId.isNotEmpty) safeParticipantId,
+        ],
       );
+
+      final UserModel participant =
+          safeParticipantId.isNotEmpty
+          ? await _fetchRequiredProfile(
+              safeParticipantId,
+              fallbackName: receiverName,
+              fallbackAvatarUrl: receiverAvatar,
+            )
+          : _fallbackUser(
+              userId ?? roomId,
+              fallbackName: receiverName,
+              fallbackAvatarUrl: receiverAvatar,
+            );
 
       return ChatThread(
         roomId: roomRow['id']?.toString() ?? roomId,
         roomHash: roomHash,
-        participant: await _fetchRequiredProfile(participantId),
+        participant: participant,
       );
     }
 
     if (userId != null && userId.trim().isNotEmpty) {
+      if (userId == currentUserId) {
+        throw const ChatRepositoryException(
+          'You cannot start a chat with yourself.',
+        );
+      }
       return findOrCreateRoom(
         currentUserId: currentUserId,
         participantId: userId,
+        participant: await _fetchRequiredProfile(
+          userId,
+          fallbackName: receiverName,
+          fallbackAvatarUrl: receiverAvatar,
+        ),
       );
     }
 
@@ -295,6 +331,25 @@ class ChatRepository {
       'send_message',
       params: <String, dynamic>{'p_room_id': roomId, 'p_content': trimmed},
     );
+    try {
+      final String roomHash = await _fetchRoomHash(roomId);
+      final String recipientId = await _resolveParticipantId(
+        roomId: roomId,
+        currentUserId: resolvedSenderId,
+        roomHash: roomHash,
+      );
+      if (recipientId.isNotEmpty) {
+        await _client.from('notifications').insert(<String, dynamic>{
+          'receiver_id': recipientId,
+          'sender_id': resolvedSenderId,
+          'type': 'message',
+          'content': trimmed,
+          'is_read': false,
+        });
+      }
+    } catch (_) {
+      // Keep message delivery independent from notification fan-out.
+    }
   }
 
   Stream<LocalFirstData<List<ChatModel>>> watchRecentChats(
@@ -419,7 +474,7 @@ class ChatRepository {
         : ((await _client
                       .from(_messagesTable)
                       .select(
-                        'id,room_id,sender_id,content,created_at,status,delivered_at,read_at',
+                        'id,room_id,sender_id,content,created_at,status,delivered_at,read_at,is_read',
                       )
                       .inFilter('room_id', roomIds)
                       .order('created_at', ascending: false))
@@ -448,9 +503,12 @@ class ChatRepository {
       final Map<String, dynamic>? latest = latestByRoom[roomId];
       final int unreadCount = messageRows
           .where((Map<String, dynamic> messageRow) {
+            final bool isRead =
+                messageRow['is_read'] == true ||
+                messageRow['status']?.toString() == 'read';
             return messageRow['room_id']?.toString() == roomId &&
                 messageRow['sender_id']?.toString() != currentUserId &&
-                messageRow['status']?.toString() != 'read';
+                !isRead;
           })
           .length;
 
@@ -486,14 +544,39 @@ class ChatRepository {
 
   Future<void> markMessagesAsRead({
     required String roomId,
-    required String userId,
+    required String currentUserId,
+    required String participantId,
   }) async {
     await _client
         .from(_messagesTable)
-        .update({'status': 'read', 'read_at': DateTime.now().toIso8601String()})
+        .update({
+          'status': 'read',
+          'is_read': true,
+          'read_at': DateTime.now().toIso8601String(),
+        })
         .eq('room_id', roomId)
-        .eq('sender_id', userId)
+        .eq('sender_id', participantId)
         .neq('status', 'read');
+    await _databaseService.markCachedMessagesAsRead(
+      roomId: roomId,
+      ownerId: currentUserId,
+      senderId: participantId,
+    );
+    await _databaseService.markRecentChatAsRead(
+      roomId: roomId,
+      ownerId: currentUserId,
+    );
+    try {
+      await _client
+          .from('notifications')
+          .update(<String, dynamic>{'is_read': true})
+          .eq('receiver_id', currentUserId)
+          .eq('sender_id', participantId)
+          .eq('type', 'message')
+          .eq('is_read', false);
+    } catch (_) {
+      // Older environments may not rely on notifications rows for messages.
+    }
   }
 
   Future<void> markMessagesAsDelivered({
@@ -617,7 +700,11 @@ class ChatRepository {
     );
   }
 
-  Future<UserModel> _fetchRequiredProfile(String userId) async {
+  Future<UserModel> _fetchRequiredProfile(
+    String userId, {
+    String? fallbackName,
+    String? fallbackAvatarUrl,
+  }) async {
     try {
       final Map<String, dynamic> row = await _client
           .from(_profilesTable)
@@ -626,8 +713,21 @@ class ChatRepository {
           .single();
       return _userFromProfile(row);
     } catch (_) {
-      return _fallbackUser(userId);
+      return _fallbackUser(
+        userId,
+        fallbackName: fallbackName,
+        fallbackAvatarUrl: fallbackAvatarUrl,
+      );
     }
+  }
+
+  Future<String> _fetchRoomHash(String roomId) async {
+    final Map<String, dynamic>? row = await _client
+        .from(_roomsTable)
+        .select('room_hash')
+        .eq('id', roomId)
+        .maybeSingle();
+    return row?['room_hash']?.toString() ?? '';
   }
 
   Future<Map<String, UserModel>> _fetchProfilesByIds(
@@ -695,11 +795,19 @@ class ChatRepository {
     );
   }
 
-  UserModel _fallbackUser(String userId) {
+  UserModel _fallbackUser(
+    String userId, {
+    String? fallbackName,
+    String? fallbackAvatarUrl,
+  }) {
     final String shortId = userId.length >= 6 ? userId.substring(0, 6) : userId;
+    final String resolvedName =
+        fallbackName?.trim().isNotEmpty == true
+        ? fallbackName!.trim()
+        : 'Gracy User';
     return UserModel(
       id: userId,
-      fullName: 'Gracy User',
+      fullName: resolvedName,
       username: '@$shortId',
       age: 0,
       role: UserRole.student,
@@ -707,8 +815,9 @@ class ChatRepository {
       bio: 'Gracy member',
       isOnline: false,
       location: 'Gracy network',
-      avatarSeed: shortId,
+      avatarSeed: resolvedName,
       year: 'Active',
+      avatarUrl: fallbackAvatarUrl,
     );
   }
 

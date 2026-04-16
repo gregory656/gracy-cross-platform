@@ -61,6 +61,8 @@ final chatThreadProvider =
             currentUserId: currentUserId,
             roomId: request.roomId,
             userId: request.userId,
+            receiverName: request.receiverName,
+            receiverAvatar: request.receiverAvatar,
           );
     });
 
@@ -99,18 +101,27 @@ class StartChatController extends AsyncNotifier<void> {
 }
 
 class ChatThreadRequest {
-  const ChatThreadRequest({this.roomId, this.userId});
+  const ChatThreadRequest({
+    this.roomId,
+    this.userId,
+    this.receiverName,
+    this.receiverAvatar,
+  });
 
   final String? roomId;
   final String? userId;
+  final String? receiverName;
+  final String? receiverAvatar;
 
   @override
   bool operator ==(Object other) {
     return other is ChatThreadRequest &&
         other.roomId == roomId &&
-        other.userId == userId;
+        other.userId == userId &&
+        other.receiverName == receiverName &&
+        other.receiverAvatar == receiverAvatar;
   }
 
   @override
-  int get hashCode => Object.hash(roomId, userId);
+  int get hashCode => Object.hash(roomId, userId, receiverName, receiverAvatar);
 }

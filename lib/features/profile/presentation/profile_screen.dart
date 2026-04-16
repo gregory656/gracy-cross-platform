@@ -13,6 +13,8 @@ import '../../../shared/providers/account_switcher_provider.dart';
 import '../../../shared/providers/auth_provider.dart';
 import '../../../shared/providers/mock_providers.dart';
 import '../../../shared/providers/profiles_provider.dart';
+import '../../../shared/providers/social_providers.dart';
+import '../../../shared/widgets/top_overlay_sheet.dart';
 import '../../../shared/widgets/user_avatar.dart';
 import '../../home/providers/post_providers.dart';
 import '../../home/widgets/post_card.dart';
@@ -105,20 +107,39 @@ class ProfileScreen extends ConsumerWidget {
                         );
                         return;
                       }
-                      context.go('${AppRoutePaths.chat}?userId=${user.id}');
-                    },
-                    onSecondaryAction: () {
-                      final String message = isOwner
-                          ? 'Profile link copied for ${user.fullName}.'
-                          : 'Connection request prepared for ${user.fullName}.';
+                      ref.read(socialServiceProvider).sendConnectionRequest(user.id);
                       ScaffoldMessenger.of(context)
                         ..clearSnackBars()
                         ..showSnackBar(
                           SnackBar(
-                            content: Text(message),
+                            content: Text(
+                              'Connection request sent to ${user.fullName}.',
+                            ),
                             behavior: SnackBarBehavior.floating,
                           ),
                         );
+                    },
+                    onSecondaryAction: () {
+                      if (isOwner) {
+                        ScaffoldMessenger.of(context)
+                          ..clearSnackBars()
+                          ..showSnackBar(
+                            SnackBar(
+                              content: Text(
+                                'Profile link copied for ${user.fullName}.',
+                              ),
+                              behavior: SnackBarBehavior.floating,
+                            ),
+                          );
+                        return;
+                      }
+                      context.push(
+                        AppRoutePaths.chatByUser(
+                          userId: user.id,
+                          receiverName: user.fullName,
+                          receiverAvatar: user.avatarUrl,
+                        ),
+                      );
                     },
                     onAvatarLongPress: isOwner
                         ? () => _showAccountSwitcherSheet(context, ref)
@@ -337,10 +358,8 @@ class _ProfileHeader extends ConsumerWidget {
 Future<void> _showAccountSwitcherSheet(BuildContext context, WidgetRef ref) async {
   final String? activeUserId = ref.read(authNotifierProvider).userId;
 
-  await showModalBottomSheet<void>(
+  await showTopOverlaySheet<void>(
     context: context,
-    backgroundColor: Colors.transparent,
-    isScrollControlled: true,
     builder: (BuildContext sheetContext) {
       return Consumer(
         builder: (
@@ -1086,9 +1105,8 @@ Future<void> _showGridManageSheet({
   required String userId,
   required PostModel post,
 }) async {
-  await showModalBottomSheet<void>(
+  await showTopOverlaySheet<void>(
     context: context,
-    backgroundColor: Colors.transparent,
     builder: (BuildContext sheetContext) {
       return SafeArea(
         child: Padding(

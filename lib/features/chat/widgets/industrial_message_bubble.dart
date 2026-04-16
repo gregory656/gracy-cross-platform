@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 
 import '../../../shared/models/message_model.dart';
 import '../../../shared/services/timezone_service.dart';
+import '../../../shared/widgets/top_overlay_sheet.dart';
 
 class IndustrialMessageBubble extends StatefulWidget {
   const IndustrialMessageBubble({
@@ -50,9 +51,8 @@ class _IndustrialMessageBubbleState extends State<IndustrialMessageBubble>
 
   void _showContextMenu() {
     HapticFeedback.lightImpact();
-    showModalBottomSheet(
+    showTopOverlaySheet<void>(
       context: context,
-      backgroundColor: Colors.transparent,
       builder: (context) => _MessageActionSheet(
         message: widget.message,
         onReply: () {

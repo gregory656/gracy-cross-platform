@@ -14,10 +14,12 @@ import '../../../shared/models/user_model.dart';
 import '../../../shared/providers/auth_provider.dart';
 import '../../../shared/providers/offline_banner_provider.dart';
 import '../../../shared/providers/profiles_provider.dart';
+import '../../../shared/providers/social_providers.dart';
 import '../../../shared/widgets/chat_tile.dart';
 import '../../../shared/widgets/custom_text_field.dart';
 import '../../../shared/widgets/disappearing_messages_dialog.dart';
 import '../../../shared/widgets/report_reason_sheet.dart';
+import '../../../shared/widgets/top_overlay_sheet.dart';
 import '../../../shared/widgets/user_avatar.dart';
 import '../data/chat_repository.dart';
 import '../providers/chat_providers.dart';
@@ -26,10 +28,18 @@ import '../widgets/industrial_message_bubble.dart';
 import '../widgets/date_header.dart';
 
 class ChatScreen extends ConsumerStatefulWidget {
-  const ChatScreen({super.key, this.chatId, this.userId});
+  const ChatScreen({
+    super.key,
+    this.chatId,
+    this.userId,
+    this.receiverName,
+    this.receiverAvatar,
+  });
 
   final String? chatId;
   final String? userId;
+  final String? receiverName;
+  final String? receiverAvatar;
 
   @override
   ConsumerState<ChatScreen> createState() => _ChatScreenState();
@@ -92,7 +102,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
         return;
       }
       _searchController.clear();
-      context.go('${AppRoutePaths.chat}?chatId=${thread.roomId}');
+      context.push('${AppRoutePaths.chat}?chatId=${thread.roomId}');
     } catch (error) {
       _showFeedback(error.toString().replaceFirst('Exception: ', ''));
     }
@@ -151,7 +161,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
       if (!mounted) {
         return;
       }
-      ref.read(offlineBannerProvider.notifier).showOfflineCachedContent();
+      ref.read(offlineBannerProvider.notifier).showOfflineCachedContentOnce();
     });
   }
 
@@ -215,12 +225,17 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
   void _markMessagesAsRead(ChatThread thread) {
     _readReceiptTimer?.cancel();
     _readReceiptTimer = Timer(const Duration(milliseconds: 500), () async {
+      final String? currentUserId = ref.read(authNotifierProvider).userId;
+      if (currentUserId == null) {
+        return;
+      }
       try {
         await ref
             .read(chatRepositoryProvider)
             .markMessagesAsRead(
               roomId: thread.roomId,
-              userId: thread.participant.id,
+              currentUserId: currentUserId,
+              participantId: thread.participant.id,
             );
       } catch (error) {
         // Silently fail for read receipts
@@ -265,9 +280,11 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
 
     final String readSignature = '${thread.roomId}:$unreadIncomingCount';
     if (unreadIncomingCount > 0 && readSignature != _lastReadSignature) {
+      ref.read(localReadChatsProvider.notifier).markRead(thread.roomId);
       _lastReadSignature = readSignature;
       _markMessagesAsRead(thread);
     } else if (unreadIncomingCount == 0) {
+      ref.read(localReadChatsProvider.notifier).markRead(thread.roomId);
       _lastReadSignature = readSignature;
     }
   }
@@ -348,6 +365,8 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
     final ChatThreadRequest request = ChatThreadRequest(
       roomId: widget.chatId,
       userId: widget.userId,
+      receiverName: widget.receiverName,
+      receiverAvatar: widget.receiverAvatar,
     );
     final bool showThread = request.roomId != null || request.userId != null;
     _syncShellNavigation(showThread);
@@ -365,6 +384,16 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
           recentChatsAsync: recentChatsAsync,
           startChatController: _searchController,
           onStartChat: _startChatByCode,
+        ),
+      );
+    }
+
+    if (widget.userId != null && widget.userId == currentUserId) {
+      return const Scaffold(
+        backgroundColor: Colors.black,
+        body: _CenteredMessage(
+          title: 'Chat unavailable',
+          subtitle: 'You cannot start a chat with yourself.',
         ),
       );
     }
@@ -414,6 +443,10 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
                         data: (LocalFirstData<List<MessageModel>> snapshot) {
                           if (snapshot.isFromCache) {
                             _showOfflineCachedNotice();
+                          } else {
+                            ref
+                                .read(offlineBannerProvider.notifier)
+                                .resetOfflineCachedContentNotice();
                           }
                           final List<MessageModel> messages = _mergeMessages(
                             snapshot.data,
@@ -435,6 +468,10 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
                             onBack: showSidebar
                                 ? null
                                 : () {
+                                    if (context.canPop()) {
+                                      context.pop();
+                                      return;
+                                    }
                                     context.go(AppRoutePaths.chat);
                                   },
                             onSend: () => _sendMessage(thread),
@@ -495,9 +532,171 @@ class _ChatShell extends ConsumerWidget {
   final VoidCallback onStartChat;
   final bool dense;
 
+  Future<void> _showChatActions(
+    BuildContext context,
+    WidgetRef ref,
+    ChatModel chat,
+    UserModel user,
+  ) {
+    return showTopOverlaySheet<void>(
+      context: context,
+      builder: (BuildContext sheetContext) {
+        return Material(
+          color: const Color(0xFF14181D),
+          borderRadius: BorderRadius.circular(24),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: <Widget>[
+              Container(
+                width: 44,
+                height: 4,
+                margin: const EdgeInsets.only(top: 12, bottom: 8),
+                decoration: BoxDecoration(
+                  color: Colors.white24,
+                  borderRadius: BorderRadius.circular(999),
+                ),
+              ),
+              ListTile(
+                leading: const Icon(
+                  Icons.visibility_off_outlined,
+                  color: Color(0xFFFFD27A),
+                ),
+                title: Text(
+                  'Remove From View',
+                  style: Theme.of(sheetContext).textTheme.titleSmall?.copyWith(
+                    color: Colors.white,
+                    fontWeight: FontWeight.w800,
+                  ),
+                ),
+                subtitle: Text(
+                  'Hide ${user.fullName} from this chat list.',
+                  style: Theme.of(sheetContext).textTheme.bodySmall?.copyWith(
+                    color: Colors.white70,
+                  ),
+                ),
+                onTap: () {
+                  Navigator.of(sheetContext).pop();
+                  ref
+                      .read(chatVisibilityProvider.notifier)
+                      .setVisibility(chat.id, ChatVisibility.hidden);
+                  ref.read(localReadChatsProvider.notifier).markRead(chat.id);
+                  ScaffoldMessenger.of(context)
+                    ..clearSnackBars()
+                    ..showSnackBar(
+                      SnackBar(
+                        content: Text(
+                          '${user.fullName} removed from view.',
+                        ),
+                        action: SnackBarAction(
+                          label: 'Undo',
+                          onPressed: () {
+                            ref
+                                .read(chatVisibilityProvider.notifier)
+                                .setVisibility(chat.id, ChatVisibility.visible);
+                          },
+                        ),
+                      ),
+                    );
+                },
+              ),
+              const Divider(height: 1, color: Color(0xFF2A2E34)),
+              ListTile(
+                leading: const Icon(
+                  Icons.archive_outlined,
+                  color: Color(0xFF7AD7FF),
+                ),
+                title: Text(
+                  'Archive',
+                  style: Theme.of(sheetContext).textTheme.titleSmall?.copyWith(
+                    color: Colors.white,
+                    fontWeight: FontWeight.w800,
+                  ),
+                ),
+                subtitle: Text(
+                  'Move ${user.fullName} into archived chats.',
+                  style: Theme.of(sheetContext).textTheme.bodySmall?.copyWith(
+                    color: Colors.white70,
+                  ),
+                ),
+                onTap: () {
+                  Navigator.of(sheetContext).pop();
+                  ref
+                      .read(chatVisibilityProvider.notifier)
+                      .setVisibility(chat.id, ChatVisibility.archived);
+                  ref.read(localReadChatsProvider.notifier).markRead(chat.id);
+                  ScaffoldMessenger.of(context)
+                    ..clearSnackBars()
+                    ..showSnackBar(
+                      SnackBar(
+                        content: Text('${user.fullName} archived.'),
+                        action: SnackBarAction(
+                          label: 'Undo',
+                          onPressed: () {
+                            ref
+                                .read(chatVisibilityProvider.notifier)
+                                .setVisibility(chat.id, ChatVisibility.visible);
+                          },
+                        ),
+                      ),
+                    );
+                },
+              ),
+              const Divider(height: 1, color: Color(0xFF2A2E34)),
+              ListTile(
+                leading: const Icon(
+                  Icons.delete_forever_outlined,
+                  color: Color(0xFFFF7A7A),
+                ),
+                title: Text(
+                  'Delete Permanently',
+                  style: Theme.of(sheetContext).textTheme.titleSmall?.copyWith(
+                    color: Colors.white,
+                    fontWeight: FontWeight.w800,
+                  ),
+                ),
+                subtitle: Text(
+                  'Remove ${user.fullName} from this device list.',
+                  style: Theme.of(sheetContext).textTheme.bodySmall?.copyWith(
+                    color: Colors.white70,
+                  ),
+                ),
+                onTap: () {
+                  Navigator.of(sheetContext).pop();
+                  ref
+                      .read(chatVisibilityProvider.notifier)
+                      .setVisibility(chat.id, ChatVisibility.deleted);
+                  ref.read(localReadChatsProvider.notifier).markRead(chat.id);
+                  ScaffoldMessenger.of(context)
+                    ..clearSnackBars()
+                    ..showSnackBar(
+                      SnackBar(
+                        content: Text('${user.fullName} deleted from view.'),
+                        action: SnackBarAction(
+                          label: 'Undo',
+                          onPressed: () {
+                            ref
+                                .read(chatVisibilityProvider.notifier)
+                                .setVisibility(chat.id, ChatVisibility.visible);
+                          },
+                        ),
+                      ),
+                    );
+                },
+              ),
+              const SizedBox(height: 10),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final bool isStarting = ref.watch(startChatControllerProvider).isLoading;
+    final Map<String, ChatVisibility> chatVisibility = ref.watch(
+      chatVisibilityProvider,
+    );
     final AsyncValue<List<UserModel>> profilesAsync = ref.watch(
       profilesDirectoryProvider,
     );
@@ -612,16 +811,34 @@ class _ChatShell extends ConsumerWidget {
                   WidgetsBinding.instance.addPostFrameCallback((_) {
                     ref
                         .read(offlineBannerProvider.notifier)
-                        .showOfflineCachedContent();
+                        .showOfflineCachedContentOnce();
                   });
+                } else {
+                  ref
+                      .read(offlineBannerProvider.notifier)
+                      .resetOfflineCachedContentNotice();
                 }
-                final List<ChatModel> chats = snapshot.data;
+                final List<ChatModel> chats = snapshot.data
+                    .where(
+                      (ChatModel chat) =>
+                          chatVisibility[chat.id] == null ||
+                          chatVisibility[chat.id] == ChatVisibility.visible,
+                    )
+                    .toList(growable: false);
+                final List<ChatModel> archivedChats = snapshot.data
+                    .where(
+                      (ChatModel chat) =>
+                          chatVisibility[chat.id] == ChatVisibility.archived,
+                    )
+                    .toList(growable: false);
                 if (chats.isEmpty) {
-                  return const _CenteredMessage(
-                    title: 'No chats yet',
-                    subtitle:
-                        'Use a Gracy code above to create the first room.',
-                  );
+                  if (archivedChats.isEmpty) {
+                    return const _CenteredMessage(
+                      title: 'No chats yet',
+                      subtitle:
+                          'Use a Gracy code above to create the first room.',
+                    );
+                  }
                 }
 
                 return Column(
@@ -645,8 +862,16 @@ class _ChatShell extends ConsumerWidget {
                             user: user,
                             onTap: () {
                               context.go(
-                                '${AppRoutePaths.chat}?chatId=${chat.id}',
+                                AppRoutePaths.chatByRoom(
+                                  chatId: chat.id,
+                                  userId: user.id,
+                                  receiverName: user.fullName,
+                                  receiverAvatar: user.avatarUrl,
+                                ),
                               );
+                            },
+                            onLongPress: () {
+                              _showChatActions(context, ref, chat, user);
                             },
                           );
                         },
@@ -656,6 +881,65 @@ class _ChatShell extends ConsumerWidget {
                           height: 1,
                           thickness: 0.8,
                           color: Colors.white.withValues(alpha: 0.10),
+                        ),
+                    ],
+                    if (archivedChats.isNotEmpty) ...<Widget>[
+                      const SizedBox(height: 18),
+                      Align(
+                        alignment: Alignment.centerLeft,
+                        child: Text(
+                          'Archived',
+                          style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                            color: Colors.white70,
+                            fontWeight: FontWeight.w800,
+                          ),
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                      for (final ChatModel archivedChat in archivedChats)
+                        Builder(
+                          builder: (BuildContext context) {
+                            final UserModel? user =
+                                profilesById[archivedChat.participantId];
+                            if (user == null) {
+                              return const SizedBox.shrink();
+                            }
+                            return ChatTile(
+                              chat: archivedChat,
+                              user: user,
+                              onTap: () {
+                                ref
+                                    .read(chatVisibilityProvider.notifier)
+                                    .setVisibility(
+                                      archivedChat.id,
+                                      ChatVisibility.visible,
+                                    );
+                                context.go(
+                                  AppRoutePaths.chatByRoom(
+                                    chatId: archivedChat.id,
+                                    userId: user.id,
+                                    receiverName: user.fullName,
+                                    receiverAvatar: user.avatarUrl,
+                                  ),
+                                );
+                              },
+                              onLongPress: () {
+                                ref
+                                    .read(chatVisibilityProvider.notifier)
+                                    .setVisibility(
+                                      archivedChat.id,
+                                      ChatVisibility.visible,
+                                    );
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  SnackBar(
+                                    content: Text(
+                                      '${user.fullName} restored from archive.',
+                                    ),
+                                  ),
+                                );
+                              },
+                            );
+                          },
                         ),
                     ],
                   ],
@@ -830,97 +1114,90 @@ class _ThreadHeader extends StatelessWidget {
   final VoidCallback? onBack;
 
   Future<void> _showThreadMenu(BuildContext context) async {
-    await showModalBottomSheet<void>(
+    await showTopOverlaySheet<void>(
       context: context,
-      backgroundColor: Colors.transparent,
       builder: (BuildContext sheetContext) {
-        return SafeArea(
-          top: false,
-          child: Padding(
-            padding: const EdgeInsets.fromLTRB(12, 0, 12, 12),
-            child: Material(
-              color: const Color(0xFF14181D),
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(24),
-                side: BorderSide(color: Colors.white.withValues(alpha: 0.08)),
+        return Material(
+          color: const Color(0xFF14181D),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(24),
+            side: BorderSide(color: Colors.white.withValues(alpha: 0.08)),
+          ),
+          clipBehavior: Clip.antiAlias,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: <Widget>[
+              Container(
+                width: 44,
+                height: 4,
+                margin: const EdgeInsets.only(top: 12, bottom: 8),
+                decoration: BoxDecoration(
+                  color: Colors.white24,
+                  borderRadius: BorderRadius.circular(999),
+                ),
               ),
-              clipBehavior: Clip.antiAlias,
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: <Widget>[
-                  Container(
-                    width: 44,
-                    height: 4,
-                    margin: const EdgeInsets.only(top: 12, bottom: 8),
-                    decoration: BoxDecoration(
-                      color: Colors.white24,
-                      borderRadius: BorderRadius.circular(999),
+              _ThreadActionTile(
+                icon: Icons.account_circle_outlined,
+                label: 'View Profile',
+                onTap: () {
+                  Navigator.of(sheetContext).pop();
+                  onViewProfile();
+                },
+              ),
+              const Divider(height: 1, color: Color(0xFF2A2E34)),
+              _ThreadActionTile(
+                icon: Icons.search_rounded,
+                label: 'Search Conversation',
+                onTap: () {
+                  Navigator.of(sheetContext).pop();
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(
+                      content: Text('Conversation search is queued next.'),
                     ),
-                  ),
-                  _ThreadActionTile(
-                    icon: Icons.account_circle_outlined,
-                    label: 'View Profile',
-                    onTap: () {
-                      Navigator.of(sheetContext).pop();
-                      onViewProfile();
-                    },
-                  ),
-                  const Divider(height: 1, color: Color(0xFF2A2E34)),
-                  _ThreadActionTile(
-                    icon: Icons.search_rounded,
-                    label: 'Search Conversation',
-                    onTap: () {
-                      Navigator.of(sheetContext).pop();
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(
-                          content: Text('Conversation search is queued next.'),
-                        ),
-                      );
-                    },
-                  ),
-                  const Divider(height: 1, color: Color(0xFF2A2E34)),
-                  _ThreadActionTile(
-                    icon: Icons.notifications_off_outlined,
-                    label: 'Mute Notifications',
-                    onTap: () {
-                      Navigator.of(sheetContext).pop();
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        SnackBar(
-                          content: Text(
-                            'Notifications muted for ${participant.fullName}.',
-                          ),
-                        ),
-                      );
-                    },
-                  ),
-                  const Divider(height: 1, color: Color(0xFF2A2E34)),
-                  _ThreadActionTile(
-                    icon: Icons.outlined_flag_rounded,
-                    label: 'Block / Report',
-                    color: const Color(0xFFFF5C5C),
-                    onTap: () async {
-                      Navigator.of(sheetContext).pop();
-                      final String? reason = await showReportReasonSheet(
-                        context,
-                        title: 'Report Profile',
-                        subtitle:
-                            'Choose what feels wrong so we can review this profile.',
-                      );
-                      if (reason != null && context.mounted) {
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          SnackBar(
-                            content: Text(
-                              'Reported ${participant.fullName} for "$reason".',
-                            ),
-                          ),
-                        );
-                      }
-                    },
-                  ),
-                  const SizedBox(height: 8),
-                ],
+                  );
+                },
               ),
-            ),
+              const Divider(height: 1, color: Color(0xFF2A2E34)),
+              _ThreadActionTile(
+                icon: Icons.notifications_off_outlined,
+                label: 'Mute Notifications',
+                onTap: () {
+                  Navigator.of(sheetContext).pop();
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      content: Text(
+                        'Notifications muted for ${participant.fullName}.',
+                      ),
+                    ),
+                  );
+                },
+              ),
+              const Divider(height: 1, color: Color(0xFF2A2E34)),
+              _ThreadActionTile(
+                icon: Icons.outlined_flag_rounded,
+                label: 'Block / Report',
+                color: const Color(0xFFFF5C5C),
+                onTap: () async {
+                  Navigator.of(sheetContext).pop();
+                  final String? reason = await showReportReasonSheet(
+                    context,
+                    title: 'Report Profile',
+                    subtitle:
+                        'Choose what feels wrong so we can review this profile.',
+                  );
+                  if (reason != null && context.mounted) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(
+                        content: Text(
+                          'Reported ${participant.fullName} for "$reason".',
+                        ),
+                      ),
+                    );
+                  }
+                },
+              ),
+              const SizedBox(height: 8),
+            ],
           ),
         );
       },
@@ -929,7 +1206,15 @@ class _ThreadHeader extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final bool isOfficial = participant.id == ChatRepository.botUserId;
+    final UserModel safeParticipant = participant.id.isEmpty
+        ? participant.copyWith(
+            id: 'unknown-user',
+            fullName: participant.fullName.trim().isEmpty
+                ? 'Gracy User'
+                : participant.fullName,
+          )
+        : participant;
+    final bool isOfficial = safeParticipant.id == ChatRepository.botUserId;
 
     return Container(
       margin: const EdgeInsets.fromLTRB(18, 4, 18, 0),
@@ -951,7 +1236,7 @@ class _ThreadHeader extends StatelessWidget {
           GestureDetector(
             onTap: onViewProfile,
             child: UserAvatar(
-              user: participant,
+              user: safeParticipant,
               size: 38,
               fontSize: 14,
               showRing: false,
@@ -966,7 +1251,9 @@ class _ThreadHeader extends StatelessWidget {
                   children: <Widget>[
                     Flexible(
                       child: Text(
-                        participant.fullName,
+                        safeParticipant.fullName.trim().isEmpty
+                            ? 'Gracy User'
+                            : safeParticipant.fullName,
                         overflow: TextOverflow.ellipsis,
                         style: Theme.of(context).textTheme.titleMedium
                             ?.copyWith(

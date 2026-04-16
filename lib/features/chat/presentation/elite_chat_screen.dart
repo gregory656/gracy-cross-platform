@@ -8,6 +8,7 @@ import '../widgets/nairobi_date_header.dart';
 import '../widgets/elite_chat_composer.dart';
 import '../../../shared/models/message_model.dart';
 import '../../../shared/services/nairobi_timezone_service.dart';
+import '../../../shared/widgets/top_overlay_sheet.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/utils/elite_animations.dart';
 
@@ -78,12 +79,11 @@ class _EliteChatScreenState extends ConsumerState<EliteChatScreen>
   }
 
   void _handleMessageLongPress(MessageModel message) {
-    showModalBottomSheet(
+    showTopOverlaySheet<void>(
       context: context,
-      backgroundColor: Colors.transparent,
       builder: (context) => Container(
-        margin: const EdgeInsets.all(16),
-        child: EliteLongPressMenu(
+          margin: const EdgeInsets.all(16),
+          child: EliteLongPressMenu(
           message: message,
           onActionSelected: (action) {
             _handleMenuAction(action, message);

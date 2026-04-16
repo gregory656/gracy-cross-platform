@@ -5,11 +5,27 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../core/constants.dart';
 import '../models/connection_model.dart';
 import '../models/notification_model.dart';
+import '../../features/chat/providers/chat_providers.dart';
 import 'auth_provider.dart';
 
 final socialServiceProvider = Provider<SocialService>((ref) {
   return SocialService(ref);
 });
+
+final localReadChatsProvider =
+    NotifierProvider<LocalReadChatsController, Map<String, DateTime>>(
+      LocalReadChatsController.new,
+    );
+
+final chatVisibilityProvider =
+    NotifierProvider<ChatVisibilityController, Map<String, ChatVisibility>>(
+      ChatVisibilityController.new,
+    );
+
+final locallyReadNotificationIdsProvider =
+    NotifierProvider<LocallyReadNotificationIdsController, Set<int>>(
+      LocallyReadNotificationIdsController.new,
+    );
 
 final notificationsStreamProvider = StreamProvider<List<NotificationModel>>((
   ref,
@@ -33,10 +49,45 @@ final notificationsStreamProvider = StreamProvider<List<NotificationModel>>((
 
 final unreadNotificationsCountProvider = Provider<int>((ref) {
   final asyncValue = ref.watch(notificationsStreamProvider);
+  final Set<int> locallyReadIds = ref.watch(locallyReadNotificationIdsProvider);
   return asyncValue.maybeWhen(
-    data: (notifications) => notifications.where((e) => !e.isRead).length,
+    data: (notifications) => notifications
+        .where((e) => !e.isRead && !locallyReadIds.contains(e.id))
+        .length,
     orElse: () => 0,
   );
+});
+
+final unreadMessagesCountProvider = Provider<int>((ref) {
+  final recentChatsAsync = ref.watch(recentChatsProvider);
+  final Map<String, DateTime> locallyReadChats = ref.watch(
+    localReadChatsProvider,
+  );
+  final Map<String, ChatVisibility> chatVisibility = ref.watch(
+    chatVisibilityProvider,
+  );
+  return recentChatsAsync.maybeWhen(
+    data: (snapshot) => snapshot.data.fold<int>(0, (int total, chat) {
+      if (chatVisibility[chat.id] != null &&
+          chatVisibility[chat.id] != ChatVisibility.visible) {
+        return total;
+      }
+      final DateTime? clearedAt = locallyReadChats[chat.id];
+      final bool wasClearedAfterLatestMessage =
+          clearedAt != null && !chat.lastMessageAt.isAfter(clearedAt);
+      if (wasClearedAfterLatestMessage) {
+        return total;
+      }
+      return total + chat.unreadCount;
+    }),
+    orElse: () => 0,
+  );
+});
+
+final notificationBellCountProvider = Provider<int>((ref) {
+  final int notificationCount = ref.watch(unreadNotificationsCountProvider);
+  final int messageCount = ref.watch(unreadMessagesCountProvider);
+  return notificationCount + messageCount;
 });
 
 final connectionsStreamProvider = StreamProvider<List<ConnectionModel>>((ref) {
@@ -121,11 +172,44 @@ class SocialService {
     if (myId == null) return;
 
     try {
+      final Map<String, dynamic>? existing = await Supabase.instance.client
+          .from('connections')
+          .select('status')
+          .eq('user_id', myId)
+          .eq('contact_id', contactId)
+          .maybeSingle();
+
+      if (existing != null) {
+        return;
+      }
+
       await Supabase.instance.client.from('connections').insert({
         'user_id': myId,
         'contact_id': contactId,
         'status': 'pending',
       });
+
+      await Supabase.instance.client.from('notifications').insert({
+        'receiver_id': contactId,
+        'sender_id': myId,
+        'type': 'connection_request',
+        'content': 'sent you a connection request',
+        'is_read': false,
+      });
+    } catch (_) {}
+  }
+
+  Future<void> markNotificationAsRead(int notificationId) async {
+    ref
+        .read(locallyReadNotificationIdsProvider.notifier)
+        .markRead(notificationId);
+    if (!SupabaseConfig.isConfigured) return;
+
+    try {
+      await Supabase.instance.client
+          .from('notifications')
+          .update({'is_read': true})
+          .eq('id', notificationId);
     } catch (_) {}
   }
 
@@ -144,6 +228,7 @@ class SocialService {
           .from('notifications')
           .update({'is_read': true})
           .eq('id', notif.id);
+      ref.read(locallyReadNotificationIdsProvider.notifier).markRead(notif.id);
     } catch (_) {}
   }
 
@@ -160,6 +245,48 @@ class SocialService {
           .from('notifications')
           .delete()
           .eq('id', notif.id);
+      ref.read(locallyReadNotificationIdsProvider.notifier).markRead(notif.id);
     } catch (_) {}
+  }
+}
+
+class LocalReadChatsController extends Notifier<Map<String, DateTime>> {
+  @override
+  Map<String, DateTime> build() => <String, DateTime>{};
+
+  void markRead(String roomId, {DateTime? at}) {
+    state = <String, DateTime>{
+      ...state,
+      roomId: at ?? DateTime.now(),
+    };
+  }
+}
+
+enum ChatVisibility { visible, hidden, archived, deleted }
+
+class ChatVisibilityController extends Notifier<Map<String, ChatVisibility>> {
+  @override
+  Map<String, ChatVisibility> build() => <String, ChatVisibility>{};
+
+  void setVisibility(String roomId, ChatVisibility visibility) {
+    if (visibility == ChatVisibility.visible) {
+      final Map<String, ChatVisibility> next = <String, ChatVisibility>{
+        ...state,
+      };
+      next.remove(roomId);
+      state = next;
+      return;
+    }
+
+    state = <String, ChatVisibility>{...state, roomId: visibility};
+  }
+}
+
+class LocallyReadNotificationIdsController extends Notifier<Set<int>> {
+  @override
+  Set<int> build() => <int>{};
+
+  void markRead(int notificationId) {
+    state = <int>{...state, notificationId};
   }
 }

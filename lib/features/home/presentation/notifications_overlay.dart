@@ -1,7 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 
+import '../../../core/router/app_router.dart';
 import '../../../core/theme/app_colors.dart';
+import '../../../features/chat/providers/chat_providers.dart';
+import '../../../shared/models/chat_model.dart';
+import '../../../shared/models/notification_model.dart';
 import '../../../shared/providers/profiles_provider.dart';
 import '../../../shared/providers/social_providers.dart';
 import '../../../shared/widgets/user_avatar.dart';
@@ -12,6 +17,7 @@ class NotificationsOverlay extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final notificationsAsync = ref.watch(notificationsStreamProvider);
+    final recentChatsAsync = ref.watch(recentChatsProvider);
 
     return Container(
       margin: const EdgeInsets.only(top: kToolbarHeight),
@@ -24,25 +30,73 @@ class NotificationsOverlay extends ConsumerWidget {
           _buildHeader(context),
           Expanded(
             child: notificationsAsync.when(
-              loading: () => const Center(child: CircularProgressIndicator()),
-              error: (err, stack) => Center(child: Text('Error: $err')),
+              loading: () => recentChatsAsync.when(
+                loading: () => const Center(child: CircularProgressIndicator()),
+                error: (_, _) => const Center(
+                  child: Text(
+                    'No new notifications.',
+                    style: TextStyle(color: AppColors.textSecondary),
+                  ),
+                ),
+                data: (snapshot) => _NotificationsBody(
+                  unreadNotifications: const <NotificationModel>[],
+                  unreadChats: snapshot.data
+                      .where((ChatModel chat) => chat.unreadCount > 0)
+                      .toList(growable: false),
+                ),
+              ),
+              error: (_, _) => recentChatsAsync.when(
+                loading: () => const Center(child: CircularProgressIndicator()),
+                error: (_, _) => const Center(
+                  child: Text(
+                    'No new notifications.',
+                    style: TextStyle(color: AppColors.textSecondary),
+                  ),
+                ),
+                data: (snapshot) => _NotificationsBody(
+                  unreadNotifications: const <NotificationModel>[],
+                  unreadChats: snapshot.data
+                      .where((ChatModel chat) => chat.unreadCount > 0)
+                      .toList(growable: false),
+                ),
+              ),
               data: (notifications) {
-                if (notifications.isEmpty) {
-                  return const Center(
-                    child: Text(
-                      'No new notifications.',
-                      style: TextStyle(color: AppColors.textSecondary),
-                    ),
-                  );
-                }
+                final Set<int> locallyReadIds = ref.watch(
+                  locallyReadNotificationIdsProvider,
+                );
+                final Map<String, ChatVisibility> chatVisibility = ref.watch(
+                  chatVisibilityProvider,
+                );
+                final Map<String, DateTime> locallyReadChats = ref.watch(
+                  localReadChatsProvider,
+                );
+                final List<NotificationModel> unreadNotifications = notifications
+                    .where(
+                      (NotificationModel notification) =>
+                          !notification.isRead &&
+                          !locallyReadIds.contains(notification.id),
+                    )
+                    .toList(growable: false);
+                final List<ChatModel> unreadChats = recentChatsAsync.maybeWhen(
+                  data: (snapshot) => snapshot.data
+                      .where((ChatModel chat) {
+                        if (chatVisibility[chat.id] != null &&
+                            chatVisibility[chat.id] != ChatVisibility.visible) {
+                          return false;
+                        }
+                        final DateTime? clearedAt = locallyReadChats[chat.id];
+                        final bool wasClearedAfterLatestMessage =
+                            clearedAt != null &&
+                            !chat.lastMessageAt.isAfter(clearedAt);
+                        return chat.unreadCount > 0 && !wasClearedAfterLatestMessage;
+                      })
+                      .toList(growable: false),
+                  orElse: () => const <ChatModel>[],
+                );
 
-                return ListView.builder(
-                  padding: const EdgeInsets.all(16),
-                  itemCount: notifications.length,
-                  itemBuilder: (context, index) {
-                    final notif = notifications[index];
-                    return _NotificationTile(notif: notif);
-                  },
+                return _NotificationsBody(
+                  unreadNotifications: unreadNotifications,
+                  unreadChats: unreadChats,
                 );
               },
             ),
@@ -79,10 +133,143 @@ class NotificationsOverlay extends ConsumerWidget {
   }
 }
 
+class _NotificationsBody extends StatelessWidget {
+  const _NotificationsBody({
+    required this.unreadNotifications,
+    required this.unreadChats,
+  });
+
+  final List<NotificationModel> unreadNotifications;
+  final List<ChatModel> unreadChats;
+
+  @override
+  Widget build(BuildContext context) {
+    if (unreadNotifications.isEmpty && unreadChats.isEmpty) {
+      return const Center(
+        child: Text(
+          'No new notifications.',
+          style: TextStyle(color: AppColors.textSecondary),
+        ),
+      );
+    }
+
+    return ListView(
+      padding: const EdgeInsets.all(16),
+      children: <Widget>[
+        if (unreadChats.isNotEmpty) ...<Widget>[
+          const _SectionTitle(title: 'Unread messages'),
+          const SizedBox(height: 12),
+          for (final ChatModel chat in unreadChats) _UnreadChatTile(chat: chat),
+          const SizedBox(height: 16),
+        ],
+        if (unreadNotifications.isNotEmpty) ...<Widget>[
+          const _SectionTitle(title: 'Requests'),
+          const SizedBox(height: 12),
+          for (final NotificationModel notif in unreadNotifications)
+            _NotificationTile(notif: notif),
+        ],
+      ],
+    );
+  }
+}
+
+class _SectionTitle extends StatelessWidget {
+  const _SectionTitle({required this.title});
+
+  final String title;
+
+  @override
+  Widget build(BuildContext context) {
+    return Text(
+      title,
+      style: const TextStyle(
+        color: AppColors.textPrimary,
+        fontSize: 15,
+        fontWeight: FontWeight.w800,
+      ),
+    );
+  }
+}
+
+class _UnreadChatTile extends ConsumerWidget {
+  const _UnreadChatTile({required this.chat});
+
+  final ChatModel chat;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final participantAsync = ref.watch(profileByIdProvider(chat.participantId));
+
+    return participantAsync.when(
+      loading: () => const Padding(
+        padding: EdgeInsets.symmetric(vertical: 12),
+        child: Center(child: CircularProgressIndicator()),
+      ),
+      error: (_, _) => const SizedBox.shrink(),
+      data: (participant) {
+        if (participant == null) {
+          return const SizedBox.shrink();
+        }
+
+        return Container(
+          margin: const EdgeInsets.only(bottom: 12),
+          decoration: BoxDecoration(
+            color: AppColors.surface.withValues(alpha: 0.45),
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(color: AppColors.outline),
+          ),
+          child: ListTile(
+            onTap: () {
+              ref.read(localReadChatsProvider.notifier).markRead(chat.id);
+              Navigator.of(context).pop();
+              context.push(
+                AppRoutePaths.chatByRoom(
+                  chatId: chat.id,
+                  userId: participant.id,
+                  receiverName: participant.fullName,
+                  receiverAvatar: participant.avatarUrl,
+                ),
+              );
+            },
+            leading: UserAvatar(user: participant, size: 42),
+            title: Text(
+              participant.fullName,
+              style: const TextStyle(
+                color: AppColors.textPrimary,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+            subtitle: Text(
+              chat.lastMessage,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: const TextStyle(color: AppColors.textSecondary),
+            ),
+            trailing: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+              decoration: BoxDecoration(
+                color: AppColors.accentCyan,
+                borderRadius: BorderRadius.circular(999),
+              ),
+              child: Text(
+                chat.unreadCount > 99 ? '99+' : '${chat.unreadCount}',
+                style: const TextStyle(
+                  color: AppColors.background,
+                  fontWeight: FontWeight.w800,
+                ),
+              ),
+            ),
+          ),
+        );
+      },
+    );
+  }
+}
+
 class _NotificationTile extends ConsumerWidget {
   const _NotificationTile({required this.notif});
 
-  final dynamic notif;
+  final NotificationModel notif;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -90,7 +277,6 @@ class _NotificationTile extends ConsumerWidget {
 
     return Container(
       margin: const EdgeInsets.only(bottom: 12),
-      padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
         color: notif.isRead
             ? AppColors.surface.withValues(alpha: 0.4)
@@ -107,85 +293,121 @@ class _NotificationTile extends ConsumerWidget {
           height: 60,
           child: Center(child: CircularProgressIndicator()),
         ),
-        error: (_, error) => const Text('Error loading sender info'),
+        error: (_, _) => const Text('Error loading sender info'),
         data: (sender) {
-          if (sender == null) return const SizedBox.shrink();
+          if (sender == null) {
+            return const SizedBox.shrink();
+          }
+          final bool isConnectionRequest = notif.type == 'connection_request';
+          final String message = isConnectionRequest
+              ? 'wants to connect with you!'
+              : (notif.content?.trim().isNotEmpty ?? false)
+                  ? notif.content!.trim()
+                  : 'sent you a new message.';
 
-          return Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(
+          return InkWell(
+            borderRadius: BorderRadius.circular(16),
+            onTap: isConnectionRequest
+                ? null
+                : () async {
+                    ref
+                        .read(locallyReadNotificationIdsProvider.notifier)
+                        .markRead(notif.id);
+                    if (context.mounted) {
+                      Navigator.of(context).pop();
+                      context.push(
+                        AppRoutePaths.chatByUser(
+                          userId: notif.senderId,
+                          receiverName: sender.fullName,
+                          receiverAvatar: sender.avatarUrl,
+                        ),
+                      );
+                    }
+                    await ref
+                        .read(socialServiceProvider)
+                        .markNotificationAsRead(notif.id);
+                  },
+            child: Padding(
+              padding: const EdgeInsets.all(12),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  UserAvatar(user: sender, size: 40),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: RichText(
-                      text: TextSpan(
-                        style: const TextStyle(
-                          color: AppColors.textPrimary,
-                          fontSize: 14,
-                        ),
-                        children: [
-                          TextSpan(
-                            text: sender.fullName,
-                            style: const TextStyle(fontWeight: FontWeight.bold),
-                          ),
-                          const TextSpan(text: ' wants to connect with you!'),
-                        ],
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-              if (notif.type == 'connection_request' && !notif.isRead) ...[
-                const SizedBox(height: 12),
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.end,
-                  children: [
-                    TextButton(
-                      onPressed: () async {
-                        await ref
-                            .read(socialServiceProvider)
-                            .declineConnection(notif);
-                      },
-                      style: TextButton.styleFrom(
-                        foregroundColor: AppColors.textSecondary,
-                      ),
-                      child: const Text('Decline'),
-                    ),
-                    const SizedBox(width: 8),
-                    ElevatedButton(
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: AppColors.accentCyan,
-                        foregroundColor: AppColors.background,
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(99),
-                        ),
-                      ),
-                      onPressed: () async {
-                        await ref
-                            .read(socialServiceProvider)
-                            .acceptConnection(notif);
-                        if (context.mounted) {
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            SnackBar(
-                              content: Text(
-                                'You are now connected with ${sender.fullName}!',
-                              ),
-                              backgroundColor: AppColors.success,
+                  Row(
+                    children: [
+                      UserAvatar(user: sender, size: 40),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: RichText(
+                          text: TextSpan(
+                            style: const TextStyle(
+                              color: AppColors.textPrimary,
+                              fontSize: 14,
                             ),
-                          );
-                        }
-                      },
-                      child: const Text(
-                        'Accept',
-                        style: TextStyle(fontWeight: FontWeight.bold),
+                            children: [
+                              TextSpan(
+                                text: sender.fullName,
+                                style: const TextStyle(
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                              TextSpan(text: ' $message'),
+                            ],
+                          ),
+                        ),
                       ),
+                    ],
+                  ),
+                  if (isConnectionRequest && !notif.isRead) ...[
+                    const SizedBox(height: 12),
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.end,
+                      children: [
+                        TextButton(
+                          onPressed: () async {
+                            await ref
+                                .read(socialServiceProvider)
+                                .declineConnection(notif);
+                          },
+                          style: TextButton.styleFrom(
+                            foregroundColor: AppColors.textSecondary,
+                          ),
+                          child: const Text('Decline'),
+                        ),
+                        const SizedBox(width: 8),
+                        ElevatedButton(
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: AppColors.accentCyan,
+                            foregroundColor: AppColors.background,
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(99),
+                            ),
+                          ),
+                          onPressed: () async {
+                            await ref
+                                .read(socialServiceProvider)
+                                .acceptConnection(notif);
+                            if (context.mounted) {
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                SnackBar(
+                                  content: Text(
+                                    'You are now connected with ${sender.fullName}!',
+                                  ),
+                                  backgroundColor: AppColors.success,
+                                ),
+                              );
+                            }
+                          },
+                          child: const Text(
+                            'Accept',
+                            style: TextStyle(fontWeight: FontWeight.bold),
+                          ),
+                        ),
+                      ],
                     ),
                   ],
-                ),
-              ],
-            ],
+                ],
+              ),
+            ),
           );
         },
       ),

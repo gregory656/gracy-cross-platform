@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../core/theme/app_colors.dart';
 import '../models/user_model.dart';
 import '../providers/auth_provider.dart';
+import '../providers/social_providers.dart';
 import '../widgets/user_avatar.dart';
 import '../widgets/verification_badges.dart';
 
@@ -23,23 +24,7 @@ class ProfileCard extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final String? myId = ref.watch(authNotifierProvider).userId;
 
-    String ctaLabel = 'Connect';
-    bool isDisabled = false;
-    VoidCallback? action = onPrimaryAction;
-
-    // Simplified connection logic - always show connect button
-    ctaLabel = 'Connect';
-    action = () async {
-      // Connection request functionality would go here
-      if (context.mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Connection request sent to ${user.fullName}'),
-            backgroundColor: AppColors.accentBlue,
-          ),
-        );
-      }
-    };
+    final socialService = ref.read(socialServiceProvider);
 
     return Card(
       elevation: 0,
@@ -143,16 +128,39 @@ class ProfileCard extends ConsumerWidget {
                   if (myId != user.id) ...[
                     Expanded(
                       child: _CardAction(
-                        label: ctaLabel,
-                        onTap: action,
-                        filled: !isDisabled,
+                        label: 'Message',
+                        onTap: onPrimaryAction,
+                        filled: true,
+                      ),
+                    ),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: _CardAction(
+                        label: 'Connect',
+                        onTap: () async {
+                          await socialService.sendConnectionRequest(user.id);
+                          if (!context.mounted) {
+                            return;
+                          }
+                          ScaffoldMessenger.of(context)
+                            ..clearSnackBars()
+                            ..showSnackBar(
+                              SnackBar(
+                                content: Text(
+                                  'Connection request sent to ${user.fullName}',
+                                ),
+                                backgroundColor: AppColors.accentBlue,
+                              ),
+                            );
+                        },
+                        filled: false,
                       ),
                     ),
                     const SizedBox(width: 10),
                   ],
                   Expanded(
                     child: _CardAction(
-                      label: 'Profile',
+                      label: myId == user.id ? 'Profile' : 'View Profile',
                       onTap: onTap,
                       filled: false,
                     ),

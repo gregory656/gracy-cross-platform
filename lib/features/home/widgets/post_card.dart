@@ -7,10 +7,12 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:dio/dio.dart';
+import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
 import 'package:image_gallery_saver/image_gallery_saver.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:share_plus/share_plus.dart';
+import '../../../core/router/app_router.dart';
 import '../../../core/router/shell_ui_provider.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/utils/elite_animations.dart';
@@ -19,6 +21,7 @@ import '../../../shared/providers/auth_provider.dart';
 import '../../../shared/services/nairobi_timezone_service.dart';
 import '../../../shared/utils/post_share_text.dart';
 import '../../../shared/widgets/report_reason_sheet.dart';
+import '../../../shared/widgets/top_overlay_sheet.dart';
 import 'post_comments_bottom_sheet.dart';
 import '../providers/post_providers.dart';
 
@@ -166,10 +169,8 @@ class _PostCardState extends ConsumerState<PostCard> {
   Future<void> _showComments() async {
     ref.read(shellNavigationVisibleProvider.notifier).hide();
     try {
-      await showModalBottomSheet<void>(
+      await showTopOverlaySheet<void>(
         context: context,
-        isScrollControlled: true,
-        backgroundColor: Colors.transparent,
         builder: (context) => PostCommentsBottomSheet(
           postId: widget.post.id,
           postAuthorId: widget.post.authorId,
@@ -205,10 +206,9 @@ class _PostCardState extends ConsumerState<PostCard> {
     }
 
     if (!canManagePost) {
-      await showModalBottomSheet<void>(
-        context: context,
-        backgroundColor: Colors.transparent,
-        builder: (BuildContext sheetContext) => _ViewerPostActionSheet(
+        await showTopOverlaySheet<void>(
+          context: context,
+          builder: (BuildContext sheetContext) => _ViewerPostActionSheet(
           onHide: () async {
             Navigator.of(sheetContext).pop();
             _hidePost();
@@ -226,9 +226,8 @@ class _PostCardState extends ConsumerState<PostCard> {
       return;
     }
 
-    await showModalBottomSheet<void>(
+    await showTopOverlaySheet<void>(
       context: context,
-      backgroundColor: Colors.transparent,
       builder: (sheetContext) => _PostActionSheet(
         canManagePost: canManagePost,
         canSaveToGallery: _hasSavableMedia,
@@ -308,10 +307,8 @@ class _PostCardState extends ConsumerState<PostCard> {
 
   Future<void> _showEditPostSheet() async {
     final messenger = ScaffoldMessenger.maybeOf(context);
-    final wasUpdated = await showModalBottomSheet<bool>(
+    final wasUpdated = await showTopOverlaySheet<bool>(
       context: context,
-      isScrollControlled: true,
-      backgroundColor: Colors.transparent,
       builder: (context) => _EditPostSheet(post: widget.post),
     );
 
@@ -543,6 +540,13 @@ class _PostCardState extends ConsumerState<PostCard> {
     return count.toString();
   }
 
+  void _openAuthorProfile() {
+    if (widget.post.authorId.isEmpty) {
+      return;
+    }
+    context.push('${AppRoutePaths.profile}?userId=${widget.post.authorId}');
+  }
+
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
@@ -574,56 +578,69 @@ class _PostCardState extends ConsumerState<PostCard> {
             padding: const EdgeInsets.fromLTRB(12, 14, 12, 10),
             child: Row(
               children: <Widget>[
-                Container(
-                  width: 40,
-                  height: 40,
-                  decoration: BoxDecoration(
-                    color: theme.colorScheme.surfaceContainerHighest,
-                    borderRadius: BorderRadius.circular(20),
-                  ),
-                  child:
-                      widget.post.authorAvatar != null &&
-                          widget.post.authorAvatar!.isNotEmpty
-                      ? ClipRRect(
-                          borderRadius: BorderRadius.circular(20),
-                          child: CachedNetworkImage(
-                            imageUrl: widget.post.authorAvatar!,
-                            fit: BoxFit.cover,
-                            placeholder: (context, url) => Icon(
-                              Icons.person,
-                              color: theme.colorScheme.onSurfaceVariant,
+                Expanded(
+                  child: InkWell(
+                    onTap: _openAuthorProfile,
+                    borderRadius: BorderRadius.circular(18),
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(vertical: 4),
+                      child: Row(
+                        children: <Widget>[
+                          Container(
+                            width: 40,
+                            height: 40,
+                            decoration: BoxDecoration(
+                              color: theme.colorScheme.surfaceContainerHighest,
+                              borderRadius: BorderRadius.circular(20),
                             ),
-                            errorWidget: (context, url, error) => Icon(
-                              Icons.person,
-                              color: theme.colorScheme.onSurfaceVariant,
+                            child:
+                                widget.post.authorAvatar != null &&
+                                    widget.post.authorAvatar!.isNotEmpty
+                                ? ClipRRect(
+                                    borderRadius: BorderRadius.circular(20),
+                                    child: CachedNetworkImage(
+                                      imageUrl: widget.post.authorAvatar!,
+                                      fit: BoxFit.cover,
+                                      placeholder: (context, url) => Icon(
+                                        Icons.person,
+                                        color: theme.colorScheme.onSurfaceVariant,
+                                      ),
+                                      errorWidget: (context, url, error) => Icon(
+                                        Icons.person,
+                                        color: theme.colorScheme.onSurfaceVariant,
+                                      ),
+                                    ),
+                                  )
+                                : Icon(
+                                    Icons.person,
+                                    color: theme.colorScheme.onSurfaceVariant,
+                                  ),
+                          ),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: <Widget>[
+                                Text(
+                                  widget.post.authorName ?? 'Unknown User',
+                                  style: theme.textTheme.titleMedium?.copyWith(
+                                    fontWeight: FontWeight.w600,
+                                    color: theme.colorScheme.onSurface,
+                                  ),
+                                ),
+                                const SizedBox(height: 2),
+                                Text(
+                                  _formatTimestamp(widget.post.createdAt),
+                                  style: theme.textTheme.bodySmall?.copyWith(
+                                    color: theme.colorScheme.onSurfaceVariant,
+                                  ),
+                                ),
+                              ],
                             ),
                           ),
-                        )
-                      : Icon(
-                          Icons.person,
-                          color: theme.colorScheme.onSurfaceVariant,
-                        ),
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: <Widget>[
-                      Text(
-                        widget.post.authorName ?? 'Unknown User',
-                        style: theme.textTheme.titleMedium?.copyWith(
-                          fontWeight: FontWeight.w600,
-                          color: theme.colorScheme.onSurface,
-                        ),
+                        ],
                       ),
-                      const SizedBox(height: 2),
-                      Text(
-                        _formatTimestamp(widget.post.createdAt),
-                        style: theme.textTheme.bodySmall?.copyWith(
-                          color: theme.colorScheme.onSurfaceVariant,
-                        ),
-                      ),
-                    ],
+                    ),
                   ),
                 ),
                 IconButton(

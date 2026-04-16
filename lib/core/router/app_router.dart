@@ -26,6 +26,40 @@ class AppRoutePaths {
   static const String postDetailPattern = '/post/:id';
 
   static String postDetail(String postId) => '/post/$postId';
+
+  static String chatByUser({
+    required String userId,
+    String? receiverName,
+    String? receiverAvatar,
+  }) {
+    final Map<String, String> params = <String, String>{'userId': userId};
+    if (receiverName != null && receiverName.trim().isNotEmpty) {
+      params['receiverName'] = receiverName.trim();
+    }
+    if (receiverAvatar != null && receiverAvatar.trim().isNotEmpty) {
+      params['receiverAvatar'] = receiverAvatar.trim();
+    }
+    return Uri(path: chat, queryParameters: params).toString();
+  }
+
+  static String chatByRoom({
+    required String chatId,
+    String? userId,
+    String? receiverName,
+    String? receiverAvatar,
+  }) {
+    final Map<String, String> params = <String, String>{'chatId': chatId};
+    if (userId != null && userId.trim().isNotEmpty) {
+      params['userId'] = userId.trim();
+    }
+    if (receiverName != null && receiverName.trim().isNotEmpty) {
+      params['receiverName'] = receiverName.trim();
+    }
+    if (receiverAvatar != null && receiverAvatar.trim().isNotEmpty) {
+      params['receiverAvatar'] = receiverAvatar.trim();
+    }
+    return Uri(path: chat, queryParameters: params).toString();
+  }
 }
 
 final appRouterProvider = Provider<GoRouter>((ref) {
@@ -126,6 +160,8 @@ final appRouterProvider = Provider<GoRouter>((ref) {
               return ChatScreen(
                 chatId: state.uri.queryParameters['chatId'],
                 userId: state.uri.queryParameters['userId'],
+                receiverName: state.uri.queryParameters['receiverName'],
+                receiverAvatar: state.uri.queryParameters['receiverAvatar'],
               );
             },
           ),
