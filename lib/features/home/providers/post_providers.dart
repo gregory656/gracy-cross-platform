@@ -2,6 +2,7 @@ import 'dart:io';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../../shared/models/post_model.dart';
+import '../../../shared/providers/offline_banner_provider.dart';
 import '../../../shared/services/post_service.dart';
 import '../../../shared/services/optimized_post_service.dart';
 
@@ -94,6 +95,7 @@ class PostsNotifier extends AsyncNotifier<List<PostModel>> {
       state = AsyncValue.data(List.from(_posts));
     } catch (e, stackTrace) {
       if (_posts.isNotEmpty) {
+        ref.read(offlineBannerProvider.notifier).showOfflineCachedContent();
         state = AsyncValue.data(List<PostModel>.from(_posts));
         return;
       }

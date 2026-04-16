@@ -2,6 +2,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../../../shared/models/chat_model.dart';
+import '../../../shared/models/local_first_data.dart';
 import '../../../shared/models/message_model.dart';
 import '../../../shared/providers/auth_provider.dart';
 import '../../../shared/services/database_service.dart';
@@ -14,22 +15,29 @@ final chatRepositoryProvider = Provider<ChatRepository>((ref) {
   );
 });
 
-final recentChatsProvider = FutureProvider<List<ChatModel>>((ref) async {
-  final String? currentUserId = ref.watch(authNotifierProvider).userId;
-  if (currentUserId == null) {
-    return const <ChatModel>[];
-  }
-
-  return ref.watch(chatRepositoryProvider).fetchRecentChats(currentUserId);
-});
-
-final messagesProvider = StreamProvider.family<List<MessageModel>, String>((
+final recentChatsProvider = StreamProvider<LocalFirstData<List<ChatModel>>>((
   ref,
-  String roomId,
 ) {
   final String? currentUserId = ref.watch(authNotifierProvider).userId;
   if (currentUserId == null) {
-    return Stream<List<MessageModel>>.value(const <MessageModel>[]);
+    return Stream<LocalFirstData<List<ChatModel>>>.value(
+      const LocalFirstData<List<ChatModel>>(data: <ChatModel>[]),
+    );
+  }
+
+  return ref.watch(chatRepositoryProvider).watchRecentChats(currentUserId);
+});
+
+final messagesProvider =
+    StreamProvider.family<LocalFirstData<List<MessageModel>>, String>((
+      ref,
+      String roomId,
+    ) {
+  final String? currentUserId = ref.watch(authNotifierProvider).userId;
+  if (currentUserId == null) {
+    return Stream<LocalFirstData<List<MessageModel>>>.value(
+      const LocalFirstData<List<MessageModel>>(data: <MessageModel>[]),
+    );
   }
 
   return ref

@@ -5,6 +5,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import 'app.dart';
 import 'core/constants.dart';
 import 'shared/services/database_service.dart';
+import 'shared/services/local_notification_service.dart';
 import 'shared/services/nairobi_timezone_service.dart';
 
 Future<void> main() async {
@@ -21,6 +22,7 @@ Future<void> main() async {
   }
 
   await DatabaseService.instance.initialize();
+  await LocalNotificationService.instance.initialize();
 
   runApp(const ProviderScope(child: GracyApp()));
 }

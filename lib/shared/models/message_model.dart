@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 
-enum MessageStatus { sent, delivered, read }
+enum MessageStatus { pending, sent, delivered, read }
 
 class MessageModel {
   const MessageModel({
@@ -17,6 +17,7 @@ class MessageModel {
     this.deliveredAt,
     this.readAt,
     this.replyToId,
+    this.isPending = false,
   });
 
   final String id;
@@ -32,6 +33,7 @@ class MessageModel {
   final DateTime? deliveredAt;
   final DateTime? readAt;
   final String? replyToId;
+  final bool isPending;
 
   factory MessageModel.fromDatabase({
     required Map<String, dynamic> row,
@@ -43,6 +45,9 @@ class MessageModel {
     final String statusStr = row['status']?.toString() ?? 'sent';
     MessageStatus status = MessageStatus.sent;
     switch (statusStr) {
+      case 'pending':
+        status = MessageStatus.pending;
+        break;
       case 'delivered':
         status = MessageStatus.delivered;
         break;
@@ -75,6 +80,7 @@ class MessageModel {
           ? DateTime.tryParse(row['read_at'].toString())
           : null,
       replyToId: row['reply_to_id']?.toString(),
+      isPending: status == MessageStatus.pending,
     );
   }
 
@@ -92,6 +98,7 @@ class MessageModel {
     DateTime? deliveredAt,
     DateTime? readAt,
     String? replyToId,
+    bool? isPending,
   }) {
     return MessageModel(
       id: id ?? this.id,
@@ -107,6 +114,7 @@ class MessageModel {
       deliveredAt: deliveredAt ?? this.deliveredAt,
       readAt: readAt ?? this.readAt,
       replyToId: replyToId ?? this.replyToId,
+      isPending: isPending ?? this.isPending,
     );
   }
 
@@ -115,6 +123,8 @@ class MessageModel {
     if (!isMe) return [];
 
     switch (status) {
+      case MessageStatus.pending:
+        return [Icons.schedule_rounded];
       case MessageStatus.sent:
         return [Icons.done];
       case MessageStatus.delivered:
@@ -129,6 +139,8 @@ class MessageModel {
     if (!isMe) return '';
 
     switch (status) {
+      case MessageStatus.pending:
+        return '#8E8E93';
       case MessageStatus.sent:
         return '#8E8E93'; // Gray
       case MessageStatus.delivered:

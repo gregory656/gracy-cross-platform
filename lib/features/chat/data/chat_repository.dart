@@ -2,10 +2,12 @@ import 'dart:async';
 
 import 'package:supabase_flutter/supabase_flutter.dart';
 
+import '../../../shared/models/local_first_data.dart';
 import '../../../shared/models/chat_model.dart';
 import '../../../shared/models/message_model.dart';
 import '../../../shared/models/user_model.dart';
 import '../../../shared/services/database_service.dart';
+import '../../../shared/services/local_notification_service.dart';
 import '../../../shared/services/timezone_service.dart';
 
 class ChatThread {
@@ -170,50 +172,30 @@ class ChatRepository {
     throw const ChatRepositoryException('No chat target was provided.');
   }
 
-  Stream<List<MessageModel>> watchMessages({
+  Stream<LocalFirstData<List<MessageModel>>> watchMessages({
     required String roomId,
     required String currentUserId,
   }) {
-    final StreamController<List<MessageModel>> controller =
-        StreamController<List<MessageModel>>();
-    final Map<String, Map<String, dynamic>> messageRowsById =
-        <String, Map<String, dynamic>>{};
-    bool hasDeliveredMessages = false;
-    bool hasCachedMessages = false;
+    final StreamController<LocalFirstData<List<MessageModel>>> controller =
+        StreamController<LocalFirstData<List<MessageModel>>>();
+    StreamSubscription<List<Map<String, dynamic>>>? messageSubscription;
+    final Set<String> notifiedIncomingIds = <String>{};
 
-    Future<void> refreshMessagesFromServer() async {
-      final List<dynamic> rows = await _client
-          .from(_messagesTable)
-          .select(
-            'id,room_id,sender_id,content,created_at,status,delivered_at,read_at',
-          )
-          .eq('room_id', roomId)
-          .order('created_at');
+    Future<void> emitCachedMessages() async {
+      final List<MessageModel> cachedMessages = await _databaseService
+          .getCachedMessages(roomId: roomId, currentUserId: currentUserId);
 
-      messageRowsById.clear();
-      for (final dynamic row in rows) {
-        final Map<String, dynamic> parsedRow = Map<String, dynamic>.from(
-          row as Map,
+      if (cachedMessages.isNotEmpty && !controller.isClosed) {
+        controller.add(
+          LocalFirstData<List<MessageModel>>(
+            data: cachedMessages,
+            isFromCache: true,
+          ),
         );
-        final String id = parsedRow['id']?.toString() ?? '';
-        if (id.isNotEmpty) {
-          messageRowsById[id] = parsedRow;
-        }
       }
     }
 
-    Future<void> emitMessages() async {
-      final List<Map<String, dynamic>> rows = messageRowsById.values.toList()
-        ..sort((Map<String, dynamic> a, Map<String, dynamic> b) {
-          final DateTime aTime =
-              DateTime.tryParse(a['created_at']?.toString() ?? '') ??
-              DateTime.now();
-          final DateTime bTime =
-              DateTime.tryParse(b['created_at']?.toString() ?? '') ??
-              DateTime.now();
-          return aTime.compareTo(bTime);
-        });
-
+    Future<void> emitRealtimeMessages(List<Map<String, dynamic>> rows) async {
       final Set<String> senderIds = rows
           .map((Map<String, dynamic> row) => row['sender_id']?.toString() ?? '')
           .where((String id) => id.isNotEmpty)
@@ -227,105 +209,68 @@ class ChatRepository {
             (Map<String, dynamic> row) => MessageModel.fromDatabase(
               row: row,
               currentUserId: currentUserId,
-              senderName: senderMap[row['sender_id']]?.fullName ?? 'Gracy User',
+              senderName:
+                  senderMap[row['sender_id']]?.fullName ?? 'Gracy User',
               senderUsername: senderMap[row['sender_id']]?.username,
               isOfficial: row['sender_id']?.toString() == botUserId,
             ),
           )
-          .toList();
+          .toList()
+        ..sort(
+          (MessageModel a, MessageModel b) => a.sentAt.compareTo(b.sentAt),
+        );
 
-      await _databaseService.cacheMessages(roomId: roomId, messages: messages, ownerId: currentUserId);
-      hasDeliveredMessages = messages.isNotEmpty;
+      await _databaseService.cacheMessages(
+        roomId: roomId,
+        messages: messages,
+        ownerId: currentUserId,
+      );
+
+      for (final MessageModel message in messages) {
+        if (message.isMe || !notifiedIncomingIds.add(message.id)) {
+          continue;
+        }
+        await LocalNotificationService.instance.showIncomingMessageNotification(
+          title: 'New Message from ${message.senderName}',
+          body: message.text,
+        );
+      }
 
       if (!controller.isClosed) {
-        controller.add(messages);
+        controller.add(LocalFirstData<List<MessageModel>>(data: messages));
       }
     }
-
-    Future<void> emitCachedMessages() async {
-      final List<MessageModel> cachedMessages = await _databaseService
-          .getCachedMessages(roomId: roomId, currentUserId: currentUserId);
-
-      if (cachedMessages.isNotEmpty && !controller.isClosed) {
-        hasCachedMessages = true;
-        controller.add(cachedMessages);
-      }
-    }
-
-    Future<void> hydrateInitialMessages() async {
-      await refreshMessagesFromServer();
-      await emitMessages();
-    }
-
-    final RealtimeChannel channel = _client.channel('public:messages:$roomId');
-
-    channel
-        .onPostgresChanges(
-          event: PostgresChangeEvent.insert,
-          schema: 'public',
-          table: _messagesTable,
-          filter: PostgresChangeFilter(
-            type: PostgresChangeFilterType.eq,
-            column: 'room_id',
-            value: roomId,
-          ),
-          callback: (PostgresChangePayload change) async {
-            final Map<String, dynamic> newRecord = change.newRecord;
-            final String id = newRecord['id']?.toString() ?? '';
-            if (id.isEmpty) {
-              return;
-            }
-
-            await refreshMessagesFromServer();
-            if (!controller.isClosed) {
-              await emitMessages();
-            }
-          },
-        )
-        .onPostgresChanges(
-          event: PostgresChangeEvent.update,
-          schema: 'public',
-          table: _messagesTable,
-          filter: PostgresChangeFilter(
-            type: PostgresChangeFilterType.eq,
-            column: 'room_id',
-            value: roomId,
-          ),
-          callback: (PostgresChangePayload change) async {
-            final Map<String, dynamic> updatedRecord = change.newRecord;
-            final String id = updatedRecord['id']?.toString() ?? '';
-            if (id.isEmpty) {
-              return;
-            }
-
-            await refreshMessagesFromServer();
-            if (!controller.isClosed) {
-              await emitMessages();
-            }
-          },
-        )
-        .subscribe((RealtimeSubscribeStatus status, Object? error) {
-          if (status == RealtimeSubscribeStatus.channelError &&
-              !controller.isClosed &&
-              !hasDeliveredMessages &&
-              !hasCachedMessages) {
-            controller.addError(error ?? 'Realtime channel error');
-          }
-        });
 
     Future<void>(() async {
       try {
         await emitCachedMessages();
-        await hydrateInitialMessages();
-      } catch (error, stackTrace) {
-        if (!controller.isClosed && !hasCachedMessages) {
-          controller.addError(error, stackTrace);
-        }
+        messageSubscription = _client
+            .from(_messagesTable)
+            .stream(primaryKey: <String>['id'])
+            .eq('room_id', roomId)
+            .order('created_at')
+            .map(
+              (List<Map<String, dynamic>> rows) =>
+                  rows
+                      .map(
+                        (Map<String, dynamic> row) =>
+                            Map<String, dynamic>.from(row),
+                      )
+                      .toList(growable: false),
+            )
+            .listen(
+              emitRealtimeMessages,
+              onError: (Object error, StackTrace stackTrace) async {
+                await emitCachedMessages();
+              },
+            );
+      } catch (_) {
+        await emitCachedMessages();
       }
     });
 
     controller.onCancel = () async {
-      await _client.removeChannel(channel);
+      await messageSubscription?.cancel();
     };
 
     return controller.stream;
@@ -352,15 +297,92 @@ class ChatRepository {
     );
   }
 
-  Future<List<ChatModel>> fetchRecentChats(String currentUserId) async {
-    try {
-      return await _fetchRecentChatsOnline(
-        currentUserId,
-      ).timeout(const Duration(seconds: 3));
-    } catch (_) {
-      final List<ChatModel> cached = await _databaseService.getCachedRecentChats(currentUserId);
-      return cached;
+  Stream<LocalFirstData<List<ChatModel>>> watchRecentChats(
+    String currentUserId,
+  ) {
+    final StreamController<LocalFirstData<List<ChatModel>>> controller =
+        StreamController<LocalFirstData<List<ChatModel>>>();
+    final Set<String> notifiedChatSignatures = <String>{};
+    RealtimeChannel? channel;
+
+    Future<void> emitCachedChats() async {
+      final List<ChatModel> cached = await _databaseService
+          .getCachedRecentChats(currentUserId);
+      if (cached.isNotEmpty && !controller.isClosed) {
+        controller.add(
+          LocalFirstData<List<ChatModel>>(data: cached, isFromCache: true),
+        );
+      }
     }
+
+    Future<void> refreshOnlineChats() async {
+      try {
+        final List<ChatModel> chats = await _fetchRecentChatsOnline(
+          currentUserId,
+        ).timeout(const Duration(seconds: 3));
+        if (controller.isClosed) {
+          return;
+        }
+        controller.add(LocalFirstData<List<ChatModel>>(data: chats));
+        for (final ChatModel chat in chats) {
+          if (chat.isLastMessageMine || chat.unreadCount <= 0) {
+            continue;
+          }
+          final String signature =
+              '${chat.id}:${chat.lastMessageAt.toIso8601String()}:${chat.unreadCount}';
+          if (!notifiedChatSignatures.add(signature)) {
+            continue;
+          }
+          await LocalNotificationService.instance.showIncomingMessageNotification(
+            title: 'New Message from ${chat.gracyId ?? 'Gracy User'}',
+            body: chat.lastMessage,
+          );
+        }
+      } catch (_) {
+        await emitCachedChats();
+      }
+    }
+
+    Future<void>(() async {
+      await emitCachedChats();
+      await refreshOnlineChats();
+
+      channel = _client.channel('public:recent_chats:$currentUserId');
+      channel!
+          .onPostgresChanges(
+            event: PostgresChangeEvent.all,
+            schema: 'public',
+            table: _messagesTable,
+            callback: (_) async {
+              await refreshOnlineChats();
+            },
+          )
+          .onPostgresChanges(
+            event: PostgresChangeEvent.all,
+            schema: 'public',
+            table: _roomsTable,
+            callback: (_) async {
+              await refreshOnlineChats();
+            },
+          )
+          .onPostgresChanges(
+            event: PostgresChangeEvent.all,
+            schema: 'public',
+            table: _chatMembersTable,
+            callback: (_) async {
+              await refreshOnlineChats();
+            },
+          )
+          .subscribe();
+    });
+
+    controller.onCancel = () async {
+      if (channel != null) {
+        await _client.removeChannel(channel!);
+      }
+    };
+
+    return controller.stream;
   }
 
   Future<List<ChatModel>> _fetchRecentChatsOnline(String currentUserId) async {
@@ -421,12 +443,16 @@ class ChatRepository {
         currentUserId: currentUserId,
         roomHash: roomHash,
       );
-      final UserModel? participant = participants[participantId];
+      final UserModel participant =
+          participants[participantId] ?? _fallbackUser(participantId);
       final Map<String, dynamic>? latest = latestByRoom[roomId];
-
-      if (participant == null) {
-        continue;
-      }
+      final int unreadCount = messageRows
+          .where((Map<String, dynamic> messageRow) {
+            return messageRow['room_id']?.toString() == roomId &&
+                messageRow['sender_id']?.toString() != currentUserId &&
+                messageRow['status']?.toString() != 'read';
+          })
+          .length;
 
       chats.add(
         ChatModel(
@@ -440,7 +466,7 @@ class ChatRepository {
           lastMessageAt:
               DateTime.tryParse(latest?['created_at']?.toString() ?? '') ??
               DateTime.now(),
-          unreadCount: 0,
+          unreadCount: unreadCount,
           roomHash: roomHash,
           isOfficial: participant.id == botUserId,
           gracyId: participant.gracyId,
@@ -592,12 +618,16 @@ class ChatRepository {
   }
 
   Future<UserModel> _fetchRequiredProfile(String userId) async {
-    final Map<String, dynamic> row = await _client
-        .from(_profilesTable)
-        .select('id,username,gracy_id,full_name,avatar_url,is_online')
-        .eq('id', userId)
-        .single();
-    return _userFromProfile(row);
+    try {
+      final Map<String, dynamic> row = await _client
+          .from(_profilesTable)
+          .select('id,username,gracy_id,full_name,avatar_url,is_online')
+          .eq('id', userId)
+          .single();
+      return _userFromProfile(row);
+    } catch (_) {
+      return _fallbackUser(userId);
+    }
   }
 
   Future<Map<String, UserModel>> _fetchProfilesByIds(
@@ -665,9 +695,27 @@ class ChatRepository {
     );
   }
 
+  UserModel _fallbackUser(String userId) {
+    final String shortId = userId.length >= 6 ? userId.substring(0, 6) : userId;
+    return UserModel(
+      id: userId,
+      fullName: 'Gracy User',
+      username: '@$shortId',
+      age: 0,
+      role: UserRole.student,
+      courses: const <String>[],
+      bio: 'Gracy member',
+      isOnline: false,
+      location: 'Gracy network',
+      avatarSeed: shortId,
+      year: 'Active',
+    );
+  }
+
   MessageStatus _messageStatusFromRow(Map<String, dynamic>? row) {
     final String status = row?['status']?.toString() ?? 'sent';
     return switch (status) {
+      'pending' => MessageStatus.pending,
       'read' => MessageStatus.read,
       'delivered' => MessageStatus.delivered,
       _ => MessageStatus.sent,

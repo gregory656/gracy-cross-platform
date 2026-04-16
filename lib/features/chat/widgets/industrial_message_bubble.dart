@@ -90,13 +90,17 @@ class _IndustrialMessageBubbleState extends State<IndustrialMessageBubble>
 
   Widget _buildStatusTicks() {
     final Color tickColor = switch (widget.message.status) {
+      MessageStatus.pending => Colors.grey.shade500,
       MessageStatus.sent => Colors.grey.shade600,
       MessageStatus.delivered => Colors.grey.shade600,
       MessageStatus.read => _electricBlue,
     };
-    final IconData statusIcon = widget.message.status == MessageStatus.sent
-        ? Icons.done_rounded
-        : Icons.done_all_rounded;
+    final IconData statusIcon = switch (widget.message.status) {
+      MessageStatus.pending => Icons.schedule_rounded,
+      MessageStatus.sent => Icons.done_rounded,
+      MessageStatus.delivered => Icons.done_all_rounded,
+      MessageStatus.read => Icons.done_all_rounded,
+    };
 
     return Icon(statusIcon, size: 14, color: tickColor);
   }

@@ -8,9 +8,11 @@ import '../../../core/constants/app_constants.dart';
 import '../../../core/router/app_router.dart';
 import '../../../core/router/shell_ui_provider.dart';
 import '../../../shared/models/chat_model.dart';
+import '../../../shared/models/local_first_data.dart';
 import '../../../shared/models/message_model.dart';
 import '../../../shared/models/user_model.dart';
 import '../../../shared/providers/auth_provider.dart';
+import '../../../shared/providers/offline_banner_provider.dart';
 import '../../../shared/providers/profiles_provider.dart';
 import '../../../shared/widgets/chat_tile.dart';
 import '../../../shared/widgets/custom_text_field.dart';
@@ -46,6 +48,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
   Timer? _deliveryReceiptTimer;
   String? _lastDeliverySignature;
   String? _lastReadSignature;
+  final List<MessageModel> _optimisticMessages = <MessageModel>[];
 
   void _syncShellNavigation(bool showThread) {
     WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -102,6 +105,24 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
       return;
     }
 
+    final MessageModel optimisticMessage = MessageModel(
+      id: 'pending-${DateTime.now().microsecondsSinceEpoch}',
+      chatId: thread.roomId,
+      senderId: currentUserId,
+      text: content,
+      sentAt: DateTime.now(),
+      isMe: true,
+      senderName: 'You',
+      status: MessageStatus.pending,
+      isPending: true,
+    );
+
+    setState(() {
+      _optimisticMessages.add(optimisticMessage);
+    });
+    _composerController.clear();
+    _replyToMessage = null;
+
     try {
       await ref
           .read(chatRepositoryProvider)
@@ -110,16 +131,85 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
             senderId: currentUserId,
             content: content,
           );
-      _composerController.clear();
-      _replyToMessage = null;
       ref.invalidate(recentChatsProvider);
 
       if (thread.participant.id == ChatRepository.botUserId) {
         _triggerFakeTyping();
       }
     } catch (error) {
+      setState(() {
+        _optimisticMessages.removeWhere(
+          (MessageModel message) => message.id == optimisticMessage.id,
+        );
+      });
       _showFeedback('Message failed: $error');
     }
+  }
+
+  void _showOfflineCachedNotice() {
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) {
+        return;
+      }
+      ref.read(offlineBannerProvider.notifier).showOfflineCachedContent();
+    });
+  }
+
+  List<MessageModel> _mergeMessages(List<MessageModel> liveMessages) {
+    final List<MessageModel> merged = List<MessageModel>.from(liveMessages);
+
+    for (final MessageModel optimistic in _optimisticMessages) {
+      final bool confirmed = liveMessages.any((MessageModel serverMessage) {
+        final Duration ageGap = serverMessage.sentAt.difference(
+          optimistic.sentAt,
+        );
+        return serverMessage.isMe &&
+            serverMessage.text == optimistic.text &&
+            ageGap.inSeconds.abs() <= 120;
+      });
+
+      if (!confirmed) {
+        merged.add(optimistic);
+      }
+    }
+
+    merged.sort((MessageModel a, MessageModel b) => a.sentAt.compareTo(b.sentAt));
+
+    final Set<String> confirmedIds = liveMessages
+        .where((MessageModel serverMessage) {
+          return _optimisticMessages.any((MessageModel optimistic) {
+            final Duration ageGap = serverMessage.sentAt.difference(
+              optimistic.sentAt,
+            );
+            return serverMessage.isMe &&
+                serverMessage.text == optimistic.text &&
+                ageGap.inSeconds.abs() <= 120;
+          });
+        })
+        .map((MessageModel message) => message.id)
+        .toSet();
+
+    if (confirmedIds.isNotEmpty) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!mounted) {
+          return;
+        }
+        setState(() {
+          _optimisticMessages.removeWhere((MessageModel optimistic) {
+            return liveMessages.any((MessageModel serverMessage) {
+              final Duration ageGap = serverMessage.sentAt.difference(
+                optimistic.sentAt,
+              );
+              return serverMessage.isMe &&
+                  serverMessage.text == optimistic.text &&
+                  ageGap.inSeconds.abs() <= 120;
+            });
+          });
+        });
+      });
+    }
+
+    return merged;
   }
 
   void _markMessagesAsRead(ChatThread thread) {
@@ -261,7 +351,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
     );
     final bool showThread = request.roomId != null || request.userId != null;
     _syncShellNavigation(showThread);
-    final AsyncValue<List<ChatModel>> recentChatsAsync = ref.watch(
+    final AsyncValue<LocalFirstData<List<ChatModel>>> recentChatsAsync = ref.watch(
       recentChatsProvider,
     );
 
@@ -316,11 +406,18 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
                         );
                       }
 
-                      final AsyncValue<List<MessageModel>> messagesAsync = ref
+                      final AsyncValue<LocalFirstData<List<MessageModel>>>
+                      messagesAsync = ref
                           .watch(messagesProvider(thread.roomId));
 
                       return messagesAsync.when(
-                        data: (List<MessageModel> messages) {
+                        data: (LocalFirstData<List<MessageModel>> snapshot) {
+                          if (snapshot.isFromCache) {
+                            _showOfflineCachedNotice();
+                          }
+                          final List<MessageModel> messages = _mergeMessages(
+                            snapshot.data,
+                          );
                           _syncReceiptState(thread, messages);
                           _maybeScrollToBottom(
                             messages.length + (_isBotTyping ? 1 : 0),
@@ -393,7 +490,7 @@ class _ChatShell extends ConsumerWidget {
 
   final String currentUserName;
   final String? currentUserCode;
-  final AsyncValue<List<ChatModel>> recentChatsAsync;
+  final AsyncValue<LocalFirstData<List<ChatModel>>> recentChatsAsync;
   final TextEditingController startChatController;
   final VoidCallback onStartChat;
   final bool dense;
@@ -510,7 +607,15 @@ class _ChatShell extends ConsumerWidget {
             ),
             const SizedBox(height: 14),
             recentChatsAsync.when(
-              data: (List<ChatModel> chats) {
+              data: (LocalFirstData<List<ChatModel>> snapshot) {
+                if (snapshot.isFromCache) {
+                  WidgetsBinding.instance.addPostFrameCallback((_) {
+                    ref
+                        .read(offlineBannerProvider.notifier)
+                        .showOfflineCachedContent();
+                  });
+                }
+                final List<ChatModel> chats = snapshot.data;
                 if (chats.isEmpty) {
                   return const _CenteredMessage(
                     title: 'No chats yet',

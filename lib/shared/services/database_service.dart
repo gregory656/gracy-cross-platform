@@ -143,6 +143,8 @@ class DatabaseService {
         senderName: row['sender_name']?.toString() ?? 'Gracy User',
         senderUsername: row['sender_username']?.toString(),
         isOfficial: (row['is_official'] as int? ?? 0) == 1,
+        status: _messageStatusFromString(row['status']?.toString()),
+        isPending: row['status']?.toString() == 'pending',
       );
     }).toList();
   }
@@ -166,6 +168,7 @@ class DatabaseService {
         'content': message.text,
         'created_at': message.sentAt.toIso8601String(),
         'is_official': message.isOfficial ? 1 : 0,
+        'status': message.status.name,
         'cached_at': DateTime.now().toIso8601String(),
       }, conflictAlgorithm: ConflictAlgorithm.replace);
     }
@@ -382,6 +385,7 @@ class DatabaseService {
         content TEXT NOT NULL,
         created_at TEXT NOT NULL,
         is_official INTEGER NOT NULL DEFAULT 0,
+        status TEXT NOT NULL DEFAULT 'sent',
         cached_at TEXT NOT NULL
       )
     ''');

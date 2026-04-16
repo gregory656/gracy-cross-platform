@@ -26,4 +26,32 @@ class ChatModel {
   final bool isOnline;
   final MessageStatus lastMessageStatus;
   final bool isLastMessageMine;
+
+  ChatModel copyWith({
+    String? id,
+    String? participantId,
+    String? lastMessage,
+    DateTime? lastMessageAt,
+    int? unreadCount,
+    String? roomHash,
+    bool? isOfficial,
+    String? gracyId,
+    bool? isOnline,
+    MessageStatus? lastMessageStatus,
+    bool? isLastMessageMine,
+  }) {
+    return ChatModel(
+      id: id ?? this.id,
+      participantId: participantId ?? this.participantId,
+      lastMessage: lastMessage ?? this.lastMessage,
+      lastMessageAt: lastMessageAt ?? this.lastMessageAt,
+      unreadCount: unreadCount ?? this.unreadCount,
+      roomHash: roomHash ?? this.roomHash,
+      isOfficial: isOfficial ?? this.isOfficial,
+      gracyId: gracyId ?? this.gracyId,
+      isOnline: isOnline ?? this.isOnline,
+      lastMessageStatus: lastMessageStatus ?? this.lastMessageStatus,
+      isLastMessageMine: isLastMessageMine ?? this.isLastMessageMine,
+    );
+  }
 }

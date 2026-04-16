@@ -225,6 +225,8 @@ class _EliteMessageBubbleState extends ConsumerState<EliteMessageBubble>
 
   Color _getStatusColor(MessageStatus status) {
     switch (status) {
+      case MessageStatus.pending:
+        return AppColors.sentGray;
       case MessageStatus.sent:
         return AppColors.sentGray;
       case MessageStatus.delivered:

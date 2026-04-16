@@ -70,6 +70,10 @@ class ChatTile extends StatelessWidget {
                                 fontWeight: FontWeight.w700,
                               ),
                         ),
+                        if (chat.unreadCount > 0) ...<Widget>[
+                          const SizedBox(width: 8),
+                          _UnreadBadge(count: chat.unreadCount),
+                        ],
                       ],
                     ),
                     const SizedBox(height: 7),
@@ -100,10 +104,6 @@ class ChatTile extends StatelessWidget {
                   ],
                 ),
               ),
-              if (chat.unreadCount > 0) ...<Widget>[
-                const SizedBox(width: 12),
-                _UnreadBadge(count: chat.unreadCount),
-              ],
             ],
           ),
         ),
@@ -174,9 +174,7 @@ class _UnreadBadge extends StatelessWidget {
       constraints: const BoxConstraints(minWidth: 28, minHeight: 28),
       padding: const EdgeInsets.symmetric(horizontal: 8),
       decoration: BoxDecoration(
-        gradient: LinearGradient(
-          colors: <Color>[AppColors.accentBlue, AppColors.accentCyan],
-        ),
+        color: const Color(0xFF007AFF),
         borderRadius: BorderRadius.circular(999),
       ),
       alignment: Alignment.center,
@@ -199,14 +197,18 @@ class _ReadReceipt extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final Color color = switch (status) {
+      MessageStatus.pending => Colors.white38,
       MessageStatus.read => const Color(0xFF6FE3FF),
       MessageStatus.delivered => Colors.white54,
       MessageStatus.sent => Colors.white38,
     };
 
-    final IconData icon = status == MessageStatus.sent
-        ? Icons.check_rounded
-        : Icons.done_all_rounded;
+    final IconData icon = switch (status) {
+      MessageStatus.pending => Icons.schedule_rounded,
+      MessageStatus.sent => Icons.check_rounded,
+      MessageStatus.delivered => Icons.done_all_rounded,
+      MessageStatus.read => Icons.done_all_rounded,
+    };
 
     return Icon(icon, size: 18, color: color);
   }
