@@ -5,6 +5,7 @@ import '../../../shared/models/chat_model.dart';
 import '../../../shared/models/local_first_data.dart';
 import '../../../shared/models/message_model.dart';
 import '../../../shared/providers/auth_provider.dart';
+import '../../../shared/providers/social_providers.dart';
 import '../../../shared/services/database_service.dart';
 import '../data/chat_repository.dart';
 
@@ -92,11 +93,53 @@ class StartChatController extends AsyncNotifier<void> {
           );
       state = const AsyncData<void>(null);
       ref.invalidate(recentChatsProvider);
+      
+      // Atomic open
+      ref.read(activeChatProvider.notifier).openChat(thread.roomId);
+      
       return thread;
     } catch (error, stackTrace) {
       state = AsyncError<void>(error, stackTrace);
       rethrow;
     }
+  }
+}
+
+final activeChatProvider = NotifierProvider<ActiveChatNotifier, String?>(ActiveChatNotifier.new);
+
+class ActiveChatNotifier extends Notifier<String?> {
+  @override
+  String? build() => null;
+
+  void openChat(String? roomId) {
+    if (roomId == null || state == roomId) return;
+
+    // 1. Clear previous chat context if switching
+    if (state != null && state != roomId) {
+      // Invalidate messages for the previous room to ensure "blank slate"
+      ref.invalidate(messagesProvider(state!));
+    }
+
+    // 2. Set active ID
+    state = roomId;
+
+    // 3. Mark as read in Supabase and locally
+    final String? currentUserId = ref.read(authNotifierProvider).userId;
+    if (currentUserId == null) return;
+
+    // Trigger async mark read (Safe because it's an action, not during build)
+    _performMarkRead(roomId, currentUserId);
+  }
+
+  Future<void> _performMarkRead(String roomId, String currentUserId) async {
+    try {
+      // First local update to UI
+      ref.read(localReadChatsProvider.notifier).markRead(roomId);
+    } catch (_) {}
+  }
+
+  void closeChat() {
+    state = null;
   }
 }
 

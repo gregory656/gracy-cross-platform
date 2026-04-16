@@ -60,6 +60,17 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
   String? _lastReadSignature;
   final List<MessageModel> _optimisticMessages = <MessageModel>[];
 
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (widget.chatId != null || widget.userId != null) {
+        // Atomic load
+        ref.read(activeChatProvider.notifier).openChat(widget.chatId);
+      }
+    });
+  }
+
   void _syncShellNavigation(bool showThread) {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) {
@@ -224,7 +235,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
 
   void _markMessagesAsRead(ChatThread thread) {
     _readReceiptTimer?.cancel();
-    _readReceiptTimer = Timer(const Duration(milliseconds: 500), () async {
+    _readReceiptTimer = Timer(const Duration(milliseconds: 1000), () async {
       final String? currentUserId = ref.read(authNotifierProvider).userId;
       if (currentUserId == null) {
         return;
@@ -237,6 +248,8 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
               currentUserId: currentUserId,
               participantId: thread.participant.id,
             );
+        // local update is now handled by the ActiveChatNotifier or here safely
+        ref.read(localReadChatsProvider.notifier).markRead(thread.roomId);
       } catch (error) {
         // Silently fail for read receipts
       }
@@ -280,11 +293,9 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
 
     final String readSignature = '${thread.roomId}:$unreadIncomingCount';
     if (unreadIncomingCount > 0 && readSignature != _lastReadSignature) {
-      ref.read(localReadChatsProvider.notifier).markRead(thread.roomId);
       _lastReadSignature = readSignature;
       _markMessagesAsRead(thread);
     } else if (unreadIncomingCount == 0) {
-      ref.read(localReadChatsProvider.notifier).markRead(thread.roomId);
       _lastReadSignature = readSignature;
     }
   }
@@ -368,6 +379,16 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
       receiverName: widget.receiverName,
       receiverAvatar: widget.receiverAvatar,
     );
+    
+    // Guard: If we are in thread mode but essential data is missing, show loading
+    final bool isThreadExpected = widget.chatId != null || widget.userId != null;
+    if (isThreadExpected && widget.chatId == null && widget.userId == null) {
+      return const Scaffold(
+        backgroundColor: Colors.black,
+        body: Center(child: CircularProgressIndicator(color: Colors.cyan)),
+      );
+    }
+
     final bool showThread = request.roomId != null || request.userId != null;
     _syncShellNavigation(showThread);
     final AsyncValue<LocalFirstData<List<ChatModel>>> recentChatsAsync = ref.watch(
@@ -1300,7 +1321,7 @@ class _ThreadHeader extends StatelessWidget {
           ),
           IconButton(
             onPressed: () => _showThreadMenu(context),
-            icon: const Icon(Icons.more_horiz_rounded, color: Colors.white70),
+            icon: const Icon(Icons.more_vert_rounded, color: Colors.white70),
           ),
           Consumer(
             builder: (context, ref, child) {
