@@ -308,22 +308,25 @@ class _CreatePostButtonState extends ConsumerState<CreatePostButton> {
           side: const BorderSide(color: Color(0xFF333333)),
         ),
         child: Container(
-          width: MediaQuery.of(dialogContext).size.width * 0.9,
-          padding: const EdgeInsets.all(20),
+          width: MediaQuery.of(dialogContext).size.width * 0.85,
+          padding: const EdgeInsets.all(16),
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
               // Header
               Row(
                 children: [
-                  Text(
-                    'What are you sharing today?',
-                    style: Theme.of(dialogContext).textTheme.titleLarge?.copyWith(
-                      color: Colors.white,
-                      fontWeight: FontWeight.w600,
+                  Expanded(
+                    child: Text(
+                      'What are you sharing today?',
+                      style: Theme.of(dialogContext).textTheme.titleLarge?.copyWith(
+                        color: Colors.white,
+                        fontWeight: FontWeight.w600,
+                      ),
+                      overflow: TextOverflow.ellipsis,
                     ),
                   ),
-                  const Spacer(),
+                  const SizedBox(width: 8),
                   IconButton(
                     onPressed: () => Navigator.of(dialogContext).pop(),
                     icon: const Icon(Icons.close, color: Colors.white),
@@ -370,25 +373,25 @@ class _CreatePostButtonState extends ConsumerState<CreatePostButton> {
             ),
             child: SingleChildScrollView(
               child: Container(
-                width: MediaQuery.of(dialogContext).size.width * 0.9,
-                constraints: BoxConstraints(
-                  maxHeight: MediaQuery.of(dialogContext).size.height * 0.8,
-                ),
-                padding: const EdgeInsets.all(20),
+                width: MediaQuery.of(dialogContext).size.width * 0.85,
+                padding: const EdgeInsets.all(12),
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
                   children: [
                     // Header
                     Row(
                       children: [
-                        Text(
-                          'Create ${feedCategoryLabelForSlug(_selectedCategory)} Post',
-                          style: Theme.of(dialogContext).textTheme.titleLarge?.copyWith(
-                            color: Colors.white,
-                            fontWeight: FontWeight.w600,
+                        Expanded(
+                          child: Text(
+                            'Create ${feedCategoryLabelForSlug(_selectedCategory)}',
+                            style: Theme.of(dialogContext).textTheme.titleLarge?.copyWith(
+                              color: Colors.white,
+                              fontWeight: FontWeight.w600,
+                            ),
+                            overflow: TextOverflow.ellipsis,
                           ),
                         ),
-                        const Spacer(),
+                        const SizedBox(width: 8),
                         IconButton(
                           onPressed: _isUploading
                               ? null
@@ -398,7 +401,7 @@ class _CreatePostButtonState extends ConsumerState<CreatePostButton> {
                       ],
                     ),
                     
-                    const SizedBox(height: 16),
+                    const SizedBox(height: 12),
                     
                     // Content Input
                     TextField(
@@ -426,7 +429,7 @@ class _CreatePostButtonState extends ConsumerState<CreatePostButton> {
                       readOnly: _isUploading, // Disable input during upload
                     ),
                     
-                    const SizedBox(height: 16),
+                    const SizedBox(height: 12),
                     
                     // Category-specific fields
                     if (_selectedCategory == FeedCategories.marketplace) ...[
@@ -438,7 +441,7 @@ class _CreatePostButtonState extends ConsumerState<CreatePostButton> {
                         locationController: _locationController,
                         universityController: _universityController,
                       ),
-                      const SizedBox(height: 16),
+                      const SizedBox(height: 12),
                     ] else if (_selectedCategory == FeedCategories.housing) ...[
                       _HousingForm(
                         hostelNameController: _hostelNameController,
@@ -449,13 +452,13 @@ class _CreatePostButtonState extends ConsumerState<CreatePostButton> {
                         onWifiChanged: (value) => setState(() => _hasWifi = value),
                         onWaterChanged: (value) => setState(() => _hasWater = value),
                       ),
-                      const SizedBox(height: 16),
+                      const SizedBox(height: 12),
                     ],
                     
                     // Image Preview / Picker
                     if (_selectedImage != null)
                       Container(
-                        height: 200,
+                        height: 150,
                         width: double.infinity,
                         decoration: BoxDecoration(
                           borderRadius: BorderRadius.circular(12),
@@ -510,7 +513,7 @@ class _CreatePostButtonState extends ConsumerState<CreatePostButton> {
                       GestureDetector(
                         onTap: _isUploading ? null : _pickImage,
                         child: Container(
-                          height: 120,
+                          height: 100,
                           width: double.infinity,
                           decoration: BoxDecoration(
                             color: const Color(0xFF0A0A0A),
@@ -549,7 +552,7 @@ class _CreatePostButtonState extends ConsumerState<CreatePostButton> {
                     ),
                   ),
                 
-                const SizedBox(height: 20),
+                const SizedBox(height: 12),
                 
                 // Action Buttons
                 Row(
