@@ -97,10 +97,7 @@ class PostsNotifier extends AsyncNotifier<List<PostModel>> {
   }
 
   Future<void> _onRealtimeInsert(PostgresChangePayload payload) async {
-    final Map<String, dynamic>? record = payload.newRecord;
-    if (record == null) {
-      return;
-    }
+    final record = payload.newRecord;
     final String? id = record['id'] as String?;
     if (id == null) {
       return;
@@ -109,6 +106,12 @@ class PostsNotifier extends AsyncNotifier<List<PostModel>> {
       return;
     }
     if (_posts.any((PostModel p) => p.id == id)) {
+      return;
+    }
+    
+    // Additional check: if this is the current user's own post, don't add it again
+    final String? currentUserId = Supabase.instance.client.auth.currentUser?.id;
+    if (currentUserId != null && record['author_id'] == currentUserId) {
       return;
     }
     try {

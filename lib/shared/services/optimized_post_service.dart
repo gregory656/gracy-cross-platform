@@ -151,17 +151,8 @@ class OptimizedPostService {
         isAnonymous: isAnonymous,
         extra: extra,
       );
-      final profile = await _getCurrentProfile(userId);
-
       final post = PostModel.fromMap({
         ...postDataWithProfile,
-        'author_name': isAnonymous 
-            ? 'Anonymous Scion'
-            : (profile?['username'] as String? ??
-                _supabase.auth.currentUser?.userMetadata?['username']?.toString()),
-        'author_avatar': isAnonymous 
-            ? null
-            : (profile?['avatar_url'] as String?),
         'is_liked_by_current_user': false,
       });
 
@@ -286,24 +277,7 @@ class OptimizedPostService {
     }
   }
 
-  Future<Map<String, dynamic>?> _getCurrentProfile(String userId) async {
-    try {
-      final response = await _supabase
-          .from('profiles')
-          .select('username, avatar_url')
-          .eq('id', userId)
-          .maybeSingle();
-
-      if (response == null) {
-        return null;
-      }
-
-      return Map<String, dynamic>.from(response);
-    } catch (_) {
-      return null;
-    }
-  }
-
+  
   Future<String> uploadProfileImage(File imageFile) async {
     final userId = _supabase.auth.currentUser?.id;
     if (userId == null) {
@@ -762,14 +736,8 @@ class OptimizedPostService {
       isAnonymous: isAnonymous,
       extra: extra,
     );
-    final Map<String, dynamic>? profile = await _getCurrentProfile(userId);
-
     return PostModel.fromMap({
       ...postDataWithProfile,
-      'author_name':
-          profile?['username'] as String? ??
-          _supabase.auth.currentUser?.userMetadata?['username']?.toString(),
-      'author_avatar': profile?['avatar_url'] as String?,
       'is_liked_by_current_user': false,
     });
   }

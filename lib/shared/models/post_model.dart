@@ -69,8 +69,12 @@ class PostModel extends Equatable {
       updatedAt: map['updated_at'] != null
           ? DateTime.parse(map['updated_at'] as String)
           : null,
-      authorName: map['author_name'] as String?,
-      authorAvatar: map['author_avatar'] as String?,
+      authorName: (map['is_anonymous'] as bool? ?? false) 
+        ? null 
+        : (map['author_name'] as String?),
+      authorAvatar: (map['is_anonymous'] as bool? ?? false) 
+        ? null 
+        : (map['author_avatar'] as String?),
       isLikedByCurrentUser: (map['is_liked_by_current_user'] as bool?) ?? false,
       likesVisible: (map['likes_visible'] as bool?) ?? true,
       category: map['category'] as String? ?? FeedCategories.discussions,
