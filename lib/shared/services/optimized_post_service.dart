@@ -155,10 +155,13 @@ class OptimizedPostService {
 
       final post = PostModel.fromMap({
         ...postDataWithProfile,
-        'author_name':
-            profile?['username'] as String? ??
-            _supabase.auth.currentUser?.userMetadata?['username']?.toString(),
-        'author_avatar': profile?['avatar_url'] as String?,
+        'author_name': isAnonymous 
+            ? 'Anonymous Scion'
+            : (profile?['username'] as String? ??
+                _supabase.auth.currentUser?.userMetadata?['username']?.toString()),
+        'author_avatar': isAnonymous 
+            ? null
+            : (profile?['avatar_url'] as String?),
         'is_liked_by_current_user': false,
       });
 
