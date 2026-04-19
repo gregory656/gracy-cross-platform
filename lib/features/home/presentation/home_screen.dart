@@ -18,6 +18,7 @@ import '../../../shared/mock_data/mock_users.dart';
 import '../../../shared/widgets/user_avatar.dart';
 import '../../../shared/widgets/custom_text_field.dart';
 import '../../../shared/widgets/profile_card.dart';
+import '../../../shared/models/feed_category.dart';
 import '../widgets/home_header.dart';
 import '../widgets/post_card.dart';
 import '../widgets/create_post_button.dart';
@@ -35,6 +36,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
   final ScrollController _scrollController = ScrollController();
   String _query = '';
   bool _showPosts = true;
+  String? _selectedCategory; // null means "All"
 
   @override
   void initState() {
@@ -87,6 +89,16 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
         _scrollController.position.maxScrollExtent - 200) {
       ref.read(postsProvider.notifier).loadMore();
     }
+  }
+
+  Future<void> _onCategorySelected(String? category) async {
+    if (_selectedCategory == category) return;
+    
+    setState(() {
+      _selectedCategory = category;
+    });
+    
+    await ref.read(postsProvider.notifier).setFeedCategory(category);
   }
 
   Future<void> _handleBackNavigation() async {
@@ -370,6 +382,11 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                 children: <Widget>[
                   _StoriesRow(currentUser: headerUser, activeUsers: activeUsers),
                   const SizedBox(height: 14),
+                  _CategoryChips(
+                    selectedCategory: _selectedCategory,
+                    onCategorySelected: _onCategorySelected,
+                  ),
+                  const SizedBox(height: 16),
                   CreatePostButton(
                     expanded: true,
                     promptText:
@@ -800,6 +817,104 @@ class _StatCard extends StatelessWidget {
             ),
           ),
         ],
+      ),
+    );
+  }
+}
+
+class _CategoryChips extends StatelessWidget {
+  const _CategoryChips({
+    required this.selectedCategory,
+    required this.onCategorySelected,
+  });
+
+  final String? selectedCategory;
+  final Function(String?) onCategorySelected;
+
+  @override
+  Widget build(BuildContext context) {
+    return SizedBox(
+      height: 40,
+      child: ListView.separated(
+        scrollDirection: Axis.horizontal,
+        itemCount: kFeedCategoryChips.length + 1, // +1 for "All"
+        separatorBuilder: (_, _) => const SizedBox(width: 8),
+        itemBuilder: (context, index) {
+          // "All" chip
+          if (index == 0) {
+            final isSelected = selectedCategory == null;
+            return CategoryChip(
+              label: 'All',
+              icon: Icons.apps,
+              isSelected: isSelected,
+              onTap: () => onCategorySelected(null),
+            );
+          }
+
+          final category = kFeedCategoryChips[index - 1];
+          final isSelected = selectedCategory == category.slug;
+          
+          return CategoryChip(
+            label: category.label,
+            icon: category.icon,
+            isSelected: isSelected,
+            onTap: () => onCategorySelected(category.slug),
+          );
+        },
+      ),
+    );
+  }
+}
+
+class CategoryChip extends StatelessWidget {
+  const CategoryChip({
+    super.key,
+    required this.label,
+    required this.icon,
+    required this.isSelected,
+    required this.onTap,
+  });
+
+  final String label;
+  final IconData icon;
+  final bool isSelected;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: onTap,
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 200),
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+        decoration: BoxDecoration(
+          color: isSelected ? AppColors.electricBlue : const Color(0xFF1A1A1A),
+          borderRadius: BorderRadius.circular(20),
+          border: Border.all(
+            color: isSelected 
+                ? AppColors.electricBlue 
+                : Colors.white.withValues(alpha: 0.2),
+          ),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(
+              icon,
+              size: 16,
+              color: isSelected ? Colors.black : Colors.white70,
+            ),
+            const SizedBox(width: 6),
+            Text(
+              label,
+              style: TextStyle(
+                color: isSelected ? Colors.black : Colors.white70,
+                fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500,
+                fontSize: 13,
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }

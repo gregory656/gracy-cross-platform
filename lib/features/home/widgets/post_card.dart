@@ -580,7 +580,7 @@ class _PostCardState extends ConsumerState<PostCard> {
               children: <Widget>[
                 Expanded(
                   child: InkWell(
-                    onTap: _openAuthorProfile,
+                    onTap: widget.post.isAnonymous ? null : _openAuthorProfile,
                     borderRadius: BorderRadius.circular(18),
                     child: Padding(
                       padding: const EdgeInsets.symmetric(vertical: 4),
@@ -590,31 +590,38 @@ class _PostCardState extends ConsumerState<PostCard> {
                             width: 40,
                             height: 40,
                             decoration: BoxDecoration(
-                              color: theme.colorScheme.surfaceContainerHighest,
+                              color: widget.post.isAnonymous 
+                                  ? const Color(0xFF2D2D2D)
+                                  : theme.colorScheme.surfaceContainerHighest,
                               borderRadius: BorderRadius.circular(20),
                             ),
-                            child:
-                                widget.post.authorAvatar != null &&
-                                    widget.post.authorAvatar!.isNotEmpty
-                                ? ClipRRect(
-                                    borderRadius: BorderRadius.circular(20),
-                                    child: CachedNetworkImage(
-                                      imageUrl: widget.post.authorAvatar!,
-                                      fit: BoxFit.cover,
-                                      placeholder: (context, url) => Icon(
-                                        Icons.person,
-                                        color: theme.colorScheme.onSurfaceVariant,
-                                      ),
-                                      errorWidget: (context, url, error) => Icon(
-                                        Icons.person,
-                                        color: theme.colorScheme.onSurfaceVariant,
-                                      ),
-                                    ),
+                            child: widget.post.isAnonymous
+                                ? Icon(
+                                    Icons.nights_stay_outlined,
+                                    color: Colors.white70,
+                                    size: 20,
                                   )
-                                : Icon(
-                                    Icons.person,
-                                    color: theme.colorScheme.onSurfaceVariant,
-                                  ),
+                                : widget.post.authorAvatar != null &&
+                                        widget.post.authorAvatar!.isNotEmpty
+                                    ? ClipRRect(
+                                        borderRadius: BorderRadius.circular(20),
+                                        child: CachedNetworkImage(
+                                          imageUrl: widget.post.authorAvatar!,
+                                          fit: BoxFit.cover,
+                                          placeholder: (context, url) => Icon(
+                                            Icons.person,
+                                            color: theme.colorScheme.onSurfaceVariant,
+                                          ),
+                                          errorWidget: (context, url, error) => Icon(
+                                            Icons.person,
+                                            color: theme.colorScheme.onSurfaceVariant,
+                                          ),
+                                        ),
+                                      )
+                                    : Icon(
+                                        Icons.person,
+                                        color: theme.colorScheme.onSurfaceVariant,
+                                      ),
                           ),
                           const SizedBox(width: 12),
                           Expanded(
@@ -622,10 +629,14 @@ class _PostCardState extends ConsumerState<PostCard> {
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: <Widget>[
                                 Text(
-                                  widget.post.authorName ?? 'Unknown User',
+                                  widget.post.isAnonymous 
+                                      ? 'Anonymous Scion'
+                                      : widget.post.authorName ?? 'Unknown User',
                                   style: theme.textTheme.titleMedium?.copyWith(
                                     fontWeight: FontWeight.w600,
-                                    color: theme.colorScheme.onSurface,
+                                    color: widget.post.isAnonymous 
+                                        ? Colors.white70
+                                        : theme.colorScheme.onSurface,
                                   ),
                                 ),
                                 const SizedBox(height: 2),
@@ -672,48 +683,94 @@ class _PostCardState extends ConsumerState<PostCard> {
               ),
             ),
 
+          // Category tag
+          Padding(
+            padding: const EdgeInsets.fromLTRB(12, 8, 12, 0),
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+              decoration: BoxDecoration(
+                color: AppColors.electricBlue.withValues(alpha: 0.1),
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(
+                  color: AppColors.electricBlue.withValues(alpha: 0.3),
+                ),
+              ),
+              child: Text(
+                widget.post.categoryFeedTag,
+                style: theme.textTheme.labelSmall?.copyWith(
+                  color: AppColors.electricBlue,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ),
+          ),
+
           if (widget.post.imageUrl != null && widget.post.imageUrl!.isNotEmpty)
             Padding(
               padding: const EdgeInsets.only(top: 12),
-              child: CachedNetworkImage(
-                imageUrl: widget.post.optimizedImageUrl,
-                fit: BoxFit.cover,
-                width: double.infinity,
-                height: 300,
-                placeholder: (context, url) => Container(
-                  height: 300,
-                  color: theme.colorScheme.surfaceContainerHighest,
-                  child: Center(
-                    child: CircularProgressIndicator(
-                      valueColor: AlwaysStoppedAnimation<Color>(
-                        theme.colorScheme.primary,
+              child: Stack(
+                children: [
+                  CachedNetworkImage(
+                    imageUrl: widget.post.optimizedImageUrl,
+                    fit: BoxFit.cover,
+                    width: double.infinity,
+                    height: 300,
+                    placeholder: (context, url) => Container(
+                      height: 300,
+                      color: theme.colorScheme.surfaceContainerHighest,
+                      child: Center(
+                        child: CircularProgressIndicator(
+                          valueColor: AlwaysStoppedAnimation<Color>(
+                            theme.colorScheme.primary,
+                          ),
+                        ),
+                      ),
+                    ),
+                    errorWidget: (context, url, error) => Container(
+                      height: 300,
+                      color: theme.colorScheme.surfaceContainerHighest,
+                      child: Center(
+                        child: Column(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: <Widget>[
+                            Icon(
+                              Icons.broken_image,
+                              color: theme.colorScheme.onSurfaceVariant,
+                              size: 48,
+                            ),
+                            const SizedBox(height: 8),
+                            Text(
+                              'Image unavailable',
+                              style: theme.textTheme.bodyMedium?.copyWith(
+                                color: theme.colorScheme.onSurfaceVariant,
+                              ),
+                            ),
+                          ],
+                        ),
                       ),
                     ),
                   ),
-                ),
-                errorWidget: (context, url, error) => Container(
-                  height: 300,
-                  color: theme.colorScheme.surfaceContainerHighest,
-                  child: Center(
-                    child: Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: <Widget>[
-                        Icon(
-                          Icons.broken_image,
-                          color: theme.colorScheme.onSurfaceVariant,
-                          size: 48,
+                  // Marketplace price badge
+                  if (widget.post.marketplacePriceLabel != null)
+                    Positioned(
+                      top: 12,
+                      right: 12,
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                        decoration: BoxDecoration(
+                          color: Colors.black.withValues(alpha: 0.8),
+                          borderRadius: BorderRadius.circular(12),
                         ),
-                        const SizedBox(height: 8),
-                        Text(
-                          'Image unavailable',
-                          style: theme.textTheme.bodyMedium?.copyWith(
-                            color: theme.colorScheme.onSurfaceVariant,
+                        child: Text(
+                          widget.post.marketplacePriceLabel!,
+                          style: theme.textTheme.labelSmall?.copyWith(
+                            color: Colors.white,
+                            fontWeight: FontWeight.w700,
                           ),
                         ),
-                      ],
+                      ),
                     ),
-                  ),
-                ),
+                ],
               ),
             ),
 
@@ -753,15 +810,32 @@ class _PostCardState extends ConsumerState<PostCard> {
                 ),
                 Expanded(
                   child: Center(
-                    child: _EngagementButton(
-                      icon: Icons.share_outlined,
-                      label: 'Share',
-                      isCompact: compactActions,
-                      isActive: false,
-                      isLoading: false,
-                      onPressed: _sharePost,
-                      activeColor: theme.colorScheme.primary,
-                    ),
+                    child: widget.post.isProjectsCategory
+                        ? _EngagementButton(
+                            icon: Icons.handshake_outlined,
+                            label: 'Collab',
+                            isCompact: compactActions,
+                            isActive: false,
+                            isLoading: false,
+                            onPressed: () {
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                const SnackBar(
+                                  content: Text('Collaboration request sent!'),
+                                  backgroundColor: Colors.green,
+                                ),
+                              );
+                            },
+                            activeColor: Colors.green,
+                          )
+                        : _EngagementButton(
+                            icon: Icons.share_outlined,
+                            label: 'Share',
+                            isCompact: compactActions,
+                            isActive: false,
+                            isLoading: false,
+                            onPressed: _sharePost,
+                            activeColor: theme.colorScheme.primary,
+                          ),
                   ),
                 ),
                 Expanded(
