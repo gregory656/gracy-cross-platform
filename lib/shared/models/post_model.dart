@@ -1,5 +1,7 @@
 import 'package:equatable/equatable.dart';
 
+import 'feed_category.dart';
+
 class PostModel extends Equatable {
   final String id;
   final String authorId;
@@ -15,6 +17,15 @@ class PostModel extends Equatable {
   final bool isLikedByCurrentUser;
   final bool likesVisible;
 
+  /// Supabase `posts.category` slug (e.g. [FeedCategories.marketplace]).
+  final String category;
+
+  /// When true, UI shows anonymous identity (Silent Confessions).
+  final bool isAnonymous;
+
+  /// Structured fields per category (marketplace, housing, projects, etc.).
+  final Map<String, dynamic>? extra;
+
   const PostModel({
     required this.id,
     required this.authorId,
@@ -29,6 +40,9 @@ class PostModel extends Equatable {
     this.authorAvatar,
     this.isLikedByCurrentUser = false,
     this.likesVisible = true,
+    this.category = FeedCategories.discussions,
+    this.isAnonymous = false,
+    this.extra,
   });
 
   factory PostModel.fromMap(Map<String, dynamic> map) {
@@ -40,6 +54,8 @@ class PostModel extends Equatable {
         map['post_text'] ??
         map['description'] ??
         map['message'];
+
+    final Map<String, dynamic>? extraMap = _parseExtra(map['extra']);
 
     return PostModel(
       id: map['id'] as String,
@@ -57,7 +73,23 @@ class PostModel extends Equatable {
       authorAvatar: map['author_avatar'] as String?,
       isLikedByCurrentUser: (map['is_liked_by_current_user'] as bool?) ?? false,
       likesVisible: (map['likes_visible'] as bool?) ?? true,
+      category: map['category'] as String? ?? FeedCategories.discussions,
+      isAnonymous: (map['is_anonymous'] as bool?) ?? false,
+      extra: extraMap,
     );
+  }
+
+  static Map<String, dynamic>? _parseExtra(dynamic raw) {
+    if (raw == null) {
+      return null;
+    }
+    if (raw is Map<String, dynamic>) {
+      return Map<String, dynamic>.from(raw);
+    }
+    if (raw is Map) {
+      return raw.map((dynamic k, dynamic v) => MapEntry(k.toString(), v));
+    }
+    return null;
   }
 
   Map<String, dynamic> toMap() {
@@ -72,6 +104,9 @@ class PostModel extends Equatable {
       'created_at': createdAt.toIso8601String(),
       'updated_at': updatedAt?.toIso8601String(),
       'likes_visible': likesVisible,
+      'category': category,
+      'is_anonymous': isAnonymous,
+      'extra': extra,
     };
   }
 
@@ -89,6 +124,9 @@ class PostModel extends Equatable {
     String? authorAvatar,
     bool? isLikedByCurrentUser,
     bool? likesVisible,
+    String? category,
+    bool? isAnonymous,
+    Map<String, dynamic>? extra,
   }) {
     return PostModel(
       id: id ?? this.id,
@@ -104,8 +142,29 @@ class PostModel extends Equatable {
       authorAvatar: authorAvatar ?? this.authorAvatar,
       isLikedByCurrentUser: isLikedByCurrentUser ?? this.isLikedByCurrentUser,
       likesVisible: likesVisible ?? this.likesVisible,
+      category: category ?? this.category,
+      isAnonymous: isAnonymous ?? this.isAnonymous,
+      extra: extra ?? this.extra,
     );
   }
+
+  /// Hashtag-style label for the global "All" feed.
+  String get categoryFeedTag => feedCategoryTagForSlug(category);
+
+  /// Marketplace price label from [extra], if present.
+  String? get marketplacePriceLabel {
+    if (category != FeedCategories.marketplace) {
+      return null;
+    }
+    final dynamic p = extra?['price'];
+    if (p == null) {
+      return null;
+    }
+    final String s = p.toString().trim();
+    return s.isEmpty ? null : s;
+  }
+
+  bool get isProjectsCategory => category == FeedCategories.projects;
 
   String get optimizedImageUrl {
     if (imageUrl == null) return '';
@@ -130,6 +189,9 @@ class PostModel extends Equatable {
     authorAvatar,
     isLikedByCurrentUser,
     likesVisible,
+    category,
+    isAnonymous,
+    extra,
   ];
 }
 

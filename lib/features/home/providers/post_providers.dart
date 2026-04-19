@@ -1,6 +1,11 @@
+import 'dart:async';
 import 'dart:io';
+
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+
+import '../../../core/constants.dart';
+import '../../../shared/models/feed_category.dart';
 import '../../../shared/models/post_model.dart';
 import '../../../shared/providers/offline_banner_provider.dart';
 import '../../../shared/services/post_service.dart';
@@ -54,11 +59,76 @@ class PostsNotifier extends AsyncNotifier<List<PostModel>> {
   double _currentProgress = 0.0;
   String _currentStatus = '';
 
+  /// `null` means the global **All** feed (no `category` filter).
+  String? _feedCategory;
+  RealtimeChannel? _postsChannel;
+
+  String? get activeFeedCategory => _feedCategory;
+
   @override
   Future<List<PostModel>> build() async {
     _postService = ref.read(optimizedPostServiceProvider);
+    ref.onDispose(_detachRealtime);
     await _loadPosts();
+    _attachRealtime();
     return _posts;
+  }
+
+  void _detachRealtime() {
+    _postsChannel?.unsubscribe();
+    _postsChannel = null;
+  }
+
+  void _attachRealtime() {
+    if (!SupabaseConfig.isConfigured) {
+      return;
+    }
+    _detachRealtime();
+    final SupabaseClient client = Supabase.instance.client;
+    _postsChannel = client.channel('home_feed_${_feedCategory ?? 'all'}');
+    _postsChannel!.onPostgresChanges(
+      event: PostgresChangeEvent.insert,
+      schema: 'public',
+      table: 'posts',
+      callback: (PostgresChangePayload payload) {
+        unawaited(_onRealtimeInsert(payload));
+      },
+    ).subscribe();
+  }
+
+  Future<void> _onRealtimeInsert(PostgresChangePayload payload) async {
+    final Map<String, dynamic>? record = payload.newRecord;
+    if (record == null) {
+      return;
+    }
+    final String? id = record['id'] as String?;
+    if (id == null) {
+      return;
+    }
+    if (_feedCategory != null && record['category'] != _feedCategory) {
+      return;
+    }
+    if (_posts.any((PostModel p) => p.id == id)) {
+      return;
+    }
+    try {
+      final PostModel post = await _postService.getPostById(id);
+      if (_feedCategory != null && post.category != _feedCategory) {
+        return;
+      }
+      _posts.insert(0, post);
+      state = AsyncValue<List<PostModel>>.data(List<PostModel>.from(_posts));
+    } catch (_) {}
+  }
+
+  Future<void> setFeedCategory(String? categorySlug) async {
+    if (_feedCategory == categorySlug) {
+      return;
+    }
+    _feedCategory = categorySlug;
+    _detachRealtime();
+    await _loadPosts(refresh: true);
+    _attachRealtime();
   }
 
   // Getters for progress tracking
@@ -82,6 +152,7 @@ class PostsNotifier extends AsyncNotifier<List<PostModel>> {
       final newPosts = await _postService.getPosts(
         limit: _limit,
         offset: _offset,
+        categoryFilter: _feedCategory,
       );
       ref.read(offlineBannerProvider.notifier).resetOfflineCachedContentNotice();
 
@@ -114,7 +185,13 @@ class PostsNotifier extends AsyncNotifier<List<PostModel>> {
     }
   }
 
-  Future<void> createPost({required String content, File? imageFile}) async {
+  Future<void> createPost({
+    required String content,
+    File? imageFile,
+    String category = FeedCategories.discussions,
+    bool isAnonymous = false,
+    Map<String, dynamic>? extra,
+  }) async {
     try {
       _currentProgress = 0.0;
       _currentStatus = 'Preparing post...';
@@ -125,6 +202,9 @@ class PostsNotifier extends AsyncNotifier<List<PostModel>> {
       final newPost = await _postService.createPost(
         content: content,
         imageFile: imageFile,
+        category: category,
+        isAnonymous: isAnonymous,
+        extra: extra,
         onProgress: (progress) {
           _currentProgress = progress;
           if (progress < 0.2) {
@@ -140,7 +220,9 @@ class PostsNotifier extends AsyncNotifier<List<PostModel>> {
         },
       );
 
-      _posts.insert(0, newPost);
+      if (_feedCategory == null || newPost.category == _feedCategory) {
+        _posts.insert(0, newPost);
+      }
       state = AsyncValue.data(List.from(_posts));
 
       _currentProgress = 0.0;

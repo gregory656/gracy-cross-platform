@@ -1,7 +1,10 @@
+import 'dart:convert';
+
 import 'package:path/path.dart' as p;
 import 'package:sqflite/sqflite.dart';
 
 import '../models/chat_model.dart';
+import '../models/feed_category.dart';
 import '../models/message_model.dart';
 import '../models/post_model.dart';
 import '../models/user_model.dart';
@@ -31,7 +34,7 @@ class DatabaseService {
 
     _database = await openDatabase(
       dbPath,
-      version: 6,
+      version: 7,
       onCreate: (Database db, int version) async {
         await _createBaseTables(db);
         await _createChatCacheTable(db);
@@ -81,6 +84,18 @@ class DatabaseService {
           await _createPostCacheTable(db);
           await _createProfilesCacheTable(db);
           await _createRecentChatsCacheTable(db);
+        }
+
+        if (oldVersion < 7) {
+          await db.execute('''
+            ALTER TABLE $_postsCacheTable ADD COLUMN category TEXT NOT NULL DEFAULT '${FeedCategories.discussions}'
+          ''');
+          await db.execute('''
+            ALTER TABLE $_postsCacheTable ADD COLUMN is_anonymous INTEGER NOT NULL DEFAULT 0
+          ''');
+          await db.execute('''
+            ALTER TABLE $_postsCacheTable ADD COLUMN extra_json TEXT
+          ''');
         }
       },
     );
@@ -259,6 +274,9 @@ class DatabaseService {
         'author_avatar': post.authorAvatar,
         'is_liked_by_current_user': post.isLikedByCurrentUser ? 1 : 0,
         'likes_visible': post.likesVisible ? 1 : 0,
+        'category': post.category,
+        'is_anonymous': post.isAnonymous ? 1 : 0,
+        'extra_json': post.extra == null ? null : jsonEncode(post.extra),
         'cached_at': DateTime.now().toIso8601String(),
       }, conflictAlgorithm: ConflictAlgorithm.replace);
     }
@@ -444,6 +462,9 @@ class DatabaseService {
         author_avatar TEXT,
         is_liked_by_current_user INTEGER NOT NULL DEFAULT 0,
         likes_visible INTEGER NOT NULL DEFAULT 1,
+        category TEXT NOT NULL DEFAULT 'discussions',
+        is_anonymous INTEGER NOT NULL DEFAULT 0,
+        extra_json TEXT,
         cached_at TEXT NOT NULL
       )
     ''');
@@ -489,6 +510,19 @@ class DatabaseService {
   }
 
   PostModel _postFromRow(Map<String, Object?> row) {
+    Map<String, dynamic>? extra;
+    final String? rawExtra = row['extra_json']?.toString();
+    if (rawExtra != null && rawExtra.isNotEmpty) {
+      try {
+        final Object? decoded = jsonDecode(rawExtra);
+        if (decoded is Map<String, dynamic>) {
+          extra = decoded;
+        } else if (decoded is Map) {
+          extra = decoded.map((dynamic k, dynamic v) => MapEntry(k.toString(), v));
+        }
+      } catch (_) {}
+    }
+
     return PostModel(
       id: row['post_id']?.toString() ?? '',
       authorId: row['author_id']?.toString() ?? '',
@@ -507,6 +541,9 @@ class DatabaseService {
       authorAvatar: row['author_avatar']?.toString(),
       isLikedByCurrentUser: (row['is_liked_by_current_user'] as int? ?? 0) == 1,
       likesVisible: (row['likes_visible'] as int? ?? 1) == 1,
+      category: row['category']?.toString() ?? FeedCategories.discussions,
+      isAnonymous: (row['is_anonymous'] as int? ?? 0) == 1,
+      extra: extra,
     );
   }
 

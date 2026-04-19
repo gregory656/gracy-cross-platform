@@ -6,6 +6,7 @@ import 'package:cloudinary_public/cloudinary_public.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
+import '../models/feed_category.dart';
 import '../models/post_model.dart';
 import 'database_service.dart';
 import '../../core/secrets.dart';
@@ -33,12 +34,16 @@ class OptimizedPostService {
     'message',
   ];
 
-  Future<List<PostModel>> getPosts({int limit = 20, int offset = 0}) async {
+  Future<List<PostModel>> getPosts({
+    int limit = 20,
+    int offset = 0,
+    String? categoryFilter,
+  }) async {
     try {
       final userId = _supabase.auth.currentUser?.id;
       if (userId == null) throw Exception('User not authenticated');
 
-      final response = await _supabase
+      var query = _supabase
           .from('posts')
           .select('''
             *,
@@ -46,7 +51,13 @@ class OptimizedPostService {
               username,
               avatar_url
             )
-          ''')
+          ''');
+
+      if (categoryFilter != null && categoryFilter.isNotEmpty) {
+        query = query.eq('category', categoryFilter);
+      }
+
+      final response = await query
           .order('created_at', ascending: false)
           .range(offset, offset + limit - 1);
 
@@ -105,6 +116,9 @@ class OptimizedPostService {
     required String content,
     File? imageFile,
     Function(double)? onProgress,
+    String category = FeedCategories.discussions,
+    bool isAnonymous = false,
+    Map<String, dynamic>? extra,
   }) async {
     try {
       final userId = _supabase.auth.currentUser?.id;
@@ -133,6 +147,9 @@ class OptimizedPostService {
         userId: userId,
         content: content,
         imageUrl: imageUrl,
+        category: category,
+        isAnonymous: isAnonymous,
+        extra: extra,
       );
       final profile = await _getCurrentProfile(userId);
 
@@ -310,6 +327,9 @@ class OptimizedPostService {
     required String userId,
     required String content,
     required String? imageUrl,
+    String category = FeedCategories.discussions,
+    bool isAnonymous = false,
+    Map<String, dynamic>? extra,
   }) async {
     final baseData = <String, dynamic>{
       'author_id': userId,
@@ -325,31 +345,79 @@ class OptimizedPostService {
 
     Object? lastError;
 
-    for (final column in candidateColumns) {
-      final postData = Map<String, dynamic>.from(baseData);
-      if (column != null) {
-        postData[column] = trimmedContent;
-      }
-
-      try {
-        final response = await _supabase
-            .from('posts')
-            .insert(postData)
-            .select()
-            .single();
-        return Map<String, dynamic>.from(response);
-      } catch (e) {
-        lastError = e;
-        if (column != null && _isMissingColumnError(e, column)) {
-          continue;
+    metaLoop:
+    for (int metaLevel = 0; metaLevel < 4; metaLevel++) {
+      final Map<String, dynamic>? meta =
+          _categoryMetaForInsertAttempt(metaLevel, category, isAnonymous, extra);
+      for (final String? column in candidateColumns) {
+        final Map<String, dynamic> postData = Map<String, dynamic>.from(baseData);
+        if (column != null) {
+          postData[column] = trimmedContent;
         }
-        rethrow;
+        if (meta != null) {
+          postData.addAll(meta);
+        }
+
+        try {
+          final response = await _supabase
+              .from('posts')
+              .insert(postData)
+              .select()
+              .single();
+          return Map<String, dynamic>.from(response);
+        } catch (e) {
+          lastError = e;
+          if (column != null && _isMissingColumnError(e, column)) {
+            continue;
+          }
+          if (_isMissingCategoryMetaError(e)) {
+            continue metaLoop;
+          }
+          rethrow;
+        }
       }
     }
 
     throw Exception(
-      'Posts table text column is unsupported. Tried: ${_postTextColumns.join(', ')}. Last error: $lastError',
+      'Posts table insert failed. Tried text columns: ${_postTextColumns.join(', ')}. Last error: $lastError',
     );
+  }
+
+  Map<String, dynamic>? _categoryMetaForInsertAttempt(
+    int level,
+    String category,
+    bool isAnonymous,
+    Map<String, dynamic>? extra,
+  ) {
+    switch (level) {
+      case 0:
+        return <String, dynamic>{
+          'category': category,
+          'is_anonymous': isAnonymous,
+          if (extra != null && extra.isNotEmpty) 'extra': extra,
+        };
+      case 1:
+        return <String, dynamic>{
+          'category': category,
+          'is_anonymous': isAnonymous,
+        };
+      case 2:
+        return <String, dynamic>{'category': category};
+      default:
+        return null;
+    }
+  }
+
+  bool _isMissingCategoryMetaError(Object error) {
+    final String message = error.toString().toLowerCase();
+    final bool mentionsUnknownColumn = message.contains('column') ||
+        message.contains('schema cache');
+    if (!mentionsUnknownColumn) {
+      return false;
+    }
+    return message.contains('category') ||
+        message.contains('is_anonymous') ||
+        message.contains('extra');
   }
 
   bool _isMissingColumnError(Object error, String column) {
@@ -674,6 +742,9 @@ class OptimizedPostService {
   Future<PostModel> createPostWithImageUrl({
     required String content,
     required String imageUrl,
+    String category = FeedCategories.discussions,
+    bool isAnonymous = false,
+    Map<String, dynamic>? extra,
   }) async {
     final String? userId = _supabase.auth.currentUser?.id;
     if (userId == null) {
@@ -684,6 +755,9 @@ class OptimizedPostService {
       userId: userId,
       content: content,
       imageUrl: imageUrl,
+      category: category,
+      isAnonymous: isAnonymous,
+      extra: extra,
     );
     final Map<String, dynamic>? profile = await _getCurrentProfile(userId);
 
@@ -1019,12 +1093,17 @@ class OptimizedPostService {
     Map<String, dynamic> postData, {
     required bool isLikedByCurrentUser,
   }) {
-    final profile = postData['profiles'] as Map<String, dynamic>?;
+    final Map<String, dynamic>? profile =
+        postData['profiles'] as Map<String, dynamic>?;
+    final bool isAnonymous = postData['is_anonymous'] == true;
+    final String? username = profile?['username'] as String?;
+    final String? avatar = profile?['avatar_url'] as String?;
 
     return PostModel.fromMap({
       ...postData,
-      'author_name': profile?['username'] as String? ?? 'Unknown User',
-      'author_avatar': profile?['avatar_url'] as String?,
+      'author_name':
+          isAnonymous ? 'Anonymous Scion' : (username ?? 'Unknown User'),
+      'author_avatar': isAnonymous ? null : avatar,
       'is_liked_by_current_user': isLikedByCurrentUser,
     });
   }
