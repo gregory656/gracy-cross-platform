@@ -20,12 +20,16 @@ import '../../../shared/widgets/custom_text_field.dart';
 import '../../../shared/widgets/disappearing_messages_dialog.dart';
 import '../../../shared/widgets/report_reason_sheet.dart';
 import '../../../shared/widgets/top_overlay_sheet.dart';
+import '../../../shared/services/gemini_service.dart';
 import '../../../shared/widgets/user_avatar.dart';
 import '../data/chat_repository.dart';
 import '../providers/chat_providers.dart';
 import '../widgets/industrial_chat_composer.dart';
 import '../widgets/industrial_message_bubble.dart';
 import '../widgets/date_header.dart';
+import '../widgets/neural_background.dart';
+import '../widgets/glassmorphism_bubble.dart';
+import '../widgets/neural_thinking_indicator.dart';
 
 class ChatScreen extends ConsumerStatefulWidget {
   const ChatScreen({
@@ -52,6 +56,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
 
   Timer? _botTypingTimer;
   bool _isBotTyping = false;
+  bool _isAiThinking = false;
   int _lastMessageCount = 0;
   String? _replyToMessage;
   Timer? _readReceiptTimer;
@@ -154,7 +159,10 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
           );
       ref.invalidate(recentChatsProvider);
 
+      // Check if this is a message to GracyAI
       if (thread.participant.id == ChatRepository.botUserId) {
+        await _handleAiResponse(thread, content);
+      } else {
         _triggerFakeTyping();
       }
     } catch (error) {
@@ -164,6 +172,52 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
         );
       });
       _showFeedback('Message failed: $error');
+    }
+  }
+
+  Future<void> _handleAiResponse(ChatThread thread, String userMessage) async {
+    setState(() {
+      _isAiThinking = true;
+    });
+
+    try {
+      // Get conversation history for context
+      final AsyncValue<LocalFirstData<List<MessageModel>>> messagesAsync = 
+          ref.watch(messagesProvider(thread.roomId));
+      final List<MessageModel> conversationHistory = messagesAsync.asData?.value.data ?? [];
+
+      // Generate AI response
+      final aiResponse = await GeminiService().generateResponse(
+        userMessage: userMessage,
+        conversationHistory: conversationHistory,
+      );
+
+      if (mounted) {
+        // Send AI response as a message
+        await ref.read(chatRepositoryProvider).sendMessage(
+          roomId: thread.roomId,
+          senderId: ChatRepository.botUserId,
+          content: aiResponse,
+        );
+        ref.invalidate(recentChatsProvider);
+      }
+    } catch (error) {
+      debugPrint('AI response error: $error');
+      if (mounted) {
+        // Send fallback message
+        await ref.read(chatRepositoryProvider).sendMessage(
+          roomId: thread.roomId,
+          senderId: ChatRepository.botUserId,
+          content: 'Sorry, I\'m having trouble connecting right now. Please try again in a moment.',
+        );
+        ref.invalidate(recentChatsProvider);
+      }
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isAiThinking = false;
+        });
+      }
     }
   }
 
@@ -338,7 +392,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
   }
 
   void _maybeScrollToBottom(int messageCount) {
-    if (_lastMessageCount == messageCount && !_isBotTyping) {
+    if (_lastMessageCount == messageCount && !_isBotTyping && !_isAiThinking) {
       return;
     }
     _lastMessageCount = messageCount;
@@ -474,7 +528,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
                           );
                           _syncReceiptState(thread, messages);
                           _maybeScrollToBottom(
-                            messages.length + (_isBotTyping ? 1 : 0),
+                            messages.length + ((_isBotTyping || _isAiThinking) ? 1 : 0),
                           );
                           return _ThreadView(
                             thread: thread,
@@ -482,7 +536,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
                             composerController: _composerController,
                             scrollController: _scrollController,
                             isBotTyping:
-                                _isBotTyping &&
+                                (_isBotTyping || _isAiThinking) &&
                                 thread.participant.id ==
                                     ChatRepository.botUserId,
                             replyToMessage: _replyToMessage,
@@ -864,6 +918,55 @@ class _ChatShell extends ConsumerWidget {
 
                 return Column(
                   children: <Widget>[
+                    // GracyAI - Always at top
+                    Builder(
+                      builder: (BuildContext context) {
+                        final UserModel gracyAi = UserModel(
+                          id: ChatRepository.botUserId,
+                          fullName: 'GracyAI',
+                          username: '@gracyai',
+                          age: 0,
+                          role: UserRole.staff,
+                          courses: const <String>[],
+                          bio: 'The Official Brain of Gracy. Powered by Gemini 1.5 Pro.',
+                          isOnline: true,
+                          location: 'Digital Campus',
+                          avatarSeed: 'GracyAI',
+                          year: 'Always Active',
+                          gracyId: ChatRepository.botGracyCode,
+                        );
+
+                        final ChatModel gracyAiChat = ChatModel(
+                          id: 'gracy-ai-chat',
+                          participantId: ChatRepository.botUserId,
+                          lastMessage: 'GracyAI: The Official Brain of Gracy ⚡',
+                          lastMessageAt: DateTime.now(),
+                          unreadCount: 0,
+                          roomHash: '',
+                          isOfficial: true,
+                          gracyId: ChatRepository.botGracyCode,
+                          isOnline: true,
+                        );
+
+                        return ChatTile(
+                          chat: gracyAiChat,
+                          user: gracyAi,
+                          onTap: () {
+                            context.go(
+                              AppRoutePaths.chatByUser(
+                                userId: ChatRepository.botUserId,
+                                receiverName: gracyAi.fullName,
+                                receiverAvatar: gracyAi.avatarUrl,
+                              ),
+                            );
+                          },
+                          onLongPress: () {
+                            _showChatActions(context, ref, gracyAiChat, gracyAi);
+                          },
+                        );
+                      },
+                    ),
+                    const SizedBox(height: 8),
                     for (
                       int index = 0;
                       index < chats.length;
@@ -1035,15 +1138,71 @@ class _ThreadView extends StatelessWidget {
         lastDate = messageDate;
       }
 
-      // Add message bubble
-      widgets.add(
-        IndustrialMessageBubble(
-          message: message,
-          onReply: () => onReply(message),
-          onForward: () => onForward(message),
-          onDelete: () => onDelete(message),
-        ),
+      // Add message bubble - use GlassmorphismBubble for AI messages
+      if (message.senderId == ChatRepository.botUserId) {
+        widgets.add(
+          GlassmorphismBubble(
+            message: message,
+            onReply: () => onReply(message),
+            onForward: () => onForward(message),
+            onDelete: () => onDelete(message),
+          ),
+        );
+      } else {
+        widgets.add(
+          IndustrialMessageBubble(
+            message: message,
+            onReply: () => onReply(message),
+            onForward: () => onForward(message),
+            onDelete: () => onDelete(message),
+          ),
+        );
+      }
+    }
+
+    return widgets;
+  }
+
+  List<Widget> _buildNeuralMessageGroup() {
+    if (messages.isEmpty) return [];
+
+    final List<Widget> widgets = [];
+    DateTime? lastDate;
+
+    for (int i = 0; i < messages.length; i++) {
+      final message = messages[i];
+      final messageDate = DateTime(
+        message.sentAt.year,
+        message.sentAt.month,
+        message.sentAt.day,
       );
+
+      // Add date header if date changed
+      if (lastDate == null || messageDate.isAfter(lastDate)) {
+        widgets.add(DateHeader(date: message.sentAt));
+        lastDate = messageDate;
+      }
+
+      // Add message bubble - use GlassmorphismBubble for AI messages
+      if (message.senderId == ChatRepository.botUserId) {
+        widgets.add(
+          GlassmorphismBubble(
+            message: message,
+            onReply: () => onReply(message),
+            onForward: () => onForward(message),
+            onDelete: () => onDelete(message),
+          ),
+        );
+      } else {
+        widgets.add(
+          IndustrialMessageBubble(
+            message: message,
+            onReply: () => onReply(message),
+            onForward: () => onForward(message),
+            onDelete: () => onDelete(message),
+          ),
+        );
+      }
     }
 
     return widgets;
@@ -1051,6 +1210,8 @@ class _ThreadView extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final isGracyAI = thread.participant.id == ChatRepository.botUserId;
+    
     return Container(
       color: Colors.black,
       child: Column(
@@ -1061,60 +1222,121 @@ class _ThreadView extends StatelessWidget {
             onViewProfile: onViewProfile,
           ),
           Expanded(
-            child: Container(
-              margin: const EdgeInsets.fromLTRB(18, 10, 18, 0),
-              decoration: BoxDecoration(
-                color: const Color(0xFF090B0F).withValues(alpha: 0.9),
-                borderRadius: BorderRadius.circular(28),
-                border: Border.all(
-                  color: Colors.white.withValues(alpha: 0.06),
-                  width: 1,
-                ),
-              ),
-              clipBehavior: Clip.antiAlias,
-              child: Column(
+            child: isGracyAI 
+                ? _buildNeuralChatInterface(context)
+                : _buildStandardChatInterface(context),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildNeuralChatInterface(BuildContext context) {
+    return NeuralBackground(
+      child: Container(
+        margin: const EdgeInsets.fromLTRB(18, 10, 18, 0),
+        decoration: BoxDecoration(
+          color: const Color(0xFF090B0F).withValues(alpha: 0.9),
+          borderRadius: BorderRadius.circular(28),
+          border: Border.all(
+            color: Colors.white.withValues(alpha: 0.06),
+            width: 1,
+          ),
+        ),
+        clipBehavior: Clip.antiAlias,
+        child: Column(
+          children: <Widget>[
+            Expanded(
+              child: Stack(
                 children: <Widget>[
-                  Expanded(
-                    child: Stack(
-                      children: <Widget>[
-                        Positioned.fill(
-                          child: CustomPaint(painter: _ChatWallpaperPainter()),
+                  ListView(
+                    controller: scrollController,
+                    padding: const EdgeInsets.fromLTRB(0, 16, 0, 0),
+                    children: <Widget>[
+                      ..._buildNeuralMessageGroup(),
+                      if (isBotTyping)
+                        Padding(
+                          padding: const EdgeInsets.only(top: 8),
+                          child: NeuralThinkingIndicator(),
                         ),
-                        ListView(
-                          controller: scrollController,
-                          padding: const EdgeInsets.fromLTRB(0, 16, 0, 0),
-                          children: <Widget>[
-                            ..._buildMessageGroup(),
-                            if (isBotTyping)
-                              Padding(
-                                padding: const EdgeInsets.only(top: 8),
-                                child: _TypingIndicator(
-                                  name: thread.participant.fullName,
-                                ),
-                              ),
-                          ],
-                        ),
-                      ],
-                    ),
-                  ),
-                  Container(
-                    padding: EdgeInsets.only(
-                      bottom: MediaQuery.of(context).viewInsets.bottom > 0
-                          ? MediaQuery.of(context).viewInsets.bottom
-                          : MediaQuery.of(context).viewPadding.bottom,
-                    ),
-                    decoration: const BoxDecoration(
-                      color: Colors.black,
-                    ),
-                    child: IndustrialChatComposer(
-                      controller: composerController,
-                      onSend: onSend,
-                      replyToMessage: replyToMessage,
-                      onCancelReply: onCancelReply,
-                    ),
+                    ],
                   ),
                 ],
               ),
+            ),
+            Container(
+              padding: EdgeInsets.only(
+                bottom: MediaQuery.of(context).viewInsets.bottom > 0
+                    ? MediaQuery.of(context).viewInsets.bottom
+                    : MediaQuery.of(context).viewPadding.bottom,
+              ),
+              decoration: const BoxDecoration(
+                color: Colors.black,
+              ),
+              child: IndustrialChatComposer(
+                controller: composerController,
+                onSend: onSend,
+                replyToMessage: replyToMessage,
+                onCancelReply: onCancelReply,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildStandardChatInterface(BuildContext context) {
+    return Container(
+      margin: const EdgeInsets.fromLTRB(18, 10, 18, 0),
+      decoration: BoxDecoration(
+        color: const Color(0xFF090B0F).withValues(alpha: 0.9),
+        borderRadius: BorderRadius.circular(28),
+        border: Border.all(
+          color: Colors.white.withValues(alpha: 0.06),
+          width: 1,
+        ),
+      ),
+      clipBehavior: Clip.antiAlias,
+      child: Column(
+        children: <Widget>[
+          Expanded(
+            child: Stack(
+              children: <Widget>[
+                Positioned.fill(
+                  child: CustomPaint(painter: _ChatWallpaperPainter()),
+                ),
+                ListView(
+                  controller: scrollController,
+                  padding: const EdgeInsets.fromLTRB(0, 16, 0, 0),
+                  children: <Widget>[
+                    ..._buildMessageGroup(),
+                    if (isBotTyping)
+                      Padding(
+                        padding: const EdgeInsets.only(top: 8),
+                        child: _TypingIndicator(
+                          name: thread.participant.fullName,
+                        ),
+                      ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+          Container(
+            padding: EdgeInsets.only(
+              bottom: MediaQuery.of(context).viewInsets.bottom > 0
+                  ? MediaQuery.of(context).viewInsets.bottom
+                  : MediaQuery.of(context).viewPadding.bottom,
+            ),
+            decoration: const BoxDecoration(
+              color: Colors.black,
+            ),
+            child: IndustrialChatComposer(
+              controller: composerController,
+              onSend: onSend,
+              replyToMessage: replyToMessage,
+              onCancelReply: onCancelReply,
             ),
           ),
         ],

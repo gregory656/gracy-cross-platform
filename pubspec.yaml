@@ -32,6 +32,8 @@ dependencies:
   dio: ^5.7.0
   flutter_secure_storage: ^9.2.4
   flutter_local_notifications: ^21.0.0
+  google_generative_ai: ^0.4.6
+  flutter_markdown: ^0.7.4+1
   image_gallery_saver:
     path: third_party/image_gallery_saver
 

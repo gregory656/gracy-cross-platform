@@ -28,8 +28,8 @@ class ChatRepository {
     TimezoneService.initialize();
   }
 
-  static const String botUserId = 'd9660385-2c30-466d-8902-602868198f82';
-  static const String botGracyCode = 'GRACY-BOT-99';
+  static const String botUserId = 'gracy_ai_official';
+  static const String botGracyCode = 'GRACY-AI';
 
   static const String _profilesTable = 'profiles';
   static const String _roomsTable = 'chat_rooms';
@@ -48,6 +48,11 @@ class ChatRepository {
     final String normalizedCode = gracyId.trim();
     if (normalizedCode.isEmpty) {
       return null;
+    }
+
+    // Special handling for GracyAI bot
+    if (normalizedCode.toUpperCase() == botGracyCode) {
+      return _createGracyAiBot();
     }
 
     final Map<String, dynamic>? row = await _client
@@ -519,7 +524,7 @@ class ChatRepository {
           lastMessage:
               latest?['content']?.toString() ??
               (participant.id == botUserId
-                  ? 'Official Gracy bot is ready.'
+                  ? 'GracyAI: The Official Brain of Gracy ⚡'
                   : 'Start the conversation'),
           lastMessageAt:
               DateTime.tryParse(latest?['created_at']?.toString() ?? '') ??
@@ -829,6 +834,23 @@ class ChatRepository {
       'delivered' => MessageStatus.delivered,
       _ => MessageStatus.sent,
     };
+  }
+
+  UserModel _createGracyAiBot() {
+    return UserModel(
+      id: botUserId,
+      fullName: 'GracyAI',
+      username: '@gracyai',
+      age: 0,
+      role: UserRole.staff,
+      courses: const <String>[],
+      bio: 'The Official Brain of Gracy. Powered by Gemini 1.5 Pro.',
+      isOnline: true,
+      location: 'Digital Campus',
+      avatarSeed: 'GracyAI',
+      year: 'Always Active',
+      gracyId: botGracyCode,
+    );
   }
 }
 
