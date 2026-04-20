@@ -7,29 +7,33 @@ import 'package:go_router/go_router.dart';
 import '../../../core/constants/app_constants.dart';
 import '../../../core/router/app_router.dart';
 import '../../../core/router/shell_ui_provider.dart';
+import '../../../core/theme/app_colors.dart';
 import '../../../shared/models/chat_model.dart';
 import '../../../shared/models/local_first_data.dart';
 import '../../../shared/models/message_model.dart';
 import '../../../shared/models/user_model.dart';
-import '../../../shared/providers/auth_provider.dart';
+import '../../../shared/providers/chat_providers.dart';
+import '../../../shared/providers/auth_provider.dart' show AuthState, authNotifierProvider;
 import '../../../shared/providers/offline_banner_provider.dart';
 import '../../../shared/providers/profiles_provider.dart';
-import '../../../shared/providers/social_providers.dart';
-import '../../../shared/widgets/chat_tile.dart';
-import '../../../shared/widgets/custom_text_field.dart';
 import '../../../shared/widgets/disappearing_messages_dialog.dart';
 import '../../../shared/widgets/report_reason_sheet.dart';
 import '../../../shared/widgets/top_overlay_sheet.dart';
-import '../../../shared/services/gemini_service.dart';
+import '../../../shared/widgets/chat_tile.dart';
+import '../../../shared/widgets/custom_text_field.dart';
 import '../../../shared/widgets/user_avatar.dart';
+import '../../../shared/services/gemini_service.dart';
+import '../../../shared/enums/user_role.dart';
 import '../data/chat_repository.dart';
-import '../providers/chat_providers.dart';
+import '../providers/elite_chat_providers.dart';
+import '../../../shared/models/chat_thread.dart';
 import '../widgets/industrial_chat_composer.dart';
 import '../widgets/industrial_message_bubble.dart';
 import '../widgets/date_header.dart';
 import '../widgets/neural_background.dart';
 import '../widgets/glassmorphism_bubble.dart';
 import '../widgets/neural_thinking_indicator.dart';
+import '../widgets/gracy_ai_logo.dart';
 
 class ChatScreen extends ConsumerStatefulWidget {
   const ChatScreen({
@@ -69,13 +73,38 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
   void initState() {
     super.initState();
     WidgetsBinding.instance.addPostFrameCallback((_) {
+      // Load chat visibility from database
+      ref.read(chatVisibilityProvider.notifier).loadVisibilityFromDatabase();
+      
       if (widget.chatId != null || widget.userId != null) {
+        // Check if this is a new GracyAI conversation (timestamp-based ID)
+        final isNewGracyConversation = widget.chatId != null && 
+            widget.userId == ChatRepository.botUserId &&
+            _isTimestampId(widget.chatId!);
+        
+        if (isNewGracyConversation) {
+          debugPrint('Starting new GracyAI conversation with fresh start');
+        }
+        
         // Atomic load
         ref.read(activeChatProvider.notifier).openChat(widget.chatId);
       }
     });
   }
 
+  bool _isTimestampId(String chatId) {
+    try {
+      final timestamp = int.parse(chatId);
+      // If it's a recent timestamp (within last 24 hours), consider it new
+      final now = DateTime.now().millisecondsSinceEpoch;
+      final oneDayAgo = now - (24 * 60 * 60 * 1000);
+      return timestamp > oneDayAgo;
+    } catch (e) {
+      return false;
+    }
+  }
+
+  
   void _syncShellNavigation(bool showThread) {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) {
@@ -188,6 +217,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
 
       // Generate AI response
       final aiResponse = await GeminiService().generateResponse(
+        userMessage,
         userMessage: userMessage,
         conversationHistory: conversationHistory,
       );
@@ -365,8 +395,52 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
     _showFeedback('Forward feature coming soon');
   }
 
-  void _handleDelete(MessageModel message) {
-    _showFeedback('Delete feature coming soon');
+  Future<void> _handleDelete(MessageModel message) async {
+    final String? currentUserId = ref.read(authNotifierProvider).userId;
+    if (currentUserId == null) return;
+
+    final shouldDelete = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        backgroundColor: const Color(0xFF1A1D29),
+        title: const Text(
+          'Delete Message',
+          style: TextStyle(color: Colors.white, fontWeight: FontWeight.w600),
+        ),
+        content: const Text(
+          'This message will be permanently deleted. This action cannot be undone.',
+          style: TextStyle(color: Colors.white70),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(false),
+            child: const Text(
+              'Cancel',
+              style: TextStyle(color: AppColors.electricBlue),
+            ),
+          ),
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(true),
+            child: const Text(
+              'Delete',
+              style: TextStyle(color: Colors.red),
+            ),
+          ),
+        ],
+      ),
+    );
+
+    if (shouldDelete == true) {
+      try {
+        await ref.read(chatRepositoryProvider).deleteMessage(
+          messageId: message.id,
+          currentUserId: currentUserId,
+        );
+        _showFeedback('Message deleted');
+      } catch (error) {
+        _showFeedback('Failed to delete message: $error');
+      }
+    }
   }
 
   void _cancelReply() {
@@ -430,6 +504,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
     final ChatThreadRequest request = ChatThreadRequest(
       roomId: widget.chatId,
       userId: widget.userId,
+      receiverId: widget.userId ?? ChatRepository.botUserId,
       receiverName: widget.receiverName,
       receiverAvatar: widget.receiverAvatar,
     );
@@ -649,11 +724,14 @@ class _ChatShell extends ConsumerWidget {
                     color: Colors.white70,
                   ),
                 ),
-                onTap: () {
+                onTap: () async {
                   Navigator.of(sheetContext).pop();
-                  ref
+                  await ref
                       .read(chatVisibilityProvider.notifier)
                       .setVisibility(chat.id, ChatVisibility.hidden);
+                  if (!context.mounted) {
+                    return;
+                  }
                   ref.read(localReadChatsProvider.notifier).markRead(chat.id);
                   ScaffoldMessenger.of(context)
                     ..clearSnackBars()
@@ -664,8 +742,8 @@ class _ChatShell extends ConsumerWidget {
                         ),
                         action: SnackBarAction(
                           label: 'Undo',
-                          onPressed: () {
-                            ref
+                          onPressed: () async {
+                            await ref
                                 .read(chatVisibilityProvider.notifier)
                                 .setVisibility(chat.id, ChatVisibility.visible);
                           },
@@ -693,11 +771,14 @@ class _ChatShell extends ConsumerWidget {
                     color: Colors.white70,
                   ),
                 ),
-                onTap: () {
+                onTap: () async {
                   Navigator.of(sheetContext).pop();
-                  ref
+                  await ref
                       .read(chatVisibilityProvider.notifier)
                       .setVisibility(chat.id, ChatVisibility.archived);
+                  if (!context.mounted) {
+                    return;
+                  }
                   ref.read(localReadChatsProvider.notifier).markRead(chat.id);
                   ScaffoldMessenger.of(context)
                     ..clearSnackBars()
@@ -706,8 +787,8 @@ class _ChatShell extends ConsumerWidget {
                         content: Text('${user.fullName} archived.'),
                         action: SnackBarAction(
                           label: 'Undo',
-                          onPressed: () {
-                            ref
+                          onPressed: () async {
+                            await ref
                                 .read(chatVisibilityProvider.notifier)
                                 .setVisibility(chat.id, ChatVisibility.visible);
                           },
@@ -735,11 +816,14 @@ class _ChatShell extends ConsumerWidget {
                     color: Colors.white70,
                   ),
                 ),
-                onTap: () {
+                onTap: () async {
                   Navigator.of(sheetContext).pop();
-                  ref
+                  await ref
                       .read(chatVisibilityProvider.notifier)
                       .setVisibility(chat.id, ChatVisibility.deleted);
+                  if (!context.mounted) {
+                    return;
+                  }
                   ref.read(localReadChatsProvider.notifier).markRead(chat.id);
                   ScaffoldMessenger.of(context)
                     ..clearSnackBars()
@@ -748,8 +832,8 @@ class _ChatShell extends ConsumerWidget {
                         content: Text('${user.fullName} deleted from view.'),
                         action: SnackBarAction(
                           label: 'Undo',
-                          onPressed: () {
-                            ref
+                          onPressed: () async {
+                            await ref
                                 .read(chatVisibilityProvider.notifier)
                                 .setVisibility(chat.id, ChatVisibility.visible);
                           },
@@ -1163,51 +1247,6 @@ class _ThreadView extends StatelessWidget {
     return widgets;
   }
 
-  List<Widget> _buildNeuralMessageGroup() {
-    if (messages.isEmpty) return [];
-
-    final List<Widget> widgets = [];
-    DateTime? lastDate;
-
-    for (int i = 0; i < messages.length; i++) {
-      final message = messages[i];
-      final messageDate = DateTime(
-        message.sentAt.year,
-        message.sentAt.month,
-        message.sentAt.day,
-      );
-
-      // Add date header if date changed
-      if (lastDate == null || messageDate.isAfter(lastDate)) {
-        widgets.add(DateHeader(date: message.sentAt));
-        lastDate = messageDate;
-      }
-
-      // Add message bubble - use GlassmorphismBubble for AI messages
-      if (message.senderId == ChatRepository.botUserId) {
-        widgets.add(
-          GlassmorphismBubble(
-            message: message,
-            onReply: () => onReply(message),
-            onForward: () => onForward(message),
-            onDelete: () => onDelete(message),
-          ),
-        );
-      } else {
-        widgets.add(
-          IndustrialMessageBubble(
-            message: message,
-            onReply: () => onReply(message),
-            onForward: () => onForward(message),
-            onDelete: () => onDelete(message),
-          ),
-        );
-      }
-    }
-
-    return widgets;
-  }
-
   @override
   Widget build(BuildContext context) {
     final isGracyAI = thread.participant.id == ChatRepository.botUserId;
@@ -1232,6 +1271,9 @@ class _ThreadView extends StatelessWidget {
   }
 
   Widget _buildNeuralChatInterface(BuildContext context) {
+    final isGracyAI = thread.participant.id == ChatRepository.botUserId;
+    final hasMessages = messages.isNotEmpty;
+    
     return NeuralBackground(
       child: Container(
         margin: const EdgeInsets.fromLTRB(18, 10, 18, 0),
@@ -1246,29 +1288,86 @@ class _ThreadView extends StatelessWidget {
         clipBehavior: Clip.antiAlias,
         child: Column(
           children: <Widget>[
-            Expanded(
-              child: Stack(
-                children: <Widget>[
-                  ListView(
-                    controller: scrollController,
-                    padding: const EdgeInsets.fromLTRB(0, 16, 0, 0),
-                    children: <Widget>[
-                      ..._buildNeuralMessageGroup(),
-                      if (isBotTyping)
-                        Padding(
-                          padding: const EdgeInsets.only(top: 8),
-                          child: NeuralThinkingIndicator(),
+            // Gemini Clone Welcome State
+            if (!hasMessages && isGracyAI) ...[
+              const Spacer(flex: 2),
+              Center(
+                child: Column(
+                  children: [
+                    const GracyAILogo(
+                      size: 80,
+                      glowing: true,
+                    ),
+                    const SizedBox(height: 24),
+                    const Text(
+                      'How can I help you today?',
+                      style: TextStyle(
+                        fontSize: 24,
+                        fontWeight: FontWeight.w600,
+                        color: Colors.white,
+                        letterSpacing: -0.5,
+                      ),
+                    ),
+                    const SizedBox(height: 32),
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
+                      decoration: BoxDecoration(
+                        color: Colors.white.withValues(alpha: 0.08),
+                        borderRadius: BorderRadius.circular(16),
+                        border: Border.all(
+                          color: AppColors.electricBlue.withValues(alpha: 0.2),
+                          width: 1,
                         ),
-                    ],
-                  ),
-                ],
+                      ),
+                      child: const Text(
+                        'Ask me anything about campus life, studies, or just chat!',
+                        style: TextStyle(
+                          fontSize: 14,
+                          color: Colors.white70,
+                          height: 1.4,
+                        ),
+                        textAlign: TextAlign.center,
+                      ),
+                    ),
+                  ],
+                ),
               ),
-            ),
+              const Spacer(flex: 3),
+            ],
+            
+            // Messages List with thinking indicator inside
+            if (hasMessages) ...[
+              Expanded(
+                child: ListView.builder(
+                  controller: scrollController,
+                  padding: const EdgeInsets.fromLTRB(0, 16, 0, 80), // Extra bottom padding for composer
+                  itemCount: messages.length + (isBotTyping ? 1 : 0),
+                  itemBuilder: (context, index) {
+                    if (index == messages.length && isBotTyping) {
+                      return Container(
+                        padding: const EdgeInsets.symmetric(vertical: 8),
+                        child: NeuralThinkingIndicator(),
+                      );
+                    }
+                    
+                    if (index >= messages.length) return const SizedBox.shrink();
+                    
+                    final message = messages[index];
+                    return GlassmorphismBubble(
+                      message: message,
+                      onReply: () => onReply(message),
+                      onForward: () => onForward(message),
+                      onDelete: () => onDelete(message),
+                    );
+                  },
+                ),
+              ),
+            ],
+            
+            // Composer
             Container(
               padding: EdgeInsets.only(
-                bottom: MediaQuery.of(context).viewInsets.bottom > 0
-                    ? MediaQuery.of(context).viewInsets.bottom
-                    : MediaQuery.of(context).viewPadding.bottom,
+                bottom: MediaQuery.of(context).viewInsets.bottom,
               ),
               decoration: const BoxDecoration(
                 color: Colors.black,
@@ -1325,9 +1424,7 @@ class _ThreadView extends StatelessWidget {
           ),
           Container(
             padding: EdgeInsets.only(
-              bottom: MediaQuery.of(context).viewInsets.bottom > 0
-                  ? MediaQuery.of(context).viewInsets.bottom
-                  : MediaQuery.of(context).viewPadding.bottom,
+              bottom: MediaQuery.of(context).viewInsets.bottom,
             ),
             decoration: const BoxDecoration(
               color: Colors.black,
@@ -1379,43 +1476,62 @@ class _ThreadHeader extends StatelessWidget {
                   borderRadius: BorderRadius.circular(999),
                 ),
               ),
-              _ThreadActionTile(
-                icon: Icons.account_circle_outlined,
-                label: 'View Profile',
-                onTap: () {
-                  Navigator.of(sheetContext).pop();
-                  onViewProfile();
-                },
-              ),
-              const Divider(height: 1, color: Color(0xFF2A2E34)),
-              _ThreadActionTile(
-                icon: Icons.search_rounded,
-                label: 'Search Conversation',
-                onTap: () {
-                  Navigator.of(sheetContext).pop();
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(
-                      content: Text('Conversation search is queued next.'),
-                    ),
-                  );
-                },
-              ),
-              const Divider(height: 1, color: Color(0xFF2A2E34)),
-              _ThreadActionTile(
-                icon: Icons.notifications_off_outlined,
-                label: 'Mute Notifications',
-                onTap: () {
-                  Navigator.of(sheetContext).pop();
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(
-                      content: Text(
-                        'Notifications muted for ${participant.fullName}.',
+              // Only show profile features for human users, not GracyAI
+              if (participant.id != ChatRepository.botUserId) ...[
+                _ThreadActionTile(
+                  icon: Icons.account_circle_outlined,
+                  label: 'View Profile',
+                  onTap: () {
+                    Navigator.of(sheetContext).pop();
+                    onViewProfile();
+                  },
+                ),
+                const Divider(height: 1, color: Color(0xFF2A2E34)),
+                _ThreadActionTile(
+                  icon: Icons.search_rounded,
+                  label: 'Search Conversation',
+                  onTap: () {
+                    Navigator.of(sheetContext).pop();
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(
+                        content: Text('Conversation search is queued next.'),
                       ),
-                    ),
-                  );
-                },
-              ),
+                    );
+                  },
+                ),
+                const Divider(height: 1, color: Color(0xFF2A2E34)),
+                _ThreadActionTile(
+                  icon: Icons.notifications_off_outlined,
+                  label: 'Mute Notifications',
+                  onTap: () {
+                    Navigator.of(sheetContext).pop();
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(
+                        content: Text(
+                          'Notifications muted for ${participant.fullName}.',
+                        ),
+                      ),
+                    );
+                  },
+                ),
+              ],
               const Divider(height: 1, color: Color(0xFF2A2E34)),
+              if (participant.id == ChatRepository.botUserId) ...[
+                _ThreadActionTile(
+                  icon: Icons.refresh_rounded,
+                  label: 'New Conversation',
+                  color: const Color(0xFF007AFF),
+                  onTap: () async {
+                    Navigator.of(context).pop();
+                    // Start new conversation with GracyAI
+                    final newRoomId = DateTime.now().millisecondsSinceEpoch.toString();
+                    Navigator.of(context).pushNamedAndRemoveUntil(
+                      '/chat/$newRoomId',
+                      (route) => false,
+                    );
+                  },
+                ),
+              ],
               _ThreadActionTile(
                 icon: Icons.outlined_flag_rounded,
                 label: 'Block / Report',
@@ -1477,13 +1593,22 @@ class _ThreadHeader extends StatelessWidget {
             const SizedBox(width: 6),
           ],
           GestureDetector(
-            onTap: onViewProfile,
-            child: UserAvatar(
-              user: safeParticipant,
-              size: 38,
-              fontSize: 14,
-              showRing: false,
-            ),
+                onTap: onViewProfile,
+                child: isOfficial
+                ? const SizedBox(
+                    width: 38,
+                    height: 38,
+                    child: GracyAILogo(
+                      size: 38,
+                      glowing: true,
+                    ),
+                  )
+                : UserAvatar(
+                    user: safeParticipant,
+                    size: 38,
+                    fontSize: 14,
+                    showRing: false,
+                  ),
           ),
           const SizedBox(width: 12),
           Expanded(

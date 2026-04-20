@@ -4,10 +4,12 @@ import 'package:path/path.dart' as p;
 import 'package:sqflite/sqflite.dart';
 
 import '../models/chat_model.dart';
+import '../enums/user_role.dart';
 import '../models/feed_category.dart';
 import '../models/message_model.dart';
 import '../models/post_model.dart';
 import '../models/user_model.dart';
+import '../models/story_model.dart';
 
 class DatabaseService {
   DatabaseService._();
@@ -19,8 +21,9 @@ class DatabaseService {
   static const String _legacyMessagesTable = 'messages';
   static const String _chatCacheTable = 'chat_message_cache';
   static const String _postsCacheTable = 'posts_cache';
-  static const String _profilesCacheTable = 'profiles_cache';
+static const String _profilesCacheTable = 'profiles_cache';
   static const String _recentChatsCacheTable = 'recent_chats_cache';
+  static const String _storiesCacheTable = 'stories_cache';
 
   Database? _database;
 
@@ -41,6 +44,7 @@ class DatabaseService {
         await _createPostCacheTable(db);
         await _createProfilesCacheTable(db);
         await _createRecentChatsCacheTable(db);
+        await _createStoriesCacheTable(db);
       },
       onUpgrade: (Database db, int oldVersion, int newVersion) async {
         if (oldVersion < 2) {
@@ -96,6 +100,10 @@ class DatabaseService {
           await db.execute('''
             ALTER TABLE $_postsCacheTable ADD COLUMN extra_json TEXT
           ''');
+        }
+
+        if (oldVersion < 8) {
+          await _createStoriesCacheTable(db);
         }
       },
     );
@@ -308,6 +316,7 @@ class DatabaseService {
     await batch.commit(noResult: true);
   }
 
+
   Future<List<UserModel>> getCachedProfiles(String ownerId) async {
     final Database db = await database;
     final List<Map<String, Object?>> rows = await db.query(
@@ -318,6 +327,56 @@ class DatabaseService {
     );
 
     return rows.map(_userFromRow).toList();
+  }
+
+  Future<List<StoryModel>> getCachedStories(String ownerId) async {
+    final Database db = await database;
+    final List<Map<String, Object?>> rows = await db.query(
+      _storiesCacheTable,
+      where: 'owner_id = ?',
+      whereArgs: <Object?>[ownerId],
+      orderBy: 'created_at DESC',
+    );
+
+    return rows.map(_storyFromRow).toList();
+  }
+
+  Future<void> cacheStories(List<StoryModel> stories, String ownerId) async {
+    final Database db = await database;
+    final Batch batch = db.batch();
+
+    for (final StoryModel story in stories) {
+      batch.insert(_storiesCacheTable, <String, Object?>{
+        'story_id': story.id,
+        'owner_id': ownerId,
+        'user_id': story.userId,
+        'content': story.content,
+        'image_url': story.imageUrl,
+        'created_at': story.createdAt.toIso8601String(),
+        'expires_at': story.expiresAt.toIso8601String(),
+        'viewed_by': story.viewedBy.join(','),
+        'author_name': story.authorName,
+        'author_avatar': story.authorAvatar,
+        'cached_at': DateTime.now().toIso8601String(),
+      }, conflictAlgorithm: ConflictAlgorithm.replace);
+    }
+
+    await batch.commit(noResult: true);
+  }
+
+  StoryModel _storyFromRow(Map<String, Object?> row) {
+    return StoryModel(
+      id: row['story_id']?.toString() ?? '',
+      userId: row['user_id']?.toString() ?? '',
+      content: row['content']?.toString(),
+      imageUrl: row['image_url']?.toString(),
+      createdAt: DateTime.tryParse(row['created_at']?.toString() ?? '') ?? DateTime.now(),
+      expiresAt: DateTime.tryParse(row['expires_at']?.toString() ?? '') ?? DateTime.now(),
+      viewedBy: (row['viewed_by']?.toString() ?? '').split(',').where((s) => s.isNotEmpty).toList(),
+      authorName: row['author_name']?.toString() ?? 'Story User',
+      authorAvatar: row['author_avatar']?.toString(),
+      isViewedByMe: false, // Client-side
+    );
   }
 
   Future<void> cacheRecentChats(List<ChatModel> chats, String ownerId) async {
@@ -506,6 +565,29 @@ class DatabaseService {
         is_last_message_mine INTEGER NOT NULL DEFAULT 1,
         cached_at TEXT NOT NULL
       )
+    ''');
+  }
+
+  Future<void> _createStoriesCacheTable(Database db) async {
+    await db.execute('''
+      CREATE TABLE IF NOT EXISTS $_storiesCacheTable (
+        story_id TEXT PRIMARY KEY,
+        owner_id TEXT NOT NULL,
+        user_id TEXT NOT NULL,
+        content TEXT,
+        image_url TEXT,
+        created_at TEXT NOT NULL,
+        expires_at TEXT NOT NULL,
+        viewed_by TEXT,
+        author_name TEXT,
+        author_avatar TEXT,
+        cached_at TEXT NOT NULL
+      )
+    ''');
+
+    await db.execute('''
+      CREATE INDEX IF NOT EXISTS idx_stories_cache_owner_expires
+      ON $_storiesCacheTable (owner_id, expires_at)
     ''');
   }
 

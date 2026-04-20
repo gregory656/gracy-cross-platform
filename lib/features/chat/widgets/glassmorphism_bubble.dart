@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 
 import '../../../shared/models/message_model.dart';
 import '../../../shared/services/timezone_service.dart';
+import 'gracy_ai_logo.dart';
 
 class GlassmorphismBubble extends StatefulWidget {
   const GlassmorphismBubble({
@@ -74,34 +75,12 @@ class _GlassmorphismBubbleState extends State<GlassmorphismBubble>
         mainAxisAlignment: MainAxisAlignment.start,
         crossAxisAlignment: CrossAxisAlignment.end,
         children: [
-          // Glowing avatar for AI
+          // GracyAI logo with neural glow
           Container(
-            width: 32,
-            height: 32,
             margin: const EdgeInsets.only(right: 8),
-            decoration: BoxDecoration(
-              shape: BoxShape.circle,
-              border: Border.all(
-                color: _electricBlue.withAlpha(128),
-                width: 2,
-              ),
-              boxShadow: [
-                BoxShadow(
-                  color: _electricBlue.withAlpha(76),
-                  blurRadius: 8,
-                  spreadRadius: 2,
-                ),
-              ],
-            ),
-            child: ClipOval(
-              child: Container(
-                color: _glassDark,
-                child: const Icon(
-                  Icons.smart_toy_outlined,
-                  color: _electricBlue,
-                  size: 16,
-                ),
-              ),
+            child: GracyAILogo(
+              size: 28,
+              glowing: true,
             ),
           ),
           // Glassmorphism bubble

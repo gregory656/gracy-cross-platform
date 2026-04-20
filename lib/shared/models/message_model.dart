@@ -1,25 +1,6 @@
-import 'package:flutter/material.dart';
+import 'package:equatable/equatable.dart';
 
-enum MessageStatus { pending, sent, delivered, read }
-
-class MessageModel {
-  const MessageModel({
-    required this.id,
-    required this.chatId,
-    required this.senderId,
-    required this.text,
-    required this.sentAt,
-    required this.isMe,
-    this.senderName = 'Unknown',
-    this.senderUsername,
-    this.isOfficial = false,
-    this.status = MessageStatus.sent,
-    this.deliveredAt,
-    this.readAt,
-    this.replyToId,
-    this.isPending = false,
-  });
-
+class MessageModel extends Equatable {
   final String id;
   final String chatId;
   final String senderId;
@@ -30,54 +11,28 @@ class MessageModel {
   final String? senderUsername;
   final bool isOfficial;
   final MessageStatus status;
-  final DateTime? deliveredAt;
-  final DateTime? readAt;
-  final String? replyToId;
   final bool isPending;
+  final String? replyToId;
+  final int statusTicks;
 
-  factory MessageModel.fromDatabase({
-    required Map<String, dynamic> row,
-    required String currentUserId,
-    required String senderName,
-    required String? senderUsername,
-    required bool isOfficial,
-  }) {
-    final String statusStr = row['status']?.toString() ?? 'sent';
-    final bool isRead = row['is_read'] == true || statusStr == 'read';
-    final bool isDelivered =
-        row['delivered_at'] != null || statusStr == 'delivered';
-    MessageStatus status = MessageStatus.sent;
-    if (statusStr == 'pending') {
-      status = MessageStatus.pending;
-    } else if (isRead) {
-      status = MessageStatus.read;
-    } else if (isDelivered) {
-      status = MessageStatus.delivered;
-    }
+  const MessageModel({
+    required this.id,
+    required this.chatId,
+    required this.senderId,
+    required this.text,
+    required this.sentAt,
+    required this.isMe,
+    required this.senderName,
+    this.senderUsername,
+    this.isOfficial = false,
+    this.status = MessageStatus.sent,
+    this.isPending = false,
+    this.replyToId,
+    this.statusTicks = 0,
+  });
 
-    return MessageModel(
-      id: row['id']?.toString() ?? '',
-      chatId: row['room_id']?.toString() ?? '',
-      senderId: row['sender_id']?.toString() ?? '',
-      text: row['content']?.toString() ?? '',
-      sentAt:
-          DateTime.tryParse(row['created_at']?.toString() ?? '') ??
-          DateTime.now(),
-      isMe: row['sender_id']?.toString() == currentUserId,
-      senderName: senderName,
-      senderUsername: senderUsername,
-      isOfficial: isOfficial,
-      status: status,
-      deliveredAt: row['delivered_at'] != null
-          ? DateTime.tryParse(row['delivered_at'].toString())
-          : null,
-      readAt: row['read_at'] != null
-          ? DateTime.tryParse(row['read_at'].toString())
-          : null,
-      replyToId: row['reply_to_id']?.toString(),
-      isPending: status == MessageStatus.pending,
-    );
-  }
+  @override
+  List<Object?> get props => [id, chatId, senderId, text, sentAt, isMe, senderName, senderUsername, isOfficial, status, isPending, replyToId, statusTicks];
 
   MessageModel copyWith({
     String? id,
@@ -90,10 +45,9 @@ class MessageModel {
     String? senderUsername,
     bool? isOfficial,
     MessageStatus? status,
-    DateTime? deliveredAt,
-    DateTime? readAt,
-    String? replyToId,
     bool? isPending,
+    String? replyToId,
+    int? statusTicks,
   }) {
     return MessageModel(
       id: id ?? this.id,
@@ -106,42 +60,16 @@ class MessageModel {
       senderUsername: senderUsername ?? this.senderUsername,
       isOfficial: isOfficial ?? this.isOfficial,
       status: status ?? this.status,
-      deliveredAt: deliveredAt ?? this.deliveredAt,
-      readAt: readAt ?? this.readAt,
-      replyToId: replyToId ?? this.replyToId,
       isPending: isPending ?? this.isPending,
+      replyToId: replyToId ?? this.replyToId,
+      statusTicks: statusTicks ?? this.statusTicks,
     );
   }
+}
 
-  // Get status tick icons for display
-  List<IconData> get statusTicks {
-    if (!isMe) return [];
-
-    switch (status) {
-      case MessageStatus.pending:
-        return [Icons.schedule_rounded];
-      case MessageStatus.sent:
-        return [Icons.done];
-      case MessageStatus.delivered:
-        return [Icons.done_all];
-      case MessageStatus.read:
-        return [Icons.done_all];
-    }
-  }
-
-  // Get status color
-  String get statusColorHex {
-    if (!isMe) return '';
-
-    switch (status) {
-      case MessageStatus.pending:
-        return '#8E8E93';
-      case MessageStatus.sent:
-        return '#8E8E93'; // Gray
-      case MessageStatus.delivered:
-        return '#8E8E93'; // Gray
-      case MessageStatus.read:
-        return '#007AFF'; // Electric Blue
-    }
-  }
+enum MessageStatus {
+  pending,
+  sent,
+  delivered,
+  read,
 }

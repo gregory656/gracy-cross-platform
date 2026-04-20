@@ -1,30 +1,30 @@
-# Save to Gallery Feature - Implementation Steps
+# Flutter Analyze Fix Progress
 
-## Status: [IN PROGRESS]
+**Current: 259 → ~200 issues (progress)**
 
-### 1. [x] Update pubspec.yaml ✅
-- Add `image_gallery_saver: ^2.0.3` and `dio: ^5.7.0`
-- Run `flutter pub get`
+## Completed
+- Fixed notifications_overlay unnecessary_underscores
+- Created AuthState, GeminiService, CustomTextField, GracyAILogo
+- Updated MessageModel (senderUsername/isOfficial/replyToId/statusTicks)
+- Created ChatRepository stub
+- UserModel + UserRole.label/verificationLevel
+- MessageModel full fields
 
-### 2. [x] Update post_card.dart ✅
-- Extend menu to all users (_showPostActions)
-- Add "Save to Gallery" option if imageUrl present
-- Implement _saveToGallery() with Dio download, permission_handler request, ImageGallerySaver.saveImage
-- Add _isSavingImage state for progress indicator
-- Snackbar feedback
+## Pending (Top Priority)
+1. UserModel props/copyWith for new fields
+2. ChatThreadRequest add roomId/receiverName/avatar
+3. OptimizedPostService add stubs (getPostById/createPost/toggleLike etc)
+4. database_service.dart UserRole import
+5. mock_users.dart UserRole.student fixes
+6. Fix CustomTextField calls (add hintText)
+7. chat_screen imports/authNotifierProvider
+8. Supabase .eq in services
+9. UserAvatar params/stub
+10. offline_banner_provider StateNotifier<bool> fix
 
-### 3. [x] Platform Permissions ✅
-- AndroidManifest.xml: Add WRITE_EXTERNAL_STORAGE (legacy)
-- Info.plist: Add NSPhotoLibraryAddUsageDescription
-
-### 4. [x] Test ✅
-- `flutter pub get`
-- `flutter run` on device
-- Verify permission prompt, save to Gallery/Photos, "Gracy" album
-
-### 5. [ ] Completion
-- Update checklist
-- attempt_completion
-
-*Next step marked with current progress.*
+## Next Steps
+- UserModel props
+- ChatThreadRequest edit
+- OptimizedPostService stubs
+- `flutter analyze`
 

@@ -172,13 +172,14 @@ class _EliteMessageBubbleState extends ConsumerState<EliteMessageBubble>
                               // Status ticks
                               Row(
                                 mainAxisSize: MainAxisSize.min,
-                                children: widget.message.statusTicks.map((icon) {
-                                  return Icon(
-                                    icon,
+                                children: List<Widget>.generate(
+                                  widget.message.statusTicks,
+                                  (_) => Icon(
+                                    Icons.check,
                                     size: 14,
                                     color: _getStatusColor(widget.message.status),
-                                  );
-                                }).toList(),
+                                  ),
+                                ),
                               ),
                             ],
                           ],

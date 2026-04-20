@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../enums/verification_level.dart';
 import '../models/user_model.dart';
 import '../../core/theme/app_colors.dart';
 
@@ -16,7 +17,26 @@ class VerificationBadge extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     switch (verificationLevel) {
-      case VerificationLevel.blueVerified:
+      case VerificationLevel.blue:
+      case VerificationLevel.basic:
+        return Container(
+          width: size,
+          height: size,
+          decoration: BoxDecoration(
+            color: AppColors.electricBlue,
+            shape: BoxShape.circle,
+            border: Border.all(
+              color: AppColors.pureWhite,
+              width: 1,
+            ),
+          ),
+          child: Icon(
+            Icons.check,
+            color: AppColors.pureWhite,
+            size: size * 0.6,
+          ),
+        );
+      case VerificationLevel.alumni:
         return Container(
           width: size,
           height: size,
@@ -56,7 +76,9 @@ class UserVerificationRow extends StatelessWidget {
       mainAxisSize: MainAxisSize.min,
       children: [
         if (user.isBlueVerified) ...[
-          VerificationBadge(verificationLevel: user.verificationLevel),
+          VerificationBadge(
+            verificationLevel: user.verificationLevel ?? VerificationLevel.blue,
+          ),
           const SizedBox(width: 4),
         ],
         if (showRole && user.isAlumni) ...[

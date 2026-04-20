@@ -9,6 +9,7 @@ import '../../../core/theme/app_colors.dart';
 import '../../../shared/models/post_model.dart';
 import '../../../shared/models/stored_account.dart';
 import '../../../shared/models/user_model.dart';
+import '../../../shared/enums/user_role.dart';
 import '../../../shared/providers/account_switcher_provider.dart';
 import '../../../shared/providers/auth_provider.dart';
 import '../../../shared/providers/mock_providers.dart';

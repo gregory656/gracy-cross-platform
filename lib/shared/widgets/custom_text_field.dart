@@ -1,30 +1,30 @@
 import 'package:flutter/material.dart';
 
 class CustomTextField extends StatelessWidget {
-  const CustomTextField({
-    super.key,
-    required this.hintText,
-    this.controller,
-    this.onChanged,
-    this.prefixIcon,
-    this.suffixIcon,
-    this.keyboardType,
-    this.readOnly = false,
-    this.obscureText = false,
-    this.maxLines = 1,
-    this.height = 48,
-  });
-
-  final String hintText;
+  final String? labelText;
+  final String? hintText;
   final TextEditingController? controller;
   final ValueChanged<String>? onChanged;
-  final IconData? prefixIcon;
-  final Widget? suffixIcon;
-  final TextInputType? keyboardType;
-  final bool readOnly;
+  final VoidCallback? onSubmitted;
+  final TextInputType keyboardType;
   final bool obscureText;
   final int maxLines;
-  final double height;
+  final double? height;
+  final IconData? prefixIcon;
+
+  const CustomTextField({
+    super.key,
+    this.labelText,
+    this.hintText,
+    this.controller,
+    this.onChanged,
+    this.onSubmitted,
+    this.keyboardType = TextInputType.text,
+    this.obscureText = false,
+    this.maxLines = 1,
+    this.height,
+    this.prefixIcon,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -33,29 +33,14 @@ class CustomTextField extends StatelessWidget {
       child: TextField(
         controller: controller,
         onChanged: onChanged,
+        onSubmitted: (_) => onSubmitted?.call(),
         keyboardType: keyboardType,
-        readOnly: readOnly,
         obscureText: obscureText,
         maxLines: maxLines,
-        style: Theme.of(context).textTheme.bodyMedium,
         decoration: InputDecoration(
+          labelText: labelText,
           hintText: hintText,
-          isDense: true,
-          contentPadding: const EdgeInsets.symmetric(
-            horizontal: 16,
-            vertical: 12,
-          ),
-          prefixIcon: prefixIcon == null
-              ? null
-              : Padding(
-                  padding: const EdgeInsetsDirectional.only(start: 16, end: 10),
-                  child: Icon(prefixIcon, size: 20),
-                ),
-          prefixIconConstraints: const BoxConstraints(
-            minWidth: 0,
-            minHeight: 0,
-          ),
-          suffixIcon: suffixIcon,
+          prefixIcon: prefixIcon == null ? null : Icon(prefixIcon),
         ),
       ),
     );

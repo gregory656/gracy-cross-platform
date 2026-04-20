@@ -4,7 +4,6 @@ import 'package:go_router/go_router.dart';
 
 import '../../../core/router/app_router.dart';
 import '../../../core/theme/app_colors.dart';
-import '../../../features/chat/providers/chat_providers.dart';
 import '../../../shared/models/chat_model.dart';
 import '../../../shared/models/notification_model.dart';
 import '../../../shared/providers/profiles_provider.dart';
@@ -17,7 +16,6 @@ class NotificationsOverlay extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final notificationsAsync = ref.watch(notificationsStreamProvider);
-    final recentChatsAsync = ref.watch(recentChatsProvider);
 
     return Container(
       margin: const EdgeInsets.only(top: kToolbarHeight),
@@ -30,75 +28,12 @@ class NotificationsOverlay extends ConsumerWidget {
           _buildHeader(context),
           Expanded(
             child: notificationsAsync.when(
-              loading: () => recentChatsAsync.when(
-                loading: () => const Center(child: CircularProgressIndicator()),
-                error: (_, _) => const Center(
-                  child: Text(
-                    'No new notifications.',
-                    style: TextStyle(color: AppColors.textSecondary),
-                  ),
-                ),
-                data: (snapshot) => _NotificationsBody(
-                  unreadNotifications: const <NotificationModel>[],
-                  unreadChats: snapshot.data
-                      .where((ChatModel chat) => chat.unreadCount > 0)
-                      .toList(growable: false),
-                ),
+              loading: () => const Center(child: CircularProgressIndicator()),
+              error: (_, _) => const Center(child: Text('No notifications')),
+              data: (notifications) => _NotificationsBody(
+                unreadNotifications: notifications.take(10).toList(),
+                unreadChats: <ChatModel>[],
               ),
-              error: (_, _) => recentChatsAsync.when(
-                loading: () => const Center(child: CircularProgressIndicator()),
-                error: (_, _) => const Center(
-                  child: Text(
-                    'No new notifications.',
-                    style: TextStyle(color: AppColors.textSecondary),
-                  ),
-                ),
-                data: (snapshot) => _NotificationsBody(
-                  unreadNotifications: const <NotificationModel>[],
-                  unreadChats: snapshot.data
-                      .where((ChatModel chat) => chat.unreadCount > 0)
-                      .toList(growable: false),
-                ),
-              ),
-              data: (notifications) {
-                final Set<int> locallyReadIds = ref.watch(
-                  locallyReadNotificationIdsProvider,
-                );
-                final Map<String, ChatVisibility> chatVisibility = ref.watch(
-                  chatVisibilityProvider,
-                );
-                final Map<String, DateTime> locallyReadChats = ref.watch(
-                  localReadChatsProvider,
-                );
-                final List<NotificationModel> unreadNotifications = notifications
-                    .where(
-                      (NotificationModel notification) =>
-                          !notification.isRead &&
-                          !locallyReadIds.contains(notification.id),
-                    )
-                    .toList(growable: false);
-                final List<ChatModel> unreadChats = recentChatsAsync.maybeWhen(
-                  data: (snapshot) => snapshot.data
-                      .where((ChatModel chat) {
-                        if (chatVisibility[chat.id] != null &&
-                            chatVisibility[chat.id] != ChatVisibility.visible) {
-                          return false;
-                        }
-                        final DateTime? clearedAt = locallyReadChats[chat.id];
-                        final bool wasClearedAfterLatestMessage =
-                            clearedAt != null &&
-                            !chat.lastMessageAt.isAfter(clearedAt);
-                        return chat.unreadCount > 0 && !wasClearedAfterLatestMessage;
-                      })
-                      .toList(growable: false),
-                  orElse: () => const <ChatModel>[],
-                );
-
-                return _NotificationsBody(
-                  unreadNotifications: unreadNotifications,
-                  unreadChats: unreadChats,
-                );
-              },
             ),
           ),
         ],

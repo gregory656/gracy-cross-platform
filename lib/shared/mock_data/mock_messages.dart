@@ -11,6 +11,7 @@ final List<MessageModel> mockMessages = <MessageModel>[
         'Your portfolio flow is very close. The spacing just needs breathing room.',
     sentAt: DateTime(2026, 3, 31, 16, 40),
     isMe: false,
+    senderName: 'Brian Otieno',
   ),
   MessageModel(
     id: 'm2',
@@ -19,6 +20,7 @@ final List<MessageModel> mockMessages = <MessageModel>[
     text: 'I am testing a more spacious card rhythm now.',
     sentAt: DateTime(2026, 3, 31, 16, 43),
     isMe: true,
+    senderName: 'You',
   ),
   MessageModel(
     id: 'm3',
@@ -27,6 +29,7 @@ final List<MessageModel> mockMessages = <MessageModel>[
     text: 'Let me know when you want to review the onboarding flow.',
     sentAt: DateTime(2026, 3, 31, 17, 20),
     isMe: false,
+    senderName: 'Brian Otieno',
   ),
   MessageModel(
     id: 'm4',
@@ -35,6 +38,7 @@ final List<MessageModel> mockMessages = <MessageModel>[
     text: 'I shared the slides for the design critique.',
     sentAt: DateTime(2026, 3, 31, 16, 45),
     isMe: false,
+    senderName: 'Lydia Wanjiku',
   ),
   MessageModel(
     id: 'm5',
@@ -43,6 +47,7 @@ final List<MessageModel> mockMessages = <MessageModel>[
     text: 'Perfect. I will leave comments after class.',
     sentAt: DateTime(2026, 3, 31, 16, 50),
     isMe: true,
+    senderName: 'You',
   ),
   MessageModel(
     id: 'm6',
@@ -51,6 +56,7 @@ final List<MessageModel> mockMessages = <MessageModel>[
     text: 'Great, thanks!',
     sentAt: DateTime(2026, 3, 31, 16, 52),
     isMe: false,
+    senderName: 'Lydia Wanjiku',
   ),
   MessageModel(
     id: 'm7',
@@ -59,6 +65,7 @@ final List<MessageModel> mockMessages = <MessageModel>[
     text: 'Happy to introduce you to the internship cohort.',
     sentAt: DateTime(2026, 3, 31, 14, 10),
     isMe: false,
+    senderName: 'Kevin Muriuki',
   ),
   MessageModel(
     id: 'm8',
@@ -67,6 +74,7 @@ final List<MessageModel> mockMessages = <MessageModel>[
     text: 'That would be amazing. I am polishing my CV now.',
     sentAt: DateTime(2026, 3, 31, 14, 14),
     isMe: true,
+    senderName: 'You',
   ),
   MessageModel(
     id: 'm9',
@@ -75,6 +83,7 @@ final List<MessageModel> mockMessages = <MessageModel>[
     text: 'Send it over once you are done.',
     sentAt: DateTime(2026, 3, 31, 14, 18),
     isMe: false,
+    senderName: 'Kevin Muriuki',
   ),
   MessageModel(
     id: 'm10',
@@ -83,6 +92,7 @@ final List<MessageModel> mockMessages = <MessageModel>[
     text: 'The dark gradient version looks much stronger.',
     sentAt: DateTime(2026, 3, 31, 12, 30),
     isMe: false,
+    senderName: 'Zuri Hassan',
   ),
   MessageModel(
     id: 'm11',
@@ -91,5 +101,6 @@ final List<MessageModel> mockMessages = <MessageModel>[
     text: 'Agreed. I will tighten the button contrast next.',
     sentAt: DateTime(2026, 3, 31, 12, 35),
     isMe: true,
+    senderName: 'You',
   ),
 ];

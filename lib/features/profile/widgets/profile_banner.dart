@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../../core/theme/app_colors.dart';
+import '../../../shared/enums/user_role.dart';
 import '../../../shared/models/user_model.dart';
 import '../../../shared/widgets/user_avatar.dart';
 

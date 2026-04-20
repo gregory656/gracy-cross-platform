@@ -1,52 +1,31 @@
-enum UserRole { student, alumni, staff }
+import 'package:equatable/equatable.dart';
 
-extension UserRoleLabel on UserRole {
-  String get label {
-    switch (this) {
-      case UserRole.student:
-        return 'Student';
-      case UserRole.alumni:
-        return 'Alumni';
-      case UserRole.staff:
-        return 'Staff';
-    }
-  }
-}
+import '../enums/verification_level.dart';
+import '../enums/user_role.dart';
 
-enum VerificationLevel { none, blueVerified }
-
-extension VerificationLevelLabel on VerificationLevel {
-  String get label {
-    switch (this) {
-      case VerificationLevel.none:
-        return 'None';
-      case VerificationLevel.blueVerified:
-        return 'Blue Verified';
-    }
-  }
-}
-
-class UserModel {
+class UserModel extends Equatable {
   const UserModel({
     required this.id,
     required this.fullName,
     required this.username,
-    required this.age,
-    required this.role,
-    required this.courses,
-    required this.bio,
-    required this.isOnline,
-    required this.location,
-    required this.avatarSeed,
-    required this.year,
+    this.age = 0,
+    this.role = UserRole.student,
+    this.courses = const [],
+    this.bio = '',
+    this.isOnline = false,
+    this.isGhostMode = false,
+    this.isBlueVerified = false,
+    this.isAlumni = false,
+    this.verificationLevel,
+    this.location = '',
+    this.avatarSeed = '',
+    this.year = '',
     this.avatarUrl,
     this.gracyId,
-    this.selectedTheme = 'dark',
-    this.notificationsEnabled = true,
-    this.verificationLevel = VerificationLevel.none,
-    this.isGhostMode = false,
-    this.phone,
+    this.selectedTheme = 'midnight',
+    this.notificationsEnabled = false,
   });
+
 
   final String id;
   final String fullName;
@@ -56,6 +35,10 @@ class UserModel {
   final List<String> courses;
   final String bio;
   final bool isOnline;
+  final bool isGhostMode;
+  final bool isBlueVerified;
+  final bool isAlumni;
+  final VerificationLevel? verificationLevel;
   final String location;
   final String avatarSeed;
   final String year;
@@ -63,24 +46,8 @@ class UserModel {
   final String? gracyId;
   final String selectedTheme;
   final bool notificationsEnabled;
-  final VerificationLevel verificationLevel;
-  final bool isGhostMode;
-  final String? phone;
 
-  String get initials {
-    final List<String> parts = fullName.trim().split(RegExp(r'\s+'));
-    if (parts.isEmpty) {
-      return '';
-    }
-    final String first = parts.first.isNotEmpty ? parts.first[0] : '';
-    final String last = parts.length > 1 && parts.last.isNotEmpty
-        ? parts.last[0]
-        : '';
-    return (first + last).toUpperCase();
-  }
-
-  bool get isBlueVerified => verificationLevel == VerificationLevel.blueVerified;
-  bool get isAlumni => role == UserRole.alumni;
+  String get initials => fullName.isNotEmpty ? fullName[0].toUpperCase() : username[0].toUpperCase();
 
   UserModel copyWith({
     String? id,
@@ -91,6 +58,10 @@ class UserModel {
     List<String>? courses,
     String? bio,
     bool? isOnline,
+    bool? isGhostMode,
+    bool? isBlueVerified,
+    bool? isAlumni,
+    VerificationLevel? verificationLevel,
     String? location,
     String? avatarSeed,
     String? year,
@@ -98,9 +69,6 @@ class UserModel {
     String? gracyId,
     String? selectedTheme,
     bool? notificationsEnabled,
-    VerificationLevel? verificationLevel,
-    bool? isGhostMode,
-    String? phone,
   }) {
     return UserModel(
       id: id ?? this.id,
@@ -111,6 +79,10 @@ class UserModel {
       courses: courses ?? this.courses,
       bio: bio ?? this.bio,
       isOnline: isOnline ?? this.isOnline,
+      isGhostMode: isGhostMode ?? this.isGhostMode,
+      isBlueVerified: isBlueVerified ?? this.isBlueVerified,
+      isAlumni: isAlumni ?? this.isAlumni,
+      verificationLevel: verificationLevel ?? this.verificationLevel,
       location: location ?? this.location,
       avatarSeed: avatarSeed ?? this.avatarSeed,
       year: year ?? this.year,
@@ -118,9 +90,29 @@ class UserModel {
       gracyId: gracyId ?? this.gracyId,
       selectedTheme: selectedTheme ?? this.selectedTheme,
       notificationsEnabled: notificationsEnabled ?? this.notificationsEnabled,
-      verificationLevel: verificationLevel ?? this.verificationLevel,
-      isGhostMode: isGhostMode ?? this.isGhostMode,
-      phone: phone ?? this.phone,
     );
   }
+
+@override
+  List<Object?> get props => [
+    id,
+    fullName,
+    username,
+    age,
+    role,
+    courses,
+    bio,
+    isOnline,
+    isGhostMode,
+    isBlueVerified,
+    isAlumni,
+    verificationLevel,
+    location,
+    avatarSeed,
+    year,
+    avatarUrl,
+    gracyId,
+    selectedTheme,
+    notificationsEnabled,
+  ];
 }

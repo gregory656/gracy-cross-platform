@@ -1,218 +1,97 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import '../../core/theme/app_colors.dart';
-import '../../core/utils/date_formatters.dart';
 import '../models/chat_model.dart';
-import '../models/message_model.dart';
 import '../models/user_model.dart';
-import 'user_avatar.dart';
 
-class ChatTile extends StatelessWidget {
-  const ChatTile({
-    super.key,
-    required this.chat,
-    required this.user,
-    required this.onTap,
-    this.onLongPress,
-  });
-
-  final ChatModel chat;
-  final UserModel user;
-  final VoidCallback onTap;
+class ChatTile extends ConsumerWidget {
+  final String chatId;
+  final UserModel participant;
+  final String lastMessage;
+  final int unreadCount;
+  final VoidCallback? onTap;
   final VoidCallback? onLongPress;
+  final bool isSelected;
+
+  ChatTile({
+    super.key,
+    ChatModel? chat,
+    UserModel? user,
+    String? chatId,
+    UserModel? participant,
+    String? lastMessage,
+    int? unreadCount,
+    this.onTap,
+    this.onLongPress,
+    this.isSelected = false,
+  }) : chatId = chatId ?? chat?.id ?? '',
+       participant = participant ?? user ?? UserModel(id: '', fullName: 'Unknown User', username: '@unknown'),
+       lastMessage = lastMessage ?? chat?.lastMessage ?? '',
+       unreadCount = unreadCount ?? chat?.unreadCount ?? 0;
 
   @override
-  Widget build(BuildContext context) {
-    return Material(
-      color: Colors.transparent,
-      child: InkWell(
-        onTap: onTap,
-        onLongPress: onLongPress,
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 12),
-          child: Row(
-            crossAxisAlignment: CrossAxisAlignment.center,
-            children: <Widget>[
-              UserAvatar(user: user, size: 56, fontSize: 16, showRing: false),
-              const SizedBox(width: 14),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: <Widget>[
-                    Row(
-                      children: <Widget>[
-                        Expanded(
-                          child: Row(
-                            children: <Widget>[
-                              Flexible(
-                                child: Text(
-                                  user.fullName,
-                                  overflow: TextOverflow.ellipsis,
-                                  style: Theme.of(context).textTheme.titleMedium
-                                      ?.copyWith(
-                                        fontWeight: FontWeight.w800,
-                                        color: Colors.white,
-                                      ),
-                                ),
-                              ),
-                              if (chat.isOfficial) ...<Widget>[
-                                const SizedBox(width: 8),
-                                const _VerifiedPill(),
-                              ],
-                            ],
-                          ),
-                        ),
-                        const SizedBox(width: 12),
-                        Text(
-                          DateFormatters.chatPreviewTime.format(
-                            chat.lastMessageAt,
-                          ),
-                          style: Theme.of(context).textTheme.labelMedium
-                              ?.copyWith(
-                                color: AppColors.textSecondary,
-                                fontWeight: FontWeight.w700,
-                              ),
-                        ),
-                        if (chat.unreadCount > 0) ...<Widget>[
-                          const SizedBox(width: 8),
-                          _UnreadBadge(count: chat.unreadCount),
-                        ],
-                      ],
+  Widget build(BuildContext context, WidgetRef ref) {
+    return InkWell(
+      onTap: onTap,
+      onLongPress: onLongPress,
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+        decoration: BoxDecoration(
+          color: isSelected ? Colors.blue.withValues(alpha: 0.1) : null,
+          borderRadius: BorderRadius.circular(12),
+        ),
+        child: Row(
+          children: [
+            CircleAvatar(
+              radius: 25,
+              backgroundImage: participant.avatarUrl != null ? NetworkImage(participant.avatarUrl!) : null,
+              child: participant.avatarUrl == null ? Text(participant.initials) : null,
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    participant.fullName,
+                    style: const TextStyle(
+                      fontWeight: FontWeight.w600,
+                      fontSize: 16,
                     ),
-                    const SizedBox(height: 7),
-                    Row(
-                      children: <Widget>[
-                        if (chat.unreadCount == 0 && chat.isLastMessageMine)
-                          _ReadReceipt(status: chat.lastMessageStatus),
-                        if (chat.unreadCount == 0 && chat.isLastMessageMine) const SizedBox(width: 8),
-                        Expanded(
-                          child: Text(
-                            chat.lastMessage,
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                            style: Theme.of(context).textTheme.bodyMedium
-                                ?.copyWith(
-                                  color: Colors.white70,
-                                  fontWeight: FontWeight.w500,
-                                ),
-                          ),
-                        ),
-                      ],
+                  ),
+                  Text(
+                    lastMessage,
+                    style: TextStyle(
+                      color: Colors.grey[600],
+                      fontSize: 14,
                     ),
-                    if (chat.gracyId != null &&
-                        chat.gracyId!.isNotEmpty) ...<Widget>[
-                      const SizedBox(height: 9),
-                      _CodePill(code: chat.gracyId!),
-                    ],
-                  ],
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ],
+              ),
+            ),
+            if (unreadCount > 0) ...[
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                decoration: BoxDecoration(
+                  color: Colors.blue,
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Text(
+                  unreadCount > 99 ? '99+' : '$unreadCount',
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontSize: 12,
+                    fontWeight: FontWeight.bold,
+                  ),
                 ),
               ),
+              const SizedBox(width: 8),
             ],
-          ),
+          ],
         ),
       ),
     );
-  }
-}
-
-class _CodePill extends StatelessWidget {
-  const _CodePill({required this.code});
-
-  final String code;
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-      decoration: BoxDecoration(
-        color: AppColors.accentBlue.withValues(alpha: 0.12),
-        borderRadius: BorderRadius.circular(999),
-        border: Border.all(color: AppColors.accentBlue.withValues(alpha: 0.2)),
-      ),
-      child: Text(
-        code,
-        style: Theme.of(context).textTheme.labelMedium?.copyWith(
-          color: AppColors.accentBlue,
-          fontWeight: FontWeight.w700,
-          letterSpacing: 0.3,
-        ),
-      ),
-    );
-  }
-}
-
-class _VerifiedPill extends StatelessWidget {
-  const _VerifiedPill();
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-      decoration: BoxDecoration(
-        color: AppColors.accentAmber.withValues(alpha: 0.16),
-        borderRadius: BorderRadius.circular(999),
-        border: Border.all(
-          color: AppColors.accentAmber.withValues(alpha: 0.45),
-        ),
-      ),
-      child: Text(
-        'Verified',
-        style: Theme.of(context).textTheme.labelSmall?.copyWith(
-          color: AppColors.accentAmber,
-          fontWeight: FontWeight.w800,
-        ),
-      ),
-    );
-  }
-}
-
-class _UnreadBadge extends StatelessWidget {
-  const _UnreadBadge({required this.count});
-
-  final int count;
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      constraints: const BoxConstraints(minWidth: 28, minHeight: 28),
-      padding: const EdgeInsets.symmetric(horizontal: 8),
-      decoration: BoxDecoration(
-        color: const Color(0xFF007AFF),
-        borderRadius: BorderRadius.circular(999),
-      ),
-      alignment: Alignment.center,
-      child: Text(
-        '$count',
-        style: Theme.of(context).textTheme.labelSmall?.copyWith(
-          color: AppColors.background,
-          fontWeight: FontWeight.w900,
-        ),
-      ),
-    );
-  }
-}
-
-class _ReadReceipt extends StatelessWidget {
-  const _ReadReceipt({required this.status});
-
-  final MessageStatus status;
-
-  @override
-  Widget build(BuildContext context) {
-    final Color color = switch (status) {
-      MessageStatus.pending => Colors.white38,
-      MessageStatus.read => const Color(0xFF6FE3FF),
-      MessageStatus.delivered => Colors.white54,
-      MessageStatus.sent => Colors.white38,
-    };
-
-    final IconData icon = switch (status) {
-      MessageStatus.pending => Icons.schedule_rounded,
-      MessageStatus.sent => Icons.check_rounded,
-      MessageStatus.delivered => Icons.done_all_rounded,
-      MessageStatus.read => Icons.done_all_rounded,
-    };
-
-    return Icon(icon, size: 18, color: color);
   }
 }

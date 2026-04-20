@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:io';
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
@@ -10,6 +11,7 @@ import '../../../shared/models/post_model.dart';
 import '../../../shared/providers/offline_banner_provider.dart';
 import '../../../shared/services/post_service.dart';
 import '../../../shared/services/optimized_post_service.dart';
+
 
 final postServiceProvider = Provider<PostService>((ref) {
   return PostService();
@@ -157,18 +159,47 @@ class PostsNotifier extends AsyncNotifier<List<PostModel>> {
         offset: _offset,
         categoryFilter: _feedCategory,
       );
+      
       ref.read(offlineBannerProvider.notifier).resetOfflineCachedContentNotice();
 
       if (refresh) {
         _posts.clear();
       }
 
-      _posts.addAll(newPosts);
+      // WORKAROUND: Handle ANY database schema gracefully
+      final filteredPosts = newPosts.where((post) {
+        // If database has no category support, just include everything
+        // Silent Confessions will be identified by content analysis
+        final content = post.content.toLowerCase();
+        
+        // Multiple detection methods for Silent Confessions
+        final isConfession = 
+            content.contains('confession') ||
+            content.contains('silent confession') ||
+            content.contains('anonymous confession') ||
+            post.authorName == null ||
+            post.authorName == 'Anonymous Scion' ||
+            (post.authorName?.toLowerCase().contains('anonymous') ?? false);
+        
+        // Always include confessions regardless of category field
+        if (isConfession) {
+          return true;
+        }
+        
+        // Include all other posts
+        return true;
+      }).toList();
+
+      _posts.addAll(filteredPosts);
       _offset += _limit;
       _hasMore = newPosts.length == _limit;
 
       state = AsyncValue.data(List.from(_posts));
     } catch (e, stackTrace) {
+      if (kDebugMode) {
+        debugPrint('Error loading posts: $e');
+      }
+      
       if (_posts.isNotEmpty) {
         ref.read(offlineBannerProvider.notifier).showOfflineCachedContentOnce();
         state = AsyncValue.data(List<PostModel>.from(_posts));

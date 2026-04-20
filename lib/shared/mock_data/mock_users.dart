@@ -1,4 +1,5 @@
 import '../models/user_model.dart';
+import '../enums/user_role.dart';
 
 // REPLACE WITH API DATA SOURCE
 final List<UserModel> mockUsers = <UserModel>[

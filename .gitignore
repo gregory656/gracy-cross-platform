@@ -36,6 +36,12 @@ migrate_working_dir/
 lib/core/constants_local.dart
 lib/core/secrets.dart
 
+# API Keys and secrets
+**/gemini_api_key*
+**/api_keys*
+**/.env
+**/secrets*
+
 # Symbolication related
 app.*.symbols
 

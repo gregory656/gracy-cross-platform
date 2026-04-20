@@ -339,6 +339,50 @@ class PostService {
     }
   }
 
+  Future<PostModel> updatePostCaption({
+    required String postId,
+    required String content,
+  }) async {
+    try {
+      final Map<String, dynamic>? updated = await _supabase
+          .from('posts')
+          .update({'content': content.trim()})
+          .eq('id', postId)
+          .select()
+          .maybeSingle();
+
+      if (updated == null) {
+        throw Exception('Post not found');
+      }
+
+      return getPostById(postId);
+    } catch (e) {
+      throw Exception('Failed to update post caption: $e');
+    }
+  }
+
+  Future<PostModel> setLikesVisibility({
+    required String postId,
+    required bool isVisible,
+  }) async {
+    try {
+      final Map<String, dynamic>? updated = await _supabase
+          .from('posts')
+          .update({'likes_visible': isVisible})
+          .eq('id', postId)
+          .select()
+          .maybeSingle();
+
+      if (updated == null) {
+        throw Exception('Post not found');
+      }
+
+      return getPostById(postId);
+    } catch (e) {
+      throw Exception('Failed to update likes visibility: $e');
+    }
+  }
+
   Future<List<PostCommentModel>> getComments(String postId) async {
     try {
       final userId = _supabase.auth.currentUser?.id;

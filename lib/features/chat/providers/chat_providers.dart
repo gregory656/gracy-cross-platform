@@ -2,6 +2,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../../../shared/models/chat_model.dart';
+import '../../../shared/models/chat_thread.dart';
 import '../../../shared/models/local_first_data.dart';
 import '../../../shared/models/message_model.dart';
 import '../../../shared/providers/auth_provider.dart';
@@ -11,7 +12,7 @@ import '../data/chat_repository.dart';
 
 final chatRepositoryProvider = Provider<ChatRepository>((ref) {
   return ChatRepository(
-    Supabase.instance.client,
+    supabase: Supabase.instance.client,
     databaseService: DatabaseService.instance,
   );
 });
@@ -141,30 +142,4 @@ class ActiveChatNotifier extends Notifier<String?> {
   void closeChat() {
     state = null;
   }
-}
-
-class ChatThreadRequest {
-  const ChatThreadRequest({
-    this.roomId,
-    this.userId,
-    this.receiverName,
-    this.receiverAvatar,
-  });
-
-  final String? roomId;
-  final String? userId;
-  final String? receiverName;
-  final String? receiverAvatar;
-
-  @override
-  bool operator ==(Object other) {
-    return other is ChatThreadRequest &&
-        other.roomId == roomId &&
-        other.userId == userId &&
-        other.receiverName == receiverName &&
-        other.receiverAvatar == receiverAvatar;
-  }
-
-  @override
-  int get hashCode => Object.hash(roomId, userId, receiverName, receiverAvatar);
 }

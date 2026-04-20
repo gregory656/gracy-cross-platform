@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
@@ -268,17 +269,105 @@ class ChatVisibilityController extends Notifier<Map<String, ChatVisibility>> {
   @override
   Map<String, ChatVisibility> build() => <String, ChatVisibility>{};
 
-  void setVisibility(String roomId, ChatVisibility visibility) {
-    if (visibility == ChatVisibility.visible) {
-      final Map<String, ChatVisibility> next = <String, ChatVisibility>{
-        ...state,
-      };
-      next.remove(roomId);
-      state = next;
-      return;
-    }
+  Future<void> setVisibility(String roomId, ChatVisibility visibility) async {
+    final authState = ref.read(authNotifierProvider);
+    if (authState.userId == null) return;
 
-    state = <String, ChatVisibility>{...state, roomId: visibility};
+    try {
+      if (visibility == ChatVisibility.visible) {
+        // Try to unhide using flexible function
+        await Supabase.instance.client.rpc('unhide_chat_room', params: {
+          'p_room_id': roomId,
+          'p_user_id': authState.userId,
+        });
+      } else if (visibility == ChatVisibility.hidden || visibility == ChatVisibility.deleted) {
+        // Try to hide using flexible function
+        await Supabase.instance.client.rpc('hide_chat_room', params: {
+          'p_room_id': roomId,
+          'p_user_id': authState.userId,
+        });
+      } else if (visibility == ChatVisibility.archived) {
+        // Archive using chat_members table
+        await Supabase.instance.client.rpc('archive_chat_room', params: {
+          'p_room_id': roomId,
+          'p_user_id': authState.userId,
+        });
+      }
+
+      // Update local state
+      if (visibility == ChatVisibility.visible) {
+        final Map<String, ChatVisibility> next = <String, ChatVisibility>{
+          ...state,
+        };
+        next.remove(roomId);
+        state = next;
+        return;
+      }
+
+      state = <String, ChatVisibility>{...state, roomId: visibility};
+    } catch (e) {
+      debugPrint('Error setting chat visibility: $e');
+      // If database update fails, still update local state for immediate UI feedback
+      if (visibility == ChatVisibility.visible) {
+        final Map<String, ChatVisibility> next = <String, ChatVisibility>{
+          ...state,
+        };
+        next.remove(roomId);
+        state = next;
+        return;
+      }
+
+      state = <String, ChatVisibility>{...state, roomId: visibility};
+    }
+  }
+
+  Future<void> loadVisibilityFromDatabase() async {
+    final authState = ref.read(authNotifierProvider);
+    if (authState.userId == null) return;
+
+    try {
+      final Map<String, ChatVisibility> visibilityMap = <String, ChatVisibility>{};
+      
+      // Try loading from chat_rooms with hidden_by array
+      try {
+        final roomsData = await Supabase.instance.client
+            .from('chat_rooms')
+            .select('id, hidden_by, is_hidden');
+
+        for (final row in roomsData) {
+          final roomId = row['id'] as String;
+          final hiddenBy = row['hidden_by'] as List? ?? [];
+          final isHidden = row['is_hidden'] as bool? ?? false;
+          
+          if (hiddenBy.contains(authState.userId) || isHidden) {
+            visibilityMap[roomId] = ChatVisibility.hidden;
+          }
+        }
+      } catch (e) {
+        debugPrint('hidden_by array not available, trying is_hidden flag: $e');
+      }
+
+      // Try loading from chat_members for archived chats
+      try {
+        final membersData = await Supabase.instance.client
+            .from('chat_members')
+            .select('room_id, is_archived')
+            .eq('user_id', authState.userId!)
+            .eq('is_archived', true);
+
+        for (final row in membersData) {
+          final roomId = row['room_id'] as String;
+          visibilityMap[roomId] = ChatVisibility.archived;
+        }
+      } catch (e) {
+        debugPrint('chat_members table not available: $e');
+      }
+
+      state = visibilityMap;
+    } catch (e) {
+      debugPrint('Error loading visibility from database: $e');
+      // Keep existing state if database load fails
+    }
   }
 }
 

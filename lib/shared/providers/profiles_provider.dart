@@ -2,6 +2,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../../core/constants.dart';
+import '../enums/user_role.dart';
 import '../mock_data/mock_users.dart';
 import '../models/user_model.dart';
 import '../services/database_service.dart';

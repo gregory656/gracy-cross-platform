@@ -5,6 +5,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../../core/constants.dart';
+import '../enums/user_role.dart';
 import '../models/stored_account.dart';
 import '../models/user_model.dart';
 import 'profiles_provider.dart';

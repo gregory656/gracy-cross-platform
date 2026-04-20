@@ -1,7 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-
-import '../providers/elite_chat_providers.dart';
 import '../widgets/elite_message_bubble.dart';
 import '../widgets/elite_long_press_menu.dart';
 import '../widgets/nairobi_date_header.dart';
@@ -33,6 +31,7 @@ class _EliteChatScreenState extends ConsumerState<EliteChatScreen>
   late AnimationController _composerAnimationController;
   String? _replyingToMessageId;
   MessageModel? _replyingToMessage;
+  final List<MessageModel> _messages = <MessageModel>[];
 
   @override
   void initState() {
@@ -68,10 +67,20 @@ class _EliteChatScreenState extends ConsumerState<EliteChatScreen>
     if (text.isEmpty) return;
 
     EliteHaptics.mediumImpact();
-    ref.read(eliteChatProvider(widget.chatId).notifier).sendMessage(
-      text,
-      replyToId: _replyingToMessageId,
-    );
+    setState(() {
+      _messages.add(
+        MessageModel(
+          id: 'elite-${DateTime.now().microsecondsSinceEpoch}',
+          chatId: widget.chatId,
+          senderId: 'me',
+          text: text,
+          sentAt: DateTime.now(),
+          isMe: true,
+          senderName: 'You',
+          replyToId: _replyingToMessageId,
+        ),
+      );
+    });
 
     _messageController.clear();
     _clearReply();
@@ -248,7 +257,6 @@ class _EliteChatScreenState extends ConsumerState<EliteChatScreen>
 
   @override
   Widget build(BuildContext context) {
-    final chatState = ref.watch(eliteChatProvider(widget.chatId));
     final timezoneService = NairobiTimezoneService.instance;
 
     return Scaffold(
@@ -266,15 +274,6 @@ class _EliteChatScreenState extends ConsumerState<EliteChatScreen>
                 letterSpacing: -0.5,
               ),
             ),
-            if (chatState.isTyping)
-              const Text(
-                'typing...',
-                style: TextStyle(
-                  color: AppColors.electricBlue,
-                  fontSize: 12,
-                  fontWeight: FontWeight.w400,
-                ),
-              ),
           ],
         ),
         actions: [
@@ -328,25 +327,7 @@ class _EliteChatScreenState extends ConsumerState<EliteChatScreen>
           ),
           
           // Message list
-          Expanded(
-            child: chatState.isLoading
-                ? const Center(
-                    child: CircularProgressIndicator(
-                      color: AppColors.electricBlue,
-                    ),
-                  )
-                : chatState.error != null
-                    ? Center(
-                        child: Text(
-                          'Error: ${chatState.error}',
-                          style: const TextStyle(
-                            color: AppColors.error,
-                            fontSize: 16,
-                          ),
-                        ),
-                      )
-                    : _buildMessageList(chatState.messages),
-          ),
+          Expanded(child: _buildMessageList(_messages)),
           
           // Message composer
           _buildMessageComposer(),

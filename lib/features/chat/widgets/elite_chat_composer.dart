@@ -7,10 +7,12 @@ class EliteChatComposer extends StatefulWidget {
     super.key,
     required this.controller,
     required this.onSend,
+    this.hintText = 'Message',
   });
 
   final TextEditingController controller;
   final VoidCallback onSend;
+  final String hintText;
 
   @override
   State<EliteChatComposer> createState() => _EliteChatComposerState();
@@ -101,8 +103,8 @@ class _EliteChatComposerState extends State<EliteChatComposer> {
                           color: Colors.black87,
                           fontSize: 16,
                         ),
-                        decoration: const InputDecoration(
-                          hintText: 'Message',
+                        decoration: InputDecoration(
+                          hintText: widget.hintText,
                           hintStyle: TextStyle(
                             color: Colors.black54,
                             fontSize: 16,
