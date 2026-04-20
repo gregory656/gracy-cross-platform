@@ -13,7 +13,8 @@ import '../../../shared/models/local_first_data.dart';
 import '../../../shared/models/message_model.dart';
 import '../../../shared/models/user_model.dart';
 import '../../../shared/providers/chat_providers.dart';
-import '../../../shared/providers/auth_provider.dart' show AuthState, authNotifierProvider;
+import '../../../shared/providers/auth_provider.dart'
+    show AuthState, authNotifierProvider;
 import '../../../shared/providers/offline_banner_provider.dart';
 import '../../../shared/providers/profiles_provider.dart';
 import '../../../shared/widgets/disappearing_messages_dialog.dart';
@@ -59,8 +60,10 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
   final ScrollController _scrollController = ScrollController();
 
   Timer? _botTypingTimer;
+  Timer? _hideTimer;
   bool _isBotTyping = false;
   bool _isAiThinking = false;
+  bool _isNavVisible = false;
   int _lastMessageCount = 0;
   String? _replyToMessage;
   Timer? _readReceiptTimer;
@@ -75,17 +78,18 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       // Load chat visibility from database
       ref.read(chatVisibilityProvider.notifier).loadVisibilityFromDatabase();
-      
+
       if (widget.chatId != null || widget.userId != null) {
         // Check if this is a new GracyAI conversation (timestamp-based ID)
-        final isNewGracyConversation = widget.chatId != null && 
-            widget.userId == ChatRepository.botUserId &&
+        final isNewGracyConversation =
+            widget.chatId != null &&
+            ChatRepository.isBotParticipant(widget.userId ?? '') &&
             _isTimestampId(widget.chatId!);
-        
+
         if (isNewGracyConversation) {
           debugPrint('Starting new GracyAI conversation with fresh start');
         }
-        
+
         // Atomic load
         ref.read(activeChatProvider.notifier).openChat(widget.chatId);
       }
@@ -104,7 +108,6 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
     }
   }
 
-  
   void _syncShellNavigation(bool showThread) {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) {
@@ -125,13 +128,16 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
       if (!mounted) {
         return;
       }
-      ref.read(offlineBannerProvider.notifier).resetOfflineCachedContentNotice();
+      ref
+          .read(offlineBannerProvider.notifier)
+          .resetOfflineCachedContentNotice();
     });
   }
 
   @override
   void dispose() {
     _botTypingTimer?.cancel();
+    _hideTimer?.cancel();
     _readReceiptTimer?.cancel();
     _deliveryReceiptTimer?.cancel();
     _composerController.dispose();
@@ -195,10 +201,11 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
             senderId: currentUserId,
             content: content,
           );
+      ref.invalidate(messagesProvider(thread.roomId));
       ref.invalidate(recentChatsProvider);
 
       // Check if this is a message to GracyAI
-      if (thread.participant.id == ChatRepository.botUserId) {
+      if (ChatRepository.isBotParticipant(thread.participant.id)) {
         await _handleAiResponse(thread, content);
       } else {
         _triggerFakeTyping();
@@ -220,9 +227,11 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
 
     try {
       // Get conversation history for context
-      final AsyncValue<LocalFirstData<List<MessageModel>>> messagesAsync = 
-          ref.watch(messagesProvider(thread.roomId));
-      final List<MessageModel> conversationHistory = messagesAsync.asData?.value.data ?? [];
+      final AsyncValue<LocalFirstData<List<MessageModel>>> messagesAsync = ref
+          .read(messagesProvider(thread.roomId));
+      final List<MessageModel> conversationHistory = <MessageModel>[
+        ...?messagesAsync.asData?.value.data,
+      ];
 
       // Generate AI response
       final aiResponse = await GeminiService().generateResponse(
@@ -233,22 +242,31 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
 
       if (mounted) {
         // Send AI response as a message
-        await ref.read(chatRepositoryProvider).sendMessage(
-          roomId: thread.roomId,
-          senderId: ChatRepository.botUserId,
-          content: aiResponse,
-        );
+        await ref
+            .read(chatRepositoryProvider)
+            .sendMessage(
+              roomId: thread.roomId,
+              senderId: ChatRepository.officialBotUserId,
+              content: aiResponse,
+              fallbackToCacheOnRemoteFailure: true,
+            );
+        ref.invalidate(messagesProvider(thread.roomId));
         ref.invalidate(recentChatsProvider);
       }
     } catch (error) {
       debugPrint('AI response error: $error');
       if (mounted) {
         // Send fallback message
-        await ref.read(chatRepositoryProvider).sendMessage(
-          roomId: thread.roomId,
-          senderId: ChatRepository.botUserId,
-          content: 'Sorry, I\'m having trouble connecting right now. Please try again in a moment.',
-        );
+        await ref
+            .read(chatRepositoryProvider)
+            .sendMessage(
+              roomId: thread.roomId,
+              senderId: ChatRepository.officialBotUserId,
+              content:
+                  'Sorry, I\'m having trouble connecting right now. Please try again in a moment.',
+              fallbackToCacheOnRemoteFailure: true,
+            );
+        ref.invalidate(messagesProvider(thread.roomId));
         ref.invalidate(recentChatsProvider);
       }
     } finally {
@@ -278,7 +296,9 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
       }
     }
 
-    merged.sort((MessageModel a, MessageModel b) => a.sentAt.compareTo(b.sentAt));
+    merged.sort(
+      (MessageModel a, MessageModel b) => a.sentAt.compareTo(b.sentAt),
+    );
 
     final Set<String> confirmedIds = liveMessages
         .where((MessageModel serverMessage) {
@@ -421,10 +441,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
           ),
           TextButton(
             onPressed: () => Navigator.of(context).pop(true),
-            child: const Text(
-              'Delete',
-              style: TextStyle(color: Colors.red),
-            ),
+            child: const Text('Delete', style: TextStyle(color: Colors.red)),
           ),
         ],
       ),
@@ -432,10 +449,9 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
 
     if (shouldDelete == true) {
       try {
-        await ref.read(chatRepositoryProvider).deleteMessage(
-          messageId: message.id,
-          currentUserId: currentUserId,
-        );
+        await ref
+            .read(chatRepositoryProvider)
+            .deleteMessage(messageId: message.id, currentUserId: currentUserId);
         _showFeedback('Message deleted');
       } catch (error) {
         _showFeedback('Failed to delete message: $error');
@@ -492,6 +508,29 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
     ).showSnackBar(SnackBar(content: Text(message)));
   }
 
+  void _handlePointerActivity(PointerDownEvent _) {
+    _showNavigationTemporarily();
+  }
+
+  void _showNavigationTemporarily() {
+    _hideTimer?.cancel();
+
+    if (!_isNavVisible && mounted) {
+      setState(() {
+        _isNavVisible = true;
+      });
+    }
+
+    _hideTimer = Timer(const Duration(seconds: 3), () {
+      if (!mounted) {
+        return;
+      }
+      setState(() {
+        _isNavVisible = false;
+      });
+    });
+  }
+
   @override
   Widget build(BuildContext context) {
     final AuthState authState = ref.watch(authNotifierProvider);
@@ -504,13 +543,14 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
     final ChatThreadRequest request = ChatThreadRequest(
       roomId: widget.chatId,
       userId: widget.userId,
-      receiverId: widget.userId ?? ChatRepository.botUserId,
+      receiverId: widget.userId ?? ChatRepository.officialBotUserId,
       receiverName: widget.receiverName,
       receiverAvatar: widget.receiverAvatar,
     );
-    
+
     // Guard: If we are in thread mode but essential data is missing, show loading
-    final bool isThreadExpected = widget.chatId != null || widget.userId != null;
+    final bool isThreadExpected =
+        widget.chatId != null || widget.userId != null;
     if (isThreadExpected && widget.chatId == null && widget.userId == null) {
       return const Scaffold(
         backgroundColor: Colors.black,
@@ -520,9 +560,8 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
 
     final bool showThread = request.roomId != null || request.userId != null;
     _syncShellNavigation(showThread);
-    final AsyncValue<LocalFirstData<List<ChatModel>>> recentChatsAsync = ref.watch(
-      recentChatsProvider,
-    );
+    final AsyncValue<LocalFirstData<List<ChatModel>>> recentChatsAsync = ref
+        .watch(recentChatsProvider);
 
     if (!showThread) {
       return Scaffold(
@@ -555,105 +594,114 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
     return Scaffold(
       backgroundColor: Colors.black,
       resizeToAvoidBottomInset: true,
-      body: LayoutBuilder(
-        builder: (BuildContext context, BoxConstraints constraints) {
-          final bool showSidebar = constraints.maxWidth >= 980;
+      body: Listener(
+        behavior: HitTestBehavior.translucent,
+        onPointerDown: _handlePointerActivity,
+        child: LayoutBuilder(
+          builder: (BuildContext context, BoxConstraints constraints) {
+            final bool showSidebar = constraints.maxWidth >= 980;
 
-          return SafeArea(
-            child: Row(
-              children: <Widget>[
-                if (showSidebar)
-                  SizedBox(
-                    width: 390,
-                    child: _ChatShell(
-                      currentUserName: authState.fullName ?? 'Gracy User',
-                      currentUserCode: authState.gracyId,
-                      recentChatsAsync: recentChatsAsync,
-                      startChatController: _searchController,
-                      onStartChat: _startChatByCode,
-                      dense: true,
+            return SafeArea(
+              child: Row(
+                children: <Widget>[
+                  if (showSidebar)
+                    SizedBox(
+                      width: 390,
+                      child: _ChatShell(
+                        currentUserName: authState.fullName ?? 'Gracy User',
+                        currentUserCode: authState.gracyId,
+                        recentChatsAsync: recentChatsAsync,
+                        startChatController: _searchController,
+                        onStartChat: _startChatByCode,
+                        dense: true,
+                      ),
+                    ),
+                  Expanded(
+                    child: threadAsync.when(
+                      data: (ChatThread? thread) {
+                        if (thread == null) {
+                          return const _CenteredMessage(
+                            title: 'Chat unavailable',
+                            subtitle:
+                                'The selected conversation could not be loaded.',
+                          );
+                        }
+
+                        final AsyncValue<LocalFirstData<List<MessageModel>>>
+                        messagesAsync = ref.watch(
+                          messagesProvider(thread.roomId),
+                        );
+
+                        return messagesAsync.when(
+                          data: (LocalFirstData<List<MessageModel>> snapshot) {
+                            _resetOfflineBannerSoon();
+                            final List<MessageModel> messages = _mergeMessages(
+                              snapshot.data,
+                            );
+                            _syncReceiptState(thread, messages);
+                            _maybeScrollToBottom(
+                              messages.length +
+                                  ((_isBotTyping || _isAiThinking) ? 1 : 0),
+                            );
+                            return _ThreadView(
+                              thread: thread,
+                              messages: messages,
+                              composerController: _composerController,
+                              scrollController: _scrollController,
+                              isBotTyping:
+                                  (_isBotTyping || _isAiThinking) &&
+                                  ChatRepository.isBotParticipant(
+                                    thread.participant.id,
+                                  ),
+                              isNavVisible: _isNavVisible,
+                              replyToMessage: _replyToMessage,
+                              onBack: showSidebar
+                                  ? null
+                                  : () {
+                                      if (context.canPop()) {
+                                        context.pop();
+                                        return;
+                                      }
+                                      context.go(AppRoutePaths.chat);
+                                    },
+                              onClose: () => context.go(AppRoutePaths.chat),
+                              onSend: () => _sendMessage(thread),
+                              onReply: _handleReply,
+                              onForward: _handleForward,
+                              onDelete: _handleDelete,
+                              onCancelReply: _cancelReply,
+                              onViewProfile: () {
+                                context.go(
+                                  '${AppRoutePaths.profile}?userId=${thread.participant.id}',
+                                );
+                              },
+                            );
+                          },
+                          loading: () =>
+                              const Center(child: CircularProgressIndicator()),
+                          error: (Object error, StackTrace stackTrace) {
+                            return _CenteredMessage(
+                              title: 'Messages failed to load',
+                              subtitle: error.toString(),
+                            );
+                          },
+                        );
+                      },
+                      loading: () =>
+                          const Center(child: CircularProgressIndicator()),
+                      error: (Object error, StackTrace stackTrace) {
+                        return _CenteredMessage(
+                          title: 'Chat unavailable',
+                          subtitle: error.toString(),
+                        );
+                      },
                     ),
                   ),
-                Expanded(
-                  child: threadAsync.when(
-                    data: (ChatThread? thread) {
-                      if (thread == null) {
-                        return const _CenteredMessage(
-                          title: 'Chat unavailable',
-                          subtitle:
-                              'The selected conversation could not be loaded.',
-                        );
-                      }
-
-                      final AsyncValue<LocalFirstData<List<MessageModel>>>
-                      messagesAsync = ref
-                          .watch(messagesProvider(thread.roomId));
-
-                      return messagesAsync.when(
-                        data: (LocalFirstData<List<MessageModel>> snapshot) {
-                          _resetOfflineBannerSoon();
-                          final List<MessageModel> messages = _mergeMessages(
-                            snapshot.data,
-                          );
-                          _syncReceiptState(thread, messages);
-                          _maybeScrollToBottom(
-                            messages.length + ((_isBotTyping || _isAiThinking) ? 1 : 0),
-                          );
-                          return _ThreadView(
-                            thread: thread,
-                            messages: messages,
-                            composerController: _composerController,
-                            scrollController: _scrollController,
-                            isBotTyping:
-                                (_isBotTyping || _isAiThinking) &&
-                                thread.participant.id ==
-                                    ChatRepository.botUserId,
-                            replyToMessage: _replyToMessage,
-                            onBack: showSidebar
-                                ? null
-                                : () {
-                                    if (context.canPop()) {
-                                      context.pop();
-                                      return;
-                                    }
-                                    context.go(AppRoutePaths.chat);
-                                  },
-                            onSend: () => _sendMessage(thread),
-                            onReply: _handleReply,
-                            onForward: _handleForward,
-                            onDelete: _handleDelete,
-                            onCancelReply: _cancelReply,
-                            onViewProfile: () {
-                              context.go(
-                                '${AppRoutePaths.profile}?userId=${thread.participant.id}',
-                              );
-                            },
-                          );
-                        },
-                        loading: () =>
-                            const Center(child: CircularProgressIndicator()),
-                        error: (Object error, StackTrace stackTrace) {
-                          return _CenteredMessage(
-                            title: 'Messages failed to load',
-                            subtitle: error.toString(),
-                          );
-                        },
-                      );
-                    },
-                    loading: () =>
-                        const Center(child: CircularProgressIndicator()),
-                    error: (Object error, StackTrace stackTrace) {
-                      return _CenteredMessage(
-                        title: 'Chat unavailable',
-                        subtitle: error.toString(),
-                      );
-                    },
-                  ),
-                ),
-              ],
-            ),
-          );
-        },
+                ],
+              ),
+            );
+          },
+        ),
       ),
     );
   }
@@ -714,9 +762,9 @@ class _ChatShell extends ConsumerWidget {
                 ),
                 subtitle: Text(
                   'Hide ${user.fullName} from this chat list.',
-                  style: Theme.of(sheetContext).textTheme.bodySmall?.copyWith(
-                    color: Colors.white70,
-                  ),
+                  style: Theme.of(
+                    sheetContext,
+                  ).textTheme.bodySmall?.copyWith(color: Colors.white70),
                 ),
                 onTap: () async {
                   Navigator.of(sheetContext).pop();
@@ -731,9 +779,7 @@ class _ChatShell extends ConsumerWidget {
                     ..clearSnackBars()
                     ..showSnackBar(
                       SnackBar(
-                        content: Text(
-                          '${user.fullName} removed from view.',
-                        ),
+                        content: Text('${user.fullName} removed from view.'),
                         action: SnackBarAction(
                           label: 'Undo',
                           onPressed: () async {
@@ -761,9 +807,9 @@ class _ChatShell extends ConsumerWidget {
                 ),
                 subtitle: Text(
                   'Move ${user.fullName} into archived chats.',
-                  style: Theme.of(sheetContext).textTheme.bodySmall?.copyWith(
-                    color: Colors.white70,
-                  ),
+                  style: Theme.of(
+                    sheetContext,
+                  ).textTheme.bodySmall?.copyWith(color: Colors.white70),
                 ),
                 onTap: () async {
                   Navigator.of(sheetContext).pop();
@@ -806,9 +852,9 @@ class _ChatShell extends ConsumerWidget {
                 ),
                 subtitle: Text(
                   'Remove ${user.fullName} from this device list.',
-                  style: Theme.of(sheetContext).textTheme.bodySmall?.copyWith(
-                    color: Colors.white70,
-                  ),
+                  style: Theme.of(
+                    sheetContext,
+                  ).textTheme.bodySmall?.copyWith(color: Colors.white70),
                 ),
                 onTap: () async {
                   Navigator.of(sheetContext).pop();
@@ -911,8 +957,7 @@ class _ChatShell extends ConsumerWidget {
                   Expanded(
                     child: CustomTextField(
                       controller: startChatController,
-                      hintText:
-                          currentUserCode == null
+                      hintText: currentUserCode == null
                           ? 'Enter a Gracy code'
                           : 'Invite with a Gracy code',
                       prefixIcon: Icons.search_rounded,
@@ -953,9 +998,9 @@ class _ChatShell extends ConsumerWidget {
               currentUserCode == null
                   ? currentUserName
                   : '$currentUserName • $currentUserCode',
-              style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                color: Colors.grey.shade500,
-              ),
+              style: Theme.of(
+                context,
+              ).textTheme.bodySmall?.copyWith(color: Colors.grey.shade500),
             ),
             const SizedBox(height: 14),
             recentChatsAsync.when(
@@ -994,13 +1039,14 @@ class _ChatShell extends ConsumerWidget {
                     Builder(
                       builder: (BuildContext context) {
                         final UserModel gracyAi = UserModel(
-                          id: ChatRepository.botUserId,
+                          id: ChatRepository.officialBotUserId,
                           fullName: 'GracyAI',
                           username: '@gracyai',
                           age: 0,
                           role: UserRole.staff,
                           courses: const <String>[],
-                          bio: 'The Official Brain of Gracy. Powered by Gemini 1.5 Pro.',
+                          bio:
+                              'The Official Brain of Gracy. Powered by Gemini 1.5 Pro.',
                           isOnline: true,
                           location: 'Digital Campus',
                           avatarSeed: 'GracyAI',
@@ -1010,7 +1056,7 @@ class _ChatShell extends ConsumerWidget {
 
                         final ChatModel gracyAiChat = ChatModel(
                           id: 'gracy-ai-chat',
-                          participantId: ChatRepository.botUserId,
+                          participantId: ChatRepository.officialBotUserId,
                           lastMessage: 'GracyAI: The Official Brain of Gracy ⚡',
                           lastMessageAt: DateTime.now(),
                           unreadCount: 0,
@@ -1026,14 +1072,19 @@ class _ChatShell extends ConsumerWidget {
                           onTap: () {
                             context.go(
                               AppRoutePaths.chatByUser(
-                                userId: ChatRepository.botUserId,
+                                userId: ChatRepository.officialBotUserId,
                                 receiverName: gracyAi.fullName,
                                 receiverAvatar: gracyAi.avatarUrl,
                               ),
                             );
                           },
                           onLongPress: () {
-                            _showChatActions(context, ref, gracyAiChat, gracyAi);
+                            _showChatActions(
+                              context,
+                              ref,
+                              gracyAiChat,
+                              gracyAi,
+                            );
                           },
                         );
                       },
@@ -1085,10 +1136,11 @@ class _ChatShell extends ConsumerWidget {
                         alignment: Alignment.centerLeft,
                         child: Text(
                           'Archived',
-                          style: Theme.of(context).textTheme.titleSmall?.copyWith(
-                            color: Colors.white70,
-                            fontWeight: FontWeight.w800,
-                          ),
+                          style: Theme.of(context).textTheme.titleSmall
+                              ?.copyWith(
+                                color: Colors.white70,
+                                fontWeight: FontWeight.w800,
+                              ),
                         ),
                       ),
                       const SizedBox(height: 8),
@@ -1166,7 +1218,9 @@ class _ThreadView extends StatelessWidget {
     required this.composerController,
     required this.scrollController,
     required this.isBotTyping,
+    required this.isNavVisible,
     required this.onSend,
+    required this.onClose,
     required this.onViewProfile,
     required this.onReply,
     required this.onForward,
@@ -1181,7 +1235,9 @@ class _ThreadView extends StatelessWidget {
   final TextEditingController composerController;
   final ScrollController scrollController;
   final bool isBotTyping;
+  final bool isNavVisible;
   final VoidCallback onSend;
+  final VoidCallback onClose;
   final VoidCallback onViewProfile;
   final Function(MessageModel) onReply;
   final Function(MessageModel) onForward;
@@ -1211,7 +1267,7 @@ class _ThreadView extends StatelessWidget {
       }
 
       // Add message bubble - use GlassmorphismBubble for AI messages
-      if (message.senderId == ChatRepository.botUserId) {
+      if (ChatRepository.isBotParticipant(message.senderId)) {
         widgets.add(
           GlassmorphismBubble(
             message: message,
@@ -1237,19 +1293,21 @@ class _ThreadView extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final isGracyAI = thread.participant.id == ChatRepository.botUserId;
-    
+    final isGracyAI = ChatRepository.isBotParticipant(thread.participant.id);
+
     return Container(
       color: Colors.black,
       child: Column(
         children: <Widget>[
           _ThreadHeader(
             participant: thread.participant,
+            isVisible: isNavVisible,
             onBack: onBack,
+            onClose: onClose,
             onViewProfile: onViewProfile,
           ),
           Expanded(
-            child: isGracyAI 
+            child: isGracyAI
                 ? _buildNeuralChatInterface(context)
                 : _buildStandardChatInterface(context),
           ),
@@ -1259,9 +1317,9 @@ class _ThreadView extends StatelessWidget {
   }
 
   Widget _buildNeuralChatInterface(BuildContext context) {
-    final isGracyAI = thread.participant.id == ChatRepository.botUserId;
+    final isGracyAI = ChatRepository.isBotParticipant(thread.participant.id);
     final hasMessages = messages.isNotEmpty;
-    
+
     return NeuralBackground(
       child: Container(
         margin: const EdgeInsets.fromLTRB(18, 10, 18, 0),
@@ -1276,90 +1334,111 @@ class _ThreadView extends StatelessWidget {
         clipBehavior: Clip.antiAlias,
         child: Column(
           children: <Widget>[
-            // Gemini Clone Welcome State
-            if (!hasMessages && isGracyAI) ...[
-              const Spacer(flex: 2),
-              Center(
-                child: Column(
-                  children: [
-                    const GracyAILogo(
-                      size: 80,
-                      glowing: true,
-                    ),
-                    const SizedBox(height: 24),
-                    const Text(
-                      'How can I help you today?',
-                      style: TextStyle(
-                        fontSize: 24,
-                        fontWeight: FontWeight.w600,
-                        color: Colors.white,
-                        letterSpacing: -0.5,
-                      ),
-                    ),
-                    const SizedBox(height: 32),
-                    Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
-                      decoration: BoxDecoration(
-                        color: Colors.white.withValues(alpha: 0.08),
-                        borderRadius: BorderRadius.circular(16),
-                        border: Border.all(
-                          color: AppColors.electricBlue.withValues(alpha: 0.2),
-                          width: 1,
-                        ),
-                      ),
-                      child: const Text(
-                        'Ask me anything about campus life, studies, or just chat!',
-                        style: TextStyle(
-                          fontSize: 14,
-                          color: Colors.white70,
-                          height: 1.4,
-                        ),
-                        textAlign: TextAlign.center,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              const Spacer(flex: 3),
-            ],
-            
-            // Messages List with thinking indicator inside
-            if (hasMessages) ...[
-              Expanded(
-                child: ListView.builder(
-                  controller: scrollController,
-                  padding: const EdgeInsets.fromLTRB(0, 16, 0, 80), // Extra bottom padding for composer
-                  itemCount: messages.length + (isBotTyping ? 1 : 0),
-                  itemBuilder: (context, index) {
-                    if (index == messages.length && isBotTyping) {
-                      return Container(
-                        padding: const EdgeInsets.symmetric(vertical: 8),
-                        child: NeuralThinkingIndicator(),
-                      );
-                    }
-                    
-                    if (index >= messages.length) return const SizedBox.shrink();
-                    
-                    final message = messages[index];
-                    return GlassmorphismBubble(
-                      message: message,
-                      onReply: () => onReply(message),
-                      onForward: () => onForward(message),
-                      onDelete: () => onDelete(message),
+            Expanded(
+              child: LayoutBuilder(
+                builder: (BuildContext context, BoxConstraints constraints) {
+                  if (hasMessages) {
+                    return ListView.builder(
+                      controller: scrollController,
+                      padding: const EdgeInsets.fromLTRB(0, 16, 0, 80),
+                      itemCount: messages.length + (isBotTyping ? 1 : 0),
+                      itemBuilder: (context, index) {
+                        if (index == messages.length && isBotTyping) {
+                          return const Padding(
+                            padding: EdgeInsets.symmetric(vertical: 8),
+                            child: NeuralThinkingIndicator(),
+                          );
+                        }
+
+                        if (index >= messages.length) {
+                          return const SizedBox.shrink();
+                        }
+
+                        final message = messages[index];
+                        return GlassmorphismBubble(
+                          message: message,
+                          onReply: () => onReply(message),
+                          onForward: () => onForward(message),
+                          onDelete: () => onDelete(message),
+                        );
+                      },
                     );
-                  },
-                ),
+                  }
+
+                  return SingleChildScrollView(
+                    padding: const EdgeInsets.fromLTRB(24, 32, 24, 24),
+                    child: ConstrainedBox(
+                      constraints: BoxConstraints(
+                        minHeight: constraints.maxHeight > 24
+                            ? constraints.maxHeight - 24
+                            : 0,
+                      ),
+                      child: Center(
+                        child: Column(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            if (isGracyAI) ...<Widget>[
+                              const GracyAILogo(size: 80, glowing: true),
+                              const SizedBox(height: 24),
+                              const Text(
+                                'How can I help you today?',
+                                style: TextStyle(
+                                  fontSize: 24,
+                                  fontWeight: FontWeight.w600,
+                                  color: Colors.white,
+                                  letterSpacing: -0.5,
+                                ),
+                                textAlign: TextAlign.center,
+                              ),
+                              const SizedBox(height: 24),
+                              Container(
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 24,
+                                  vertical: 16,
+                                ),
+                                decoration: BoxDecoration(
+                                  color: Colors.white.withValues(alpha: 0.08),
+                                  borderRadius: BorderRadius.circular(16),
+                                  border: Border.all(
+                                    color: AppColors.electricBlue.withValues(
+                                      alpha: 0.2,
+                                    ),
+                                    width: 1,
+                                  ),
+                                ),
+                                child: const Text(
+                                  'Ask me anything about campus life, studies, or just chat!',
+                                  style: TextStyle(
+                                    fontSize: 14,
+                                    color: Colors.white70,
+                                    height: 1.4,
+                                  ),
+                                  textAlign: TextAlign.center,
+                                ),
+                              ),
+                            ],
+                            if (isBotTyping) ...<Widget>[
+                              const SizedBox(height: 20),
+                              const SizedBox(
+                                width: 320,
+                                child: NeuralThinkingIndicator(),
+                              ),
+                            ],
+                          ],
+                        ),
+                      ),
+                    ),
+                  );
+                },
               ),
-            ],
-            
+            ),
+
             // Composer
             Container(
               padding: EdgeInsets.only(
                 bottom: MediaQuery.of(context).viewInsets.bottom,
               ),
-              decoration: const BoxDecoration(
-                color: Colors.black,
-              ),
+              decoration: const BoxDecoration(color: Colors.black),
               child: IndustrialChatComposer(
                 controller: composerController,
                 onSend: onSend,
@@ -1414,9 +1493,7 @@ class _ThreadView extends StatelessWidget {
             padding: EdgeInsets.only(
               bottom: MediaQuery.of(context).viewInsets.bottom,
             ),
-            decoration: const BoxDecoration(
-              color: Colors.black,
-            ),
+            decoration: const BoxDecoration(color: Colors.black),
             child: IndustrialChatComposer(
               controller: composerController,
               onSend: onSend,
@@ -1433,12 +1510,16 @@ class _ThreadView extends StatelessWidget {
 class _ThreadHeader extends StatelessWidget {
   const _ThreadHeader({
     required this.participant,
+    required this.isVisible,
     required this.onViewProfile,
+    required this.onClose,
     this.onBack,
   });
 
   final UserModel participant;
+  final bool isVisible;
   final VoidCallback onViewProfile;
+  final VoidCallback onClose;
   final VoidCallback? onBack;
 
   Future<void> _showThreadMenu(BuildContext context) async {
@@ -1465,7 +1546,7 @@ class _ThreadHeader extends StatelessWidget {
                 ),
               ),
               // Only show profile features for human users, not GracyAI
-              if (participant.id != ChatRepository.botUserId) ...[
+              if (!ChatRepository.isBotParticipant(participant.id)) ...[
                 _ThreadActionTile(
                   icon: Icons.account_circle_outlined,
                   label: 'View Profile',
@@ -1504,7 +1585,7 @@ class _ThreadHeader extends StatelessWidget {
                 ),
               ],
               const Divider(height: 1, color: Color(0xFF2A2E34)),
-              if (participant.id == ChatRepository.botUserId) ...[
+              if (ChatRepository.isBotParticipant(participant.id)) ...[
                 _ThreadActionTile(
                   icon: Icons.refresh_rounded,
                   label: 'New Conversation',
@@ -1513,12 +1594,13 @@ class _ThreadHeader extends StatelessWidget {
                     final GoRouter router = GoRouter.of(context);
                     Navigator.of(sheetContext).pop();
                     // Start new conversation with GracyAI
-                    final String newRoomId =
-                        DateTime.now().millisecondsSinceEpoch.toString();
+                    final String newRoomId = DateTime.now()
+                        .millisecondsSinceEpoch
+                        .toString();
                     router.go(
                       AppRoutePaths.chatByRoom(
                         chatId: newRoomId,
-                        userId: ChatRepository.botUserId,
+                        userId: ChatRepository.officialBotUserId,
                         receiverName: participant.fullName,
                         receiverAvatar: participant.avatarUrl,
                       ),
@@ -1567,7 +1649,7 @@ class _ThreadHeader extends StatelessWidget {
                 : participant.fullName,
           )
         : participant;
-    final bool isOfficial = safeParticipant.id == ChatRepository.botUserId;
+    final bool isOfficial = ChatRepository.isBotParticipant(safeParticipant.id);
 
     return Container(
       margin: const EdgeInsets.fromLTRB(18, 4, 18, 0),
@@ -1584,18 +1666,15 @@ class _ThreadHeader extends StatelessWidget {
               icon: const Icon(Icons.arrow_back_rounded),
               color: Colors.white,
             ),
-            const SizedBox(width: 6),
+            const SizedBox(width: 2),
           ],
           GestureDetector(
-                onTap: onViewProfile,
-                child: isOfficial
+            onTap: onViewProfile,
+            child: isOfficial
                 ? const SizedBox(
                     width: 38,
                     height: 38,
-                    child: GracyAILogo(
-                      size: 38,
-                      glowing: true,
-                    ),
+                    child: GracyAILogo(size: 38, glowing: true),
                   )
                 : UserAvatar(
                     user: safeParticipant,
@@ -1661,8 +1740,17 @@ class _ThreadHeader extends StatelessWidget {
             ),
           ),
           IconButton(
+            onPressed: onClose,
+            icon: const Icon(Icons.close_rounded),
+            color: Colors.white70,
+            tooltip: 'Close conversation',
+          ),
+          IconButton(
             onPressed: () => _showThreadMenu(context),
-            icon: const Icon(Icons.more_vert_rounded, color: Colors.white70),
+            icon: const Icon(
+              Icons.more_vert_rounded,
+              color: Colors.white70,
+            ),
           ),
           Consumer(
             builder: (context, ref, child) {
@@ -1670,7 +1758,8 @@ class _ThreadHeader extends StatelessWidget {
                 onPressed: () {
                   showDialog<void>(
                     context: context,
-                    builder: (context) => const DisappearingMessagesDialog(),
+                    builder: (context) =>
+                        const DisappearingMessagesDialog(),
                   );
                 },
                 icon: const Icon(Icons.timer_outlined),

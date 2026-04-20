@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
+import '../../../features/chat/data/chat_repository.dart';
 import '../../../shared/models/message_model.dart';
 import '../../../shared/services/timezone_service.dart';
 import 'gracy_ai_logo.dart';
@@ -69,21 +70,41 @@ class _GlassmorphismBubbleState extends State<GlassmorphismBubble>
 
   @override
   Widget build(BuildContext context) {
+    final bool isMe = widget.message.isMe;
+    final bool isAiMessage =
+        !isMe && ChatRepository.isBotParticipant(widget.message.senderId);
+    final Alignment bubbleAlignment = isMe
+        ? Alignment.centerRight
+        : Alignment.centerLeft;
+    final MainAxisAlignment rowAlignment = isMe
+        ? MainAxisAlignment.end
+        : MainAxisAlignment.start;
+    final CrossAxisAlignment contentAlignment = isMe
+        ? CrossAxisAlignment.end
+        : CrossAxisAlignment.start;
+    final Color bubbleColor = isMe
+        ? _electricBlue
+        : _glassDark.withValues(alpha: 0.92);
+    final BorderRadius borderRadius = BorderRadius.only(
+      topLeft: const Radius.circular(22),
+      topRight: const Radius.circular(22),
+      bottomLeft: Radius.circular(isMe ? 22 : 8),
+      bottomRight: Radius.circular(isMe ? 8 : 22),
+    );
+
     return Container(
       margin: const EdgeInsets.symmetric(vertical: 3, horizontal: 14),
+      alignment: bubbleAlignment,
       child: Row(
-        mainAxisAlignment: MainAxisAlignment.start,
+        mainAxisSize: MainAxisSize.min,
+        mainAxisAlignment: rowAlignment,
         crossAxisAlignment: CrossAxisAlignment.end,
         children: [
-          // GracyAI logo with neural glow
-          Container(
-            margin: const EdgeInsets.only(right: 8),
-            child: GracyAILogo(
-              size: 28,
-              glowing: true,
+          if (!isMe && isAiMessage)
+            Container(
+              margin: const EdgeInsets.only(right: 8),
+              child: const GracyAILogo(size: 28, glowing: true),
             ),
-          ),
-          // Glassmorphism bubble
           GestureDetector(
             onLongPress: _showContextMenu,
             onTapDown: (_) => _animationController.forward(),
@@ -98,92 +119,83 @@ class _GlassmorphismBubbleState extends State<GlassmorphismBubble>
                     constraints: BoxConstraints(
                       maxWidth: MediaQuery.of(context).size.width * 0.74,
                     ),
-                    padding: const EdgeInsets.fromLTRB(16, 12, 14, 8),
+                    padding: const EdgeInsets.all(12),
                     decoration: BoxDecoration(
-                      color: _glassDark.withAlpha(204),
-                      borderRadius: const BorderRadius.only(
-                        topLeft: Radius.circular(22),
-                        topRight: Radius.circular(22),
-                        bottomLeft: Radius.circular(8),
-                        bottomRight: Radius.circular(22),
-                      ),
-                      border: Border.all(
-                        color: _electricBlue.withAlpha(76),
-                        width: 1,
-                      ),
-                      boxShadow: [
-                        // Outer glow
+                      color: bubbleColor,
+                      borderRadius: borderRadius,
+                      border: isMe
+                          ? null
+                          : Border.all(
+                              color: _electricBlue.withValues(alpha: 0.28),
+                              width: 1,
+                            ),
+                      boxShadow: <BoxShadow>[
                         BoxShadow(
-                          color: _electricBlue.withAlpha(51),
-                          blurRadius: 12,
-                          spreadRadius: 1,
+                          color: isMe
+                              ? _electricBlue.withValues(alpha: 0.22)
+                              : _electricBlue.withValues(alpha: 0.12),
+                          blurRadius: isMe ? 10 : 12,
+                          spreadRadius: isMe ? 0 : 1,
                           offset: const Offset(0, 4),
                         ),
-                        // Inner shadow for depth
                         BoxShadow(
-                          color: Colors.black.withAlpha(76),
+                          color: Colors.black.withValues(alpha: 0.22),
                           blurRadius: 8,
                           offset: const Offset(0, 2),
                         ),
                       ],
                     ),
-                    child: ClipRRect(
-                      borderRadius: const BorderRadius.only(
-                        topLeft: Radius.circular(22),
-                        topRight: Radius.circular(22),
-                        bottomLeft: Radius.circular(8),
-                        bottomRight: Radius.circular(22),
-                      ),
-                      child: Container(
-                        decoration: BoxDecoration(
-                          color: Colors.white.withAlpha(13),
-                        ),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            // Message content
-                            Text(
-                              widget.message.text,
-                              style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                                color: Colors.white.withAlpha(230),
+                    child: Column(
+                      crossAxisAlignment: contentAlignment,
+                      children: [
+                        Text(
+                          widget.message.text,
+                          style: Theme.of(context).textTheme.bodyMedium
+                              ?.copyWith(
+                                color: Colors.white.withValues(alpha: 0.94),
                                 fontSize: 15.5,
                                 height: 1.42,
                               ),
-                            ),
-                            const SizedBox(height: 6),
-                            Row(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                Text(
-                                  TimezoneService.formatNairobiTime(
-                                    widget.message.sentAt,
-                                  ),
-                                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                                    color: Colors.white.withAlpha(153),
+                        ),
+                        const SizedBox(height: 6),
+                        Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Text(
+                              TimezoneService.formatNairobiTime(
+                                widget.message.sentAt,
+                              ),
+                              style: Theme.of(context).textTheme.bodySmall
+                                  ?.copyWith(
+                                    color: Colors.white.withValues(alpha: 0.64),
                                     fontSize: 11,
                                   ),
-                                ),
-                                const SizedBox(width: 4),
-                                Container(
-                                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                                  decoration: BoxDecoration(
-                                    color: _electricBlue.withAlpha(51),
-                                    borderRadius: BorderRadius.circular(8),
-                                  ),
-                                  child: Text(
-                                    'AI',
-                                    style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                                      color: _electricBlue,
-                                      fontWeight: FontWeight.bold,
-                                      fontSize: 9,
-                                    ),
-                                  ),
-                                ),
-                              ],
                             ),
+                            if (isAiMessage) ...<Widget>[
+                              const SizedBox(width: 6),
+                              Container(
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 6,
+                                  vertical: 2,
+                                ),
+                                decoration: BoxDecoration(
+                                  color: _electricBlue.withValues(alpha: 0.18),
+                                  borderRadius: BorderRadius.circular(8),
+                                ),
+                                child: Text(
+                                  'AI',
+                                  style: Theme.of(context).textTheme.labelSmall
+                                      ?.copyWith(
+                                        color: _electricBlue,
+                                        fontWeight: FontWeight.bold,
+                                        fontSize: 9,
+                                      ),
+                                ),
+                              ),
+                            ],
                           ],
                         ),
-                      ),
+                      ],
                     ),
                   ),
                 );
