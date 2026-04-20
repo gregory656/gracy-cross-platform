@@ -201,6 +201,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
             senderId: currentUserId,
             content: content,
           );
+      if (!mounted) return;
       ref.invalidate(messagesProvider(thread.roomId));
       ref.invalidate(recentChatsProvider);
 
@@ -452,6 +453,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
         await ref
             .read(chatRepositoryProvider)
             .deleteMessage(messageId: message.id, currentUserId: currentUserId);
+        if (!mounted) return;
         _showFeedback('Message deleted');
       } catch (error) {
         _showFeedback('Failed to delete message: $error');
@@ -1299,16 +1301,13 @@ class _ThreadView extends StatelessWidget {
       color: Colors.black,
       child: Column(
         children: <Widget>[
-          AnimatedOpacity(
-            opacity: isNavVisible ? 1.0 : 0.0,
-            duration: const Duration(milliseconds: 200),
-            child: _ThreadHeader(
-              participant: thread.participant,
-              isVisible: isNavVisible,
-              onBack: onBack,
-              onClose: onClose,
-              onViewProfile: onViewProfile,
-            ),
+          // Header - Always visible (24/7) as per user request
+          _ThreadHeader(
+            participant: thread.participant,
+            isVisible: true, // Permanent visibility
+            onBack: onBack,
+            onClose: onClose,
+            onViewProfile: onViewProfile,
           ),
           Expanded(
             child: isGracyAI
@@ -1349,7 +1348,7 @@ class _ThreadView extends StatelessWidget {
                       itemBuilder: (context, index) {
                         if (index == messages.length && isBotTyping) {
                           return const Padding(
-                            padding: EdgeInsets.symmetric(vertical: 8),
+                            padding: EdgeInsets.symmetric(vertical: 2),
                             child: NeuralThinkingIndicator(),
                           );
                         }

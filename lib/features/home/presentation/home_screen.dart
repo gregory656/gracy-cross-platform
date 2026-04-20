@@ -437,35 +437,17 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                 children: <Widget>[
                   _StoriesRow(currentUser: headerUser, activeUsers: activeUsers),
                   const SizedBox(height: 14),
-                  AnimatedSlide(
-                    duration: const Duration(milliseconds: 220),
-                    curve: Curves.easeOutCubic,
-                    offset: _isFeedChromeVisible
-                        ? Offset.zero
-                        : const Offset(0, -0.18),
-                    child: AnimatedOpacity(
-                      duration: const Duration(milliseconds: 180),
-                      opacity: _isFeedChromeVisible ? 1 : 0,
-                      child: IgnorePointer(
-                        ignoring: !_isFeedChromeVisible,
-                        child: Column(
-                          children: <Widget>[
-                            _CategoryChips(
-                              selectedCategory: _selectedCategory,
-                              onCategorySelected: _onCategorySelected,
-                            ),
-                            const SizedBox(height: 16),
-                            CreatePostButton(
-                              expanded: true,
-                              promptText:
-                                  "What's on your mind, ${_firstName(headerUser.fullName)}?",
-                            ),
-                            const SizedBox(height: 16),
-                          ],
-                        ),
-                      ),
-                    ),
+                  _CategoryChips(
+                    selectedCategory: _selectedCategory,
+                    onCategorySelected: _onCategorySelected,
                   ),
+                  const SizedBox(height: 16),
+                  CreatePostButton(
+                    expanded: true,
+                    promptText:
+                        "What's on your mind, ${_firstName(headerUser.fullName)}?",
+                  ),
+                  const SizedBox(height: 16),
                   if (isUploading) ...<Widget>[
                     ClipRRect(
                       borderRadius: BorderRadius.circular(999),
@@ -593,6 +575,8 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                     return PostCard(post: posts[index]);
                   },
                   childCount: posts.length + 1,
+                  addAutomaticKeepAlives: true,
+                  addRepaintBoundaries: true,
                 ),
               );
             },

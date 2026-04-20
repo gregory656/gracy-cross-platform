@@ -30,12 +30,11 @@ class PostCard extends ConsumerStatefulWidget {
   final Future<void> Function()? onPostChanged;
   final VoidCallback? onPostDeleted;
 
-  const PostCard({
-    super.key,
+  PostCard({
     required this.post,
     this.onPostChanged,
     this.onPostDeleted,
-  });
+  }) : super(key: ValueKey(post.id));
 
   @override
   ConsumerState<PostCard> createState() => _PostCardState();

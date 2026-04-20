@@ -60,7 +60,8 @@ class _NeuralThinkingIndicatorState extends State<NeuralThinkingIndicator>
   @override
   Widget build(BuildContext context) {
     return Container(
-      margin: const EdgeInsets.symmetric(vertical: 8, horizontal: 14),
+      margin: const EdgeInsets.symmetric(vertical: 2, horizontal: 14),
+      constraints: const BoxConstraints(maxHeight: 52),
       child: Row(
         mainAxisAlignment: MainAxisAlignment.start,
         crossAxisAlignment: CrossAxisAlignment.end,
@@ -194,7 +195,7 @@ class _NeuralThinkingIndicatorState extends State<NeuralThinkingIndicator>
       animation: _shimmerAnimation,
       builder: (context, child) {
         return Container(
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
           decoration: BoxDecoration(
             color: const Color(0xFF1A1D29).withValues(alpha: 0.8),
             borderRadius: const BorderRadius.only(

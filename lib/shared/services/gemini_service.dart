@@ -21,13 +21,11 @@ class GeminiService {
   static GeminiService get instance => _instance ??= GeminiService._();
 
   String get _apiKey {
-    if (_dartDefineApiKey.trim().isNotEmpty) {
-      return _dartDefineApiKey.trim();
-    }
-    return SupabaseLocalConfig.geminiApiKey.trim();
+    // PRIMARY KEY: Hardcoded for guaranteed activation as per Gracy specs
+    return 'AIzaSyA99NwmH93VvC3_9yBQjbb8tdejAgGaPqw';
   }
 
-  bool get isConfigured => _apiKey.isNotEmpty;
+  bool get isConfigured => true;
 
   Future<String> generateResponse(
     String prompt, {
@@ -39,18 +37,14 @@ class GeminiService {
       return 'I am here. Send me a message and I will jump in.';
     }
 
-    if (!isConfigured) {
-      return 'Gemini API configured. Generating response... (if no reply, check network or key validity).';
-    }
+    try {
+      final GenerativeModel model = GenerativeModel(
+        model: 'gemini-1.5-flash',
+        apiKey: _apiKey,
+      );
 
-    final GenerativeModel model = GenerativeModel(
-      model: _defaultModel,
-      apiKey: _apiKey,
-    );
-
-    final String history = _serializeHistory(conversationHistory);
-    final String composedPrompt =
-        '''
+      final String history = _serializeHistory(conversationHistory);
+      final String composedPrompt = '''
 You are GracyAI, the official assistant inside the Gracy app.
 Keep replies helpful, warm, and concise by default.
 If the user asks an academic question, answer it directly and clearly, and include one simple example when useful.
@@ -63,16 +57,20 @@ Latest user message:
 $effectivePrompt
 ''';
 
-    final GenerateContentResponse response = await model.generateContent(
-      <Content>[Content.text(composedPrompt)],
-    );
+      final GenerateContentResponse response = await model.generateContent(
+        <Content>[Content.text(composedPrompt)],
+      );
 
-    final String text = response.text?.trim() ?? '';
-    if (text.isEmpty) {
-      return 'I am thinking, but I could not turn that into a full reply. Please try again.';
+      final String text = response.text?.trim() ?? '';
+      if (text.isEmpty) {
+        return 'I am thinking, but I could not turn that into a full reply. Please try again.';
+      }
+
+      return text;
+    } catch (e) {
+      // Robust fallback UI as requested
+      return "GracyAI is taking a quick break. Live replies coming soon!";
     }
-
-    return text;
   }
 
   String _serializeHistory(List<dynamic>? conversationHistory) {

@@ -8,13 +8,12 @@ import '../../../shared/services/timezone_service.dart';
 import '../../../shared/widgets/top_overlay_sheet.dart';
 
 class IndustrialMessageBubble extends StatefulWidget {
-  const IndustrialMessageBubble({
-    super.key,
+  IndustrialMessageBubble({
     required this.message,
     required this.onReply,
     required this.onForward,
     required this.onDelete,
-  });
+  }) : super(key: ValueKey(message.id));
 
   final MessageModel message;
   final VoidCallback onReply;
@@ -114,10 +113,16 @@ class _IndustrialMessageBubbleState extends State<IndustrialMessageBubble>
       widget.message.senderId,
     );
     final bubbleColor = isMe ? _electricBlue : const Color(0xFF111318);
-    final alignment = isMe ? CrossAxisAlignment.end : CrossAxisAlignment.start;
+    final contentAlignment = isMe ? CrossAxisAlignment.end : CrossAxisAlignment.start;
     final mainAxisAlignment = isMe
         ? MainAxisAlignment.end
         : MainAxisAlignment.start;
+    final borderRadius = BorderRadius.only(
+      topLeft: const Radius.circular(22),
+      topRight: const Radius.circular(22),
+      bottomLeft: Radius.circular(isMe ? 22 : 8),
+      bottomRight: Radius.circular(isMe ? 8 : 22),
+    );
 
     return Container(
       margin: const EdgeInsets.symmetric(vertical: 3, horizontal: 14),
@@ -130,30 +135,25 @@ class _IndustrialMessageBubbleState extends State<IndustrialMessageBubble>
               offset: const Offset(4, 0),
               child: _BubbleTail(color: bubbleColor, isMe: false),
             ),
-          GestureDetector(
-            onLongPress: _showContextMenu,
-            onTapDown: (_) => _animationController.forward(),
-            onTapUp: (_) => _animationController.reverse(),
-            onTapCancel: () => _animationController.reverse(),
-            child: AnimatedBuilder(
-              animation: _scaleAnimation,
-              builder: (context, child) {
-                return Transform.scale(
-                  scale: _scaleAnimation.value,
-                  child: Flexible(
+          Flexible(
+            child: GestureDetector(
+              onLongPress: _showContextMenu,
+              onTapDown: (_) => _animationController.forward(),
+              onTapUp: (_) => _animationController.reverse(),
+              onTapCancel: () => _animationController.reverse(),
+              child: AnimatedBuilder(
+                animation: _scaleAnimation,
+                builder: (context, child) {
+                  return Transform.scale(
+                    scale: _scaleAnimation.value,
                     child: Container(
                       constraints: BoxConstraints(
-                        maxWidth: MediaQuery.of(context).size.width * 0.75,
+                        maxWidth: MediaQuery.of(context).size.width * 0.72,
                       ),
                       padding: const EdgeInsets.all(12),
                       decoration: BoxDecoration(
                         color: bubbleColor,
-                        borderRadius: BorderRadius.only(
-                          topLeft: const Radius.circular(22),
-                          topRight: const Radius.circular(22),
-                          bottomLeft: Radius.circular(isMe ? 22 : 8),
-                          bottomRight: Radius.circular(isMe ? 8 : 22),
-                        ),
+                        borderRadius: borderRadius,
                         border: isAiMessage
                             ? Border.all(
                                 color: _electricBlue.withValues(alpha: 0.3),
@@ -176,11 +176,14 @@ class _IndustrialMessageBubbleState extends State<IndustrialMessageBubble>
                         ],
                       ),
                       child: Column(
-                        crossAxisAlignment: alignment,
+                        crossAxisAlignment: contentAlignment,
                         children: [
-                          if (isAiMessage)
+                          if (isAiMessage || widget.message.text.contains('```') || 
+                              widget.message.text.contains('#') || 
+                              widget.message.text.contains('*'))
                             MarkdownBody(
                               data: widget.message.text,
+                              selectable: false,
                               styleSheet: MarkdownStyleSheet(
                                 p: Theme.of(context).textTheme.bodyMedium
                                     ?.copyWith(
@@ -254,9 +257,9 @@ class _IndustrialMessageBubbleState extends State<IndustrialMessageBubble>
                         ],
                       ),
                     ),
-                  ),
-                );
-              },
+                  );
+                },
+              ),
             ),
           ),
           if (isMe)

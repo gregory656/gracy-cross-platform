@@ -7,13 +7,12 @@ import '../../../shared/services/timezone_service.dart';
 import 'gracy_ai_logo.dart';
 
 class GlassmorphismBubble extends StatefulWidget {
-  const GlassmorphismBubble({
-    super.key,
+  GlassmorphismBubble({
     required this.message,
     required this.onReply,
     required this.onForward,
     required this.onDelete,
-  });
+  }) : super(key: ValueKey(message.id));
 
   final MessageModel message;
   final VoidCallback onReply;
@@ -105,102 +104,104 @@ class _GlassmorphismBubbleState extends State<GlassmorphismBubble>
               margin: const EdgeInsets.only(right: 8),
               child: const GracyAILogo(size: 28, glowing: true),
             ),
-          GestureDetector(
-            onLongPress: _showContextMenu,
-            onTapDown: (_) => _animationController.forward(),
-            onTapUp: (_) => _animationController.reverse(),
-            onTapCancel: () => _animationController.reverse(),
-            child: AnimatedBuilder(
-              animation: _scaleAnimation,
-              builder: (context, child) {
-                return Transform.scale(
-                  scale: _scaleAnimation.value,
-                  child: Container(
-                    constraints: BoxConstraints(
-                      maxWidth: MediaQuery.of(context).size.width * 0.7,
-                    ),
-                    padding: const EdgeInsets.all(12),
-                    decoration: BoxDecoration(
-                      color: bubbleColor,
-                      borderRadius: borderRadius,
-                      border: isMe
-                          ? null
-                          : Border.all(
-                              color: _electricBlue.withValues(alpha: 0.28),
-                              width: 1,
-                            ),
-                      boxShadow: <BoxShadow>[
-                        BoxShadow(
-                          color: isMe
-                              ? _electricBlue.withValues(alpha: 0.22)
-                              : _electricBlue.withValues(alpha: 0.12),
-                          blurRadius: isMe ? 10 : 12,
-                          spreadRadius: isMe ? 0 : 1,
-                          offset: const Offset(0, 4),
-                        ),
-                        BoxShadow(
-                          color: Colors.black.withValues(alpha: 0.22),
-                          blurRadius: 8,
-                          offset: const Offset(0, 2),
-                        ),
-                      ],
-                    ),
-                    child: Column(
-                      crossAxisAlignment: contentAlignment,
-                      children: [
-                        Text(
-                          widget.message.text,
-                          softWrap: true,
-                          style: Theme.of(context).textTheme.bodyMedium
-                              ?.copyWith(
-                                color: Colors.white.withValues(alpha: 0.94),
-                                fontSize: 15.5,
-                                height: 1.42,
+          Flexible(
+            child: GestureDetector(
+              onLongPress: _showContextMenu,
+              onTapDown: (_) => _animationController.forward(),
+              onTapUp: (_) => _animationController.reverse(),
+              onTapCancel: () => _animationController.reverse(),
+              child: AnimatedBuilder(
+                animation: _scaleAnimation,
+                builder: (context, child) {
+                  return Transform.scale(
+                    scale: _scaleAnimation.value,
+                    child: Container(
+                      constraints: BoxConstraints(
+                        maxWidth: MediaQuery.of(context).size.width * 0.72,
+                      ),
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        color: bubbleColor,
+                        borderRadius: borderRadius,
+                        border: isMe
+                            ? null
+                            : Border.all(
+                                color: _electricBlue.withValues(alpha: 0.28),
+                                width: 1,
                               ),
-                        ),
-                        const SizedBox(height: 6),
-                        Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Text(
-                              TimezoneService.formatNairobiTime(
-                                widget.message.sentAt,
+                        boxShadow: <BoxShadow>[
+                          BoxShadow(
+                            color: isMe
+                                ? _electricBlue.withValues(alpha: 0.22)
+                                : _electricBlue.withValues(alpha: 0.12),
+                            blurRadius: isMe ? 10 : 12,
+                            spreadRadius: isMe ? 0 : 1,
+                            offset: const Offset(0, 4),
+                          ),
+                          BoxShadow(
+                            color: Colors.black.withValues(alpha: 0.2),
+                            blurRadius: 15,
+                            offset: const Offset(0, 8),
+                          ),
+                        ],
+                      ),
+                      child: Column(
+                        crossAxisAlignment: contentAlignment,
+                        children: [
+                          Text(
+                            widget.message.text,
+                            softWrap: true,
+                            style: Theme.of(context).textTheme.bodyMedium
+                                ?.copyWith(
+                                  color: Colors.white.withValues(alpha: 0.94),
+                                  fontSize: 15.5,
+                                  height: 1.42,
+                                ),
+                          ),
+                          const SizedBox(height: 6),
+                          Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Text(
+                                TimezoneService.formatNairobiTime(
+                                  widget.message.sentAt,
+                                ),
+                                style: Theme.of(context).textTheme.bodySmall
+                                    ?.copyWith(
+                                      color: Colors.white.withValues(alpha: 0.64),
+                                      fontSize: 11,
+                                    ),
                               ),
-                              style: Theme.of(context).textTheme.bodySmall
-                                  ?.copyWith(
-                                    color: Colors.white.withValues(alpha: 0.64),
-                                    fontSize: 11,
+                              if (isAiMessage) ...<Widget>[
+                                const SizedBox(width: 6),
+                                Container(
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 6,
+                                    vertical: 2,
                                   ),
-                            ),
-                            if (isAiMessage) ...<Widget>[
-                              const SizedBox(width: 6),
-                              Container(
-                                padding: const EdgeInsets.symmetric(
-                                  horizontal: 6,
-                                  vertical: 2,
+                                  decoration: BoxDecoration(
+                                    color: _electricBlue.withValues(alpha: 0.18),
+                                    borderRadius: BorderRadius.circular(8),
+                                  ),
+                                  child: Text(
+                                    'AI',
+                                    style: Theme.of(context).textTheme.labelSmall
+                                        ?.copyWith(
+                                          color: _electricBlue,
+                                          fontWeight: FontWeight.bold,
+                                          fontSize: 9,
+                                        ),
+                                  ),
                                 ),
-                                decoration: BoxDecoration(
-                                  color: _electricBlue.withValues(alpha: 0.18),
-                                  borderRadius: BorderRadius.circular(8),
-                                ),
-                                child: Text(
-                                  'AI',
-                                  style: Theme.of(context).textTheme.labelSmall
-                                      ?.copyWith(
-                                        color: _electricBlue,
-                                        fontWeight: FontWeight.bold,
-                                        fontSize: 9,
-                                      ),
-                                ),
-                              ),
+                              ],
                             ],
-                          ],
-                        ),
-                      ],
+                          ),
+                        ],
+                      ),
                     ),
-                  ),
-                );
-              },
+                  );
+                },
+              ),
             ),
           ),
         ],

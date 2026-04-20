@@ -76,7 +76,7 @@ class ChatRepository {
             .eq('room_id', roomId)
             .order('created_at', ascending: true)
             .asyncMap((List<Map<String, dynamic>> rows) async {
-              final List<MessageModel> messages = rows
+              final List<MessageModel> rawMessages = rows
                   .map(
                     (Map<String, dynamic> row) => _messageFromRemoteRow(
                       row,
@@ -84,7 +84,14 @@ class ChatRepository {
                       roomId: roomId,
                     ),
                   )
-                  .toList(growable: false);
+                  .toList();
+              
+              // DEDUPLICATION FIX: Ensure unique messages by ID
+              final Map<String, MessageModel> uniqueMap = {
+                for (var m in rawMessages) m.id: m,
+              };
+              final List<MessageModel> messages = uniqueMap.values.toList();
+              messages.sort((a, b) => a.sentAt.compareTo(b.sentAt));
 
               await _databaseService.clearCachedMessages(roomId, currentUserId);
               if (messages.isNotEmpty) {

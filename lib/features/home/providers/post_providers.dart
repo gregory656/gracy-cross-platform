@@ -168,11 +168,7 @@ class PostsNotifier extends AsyncNotifier<List<PostModel>> {
 
       // WORKAROUND: Handle ANY database schema gracefully
       final filteredPosts = newPosts.where((post) {
-        // If database has no category support, just include everything
-        // Silent Confessions will be identified by content analysis
         final content = post.content.toLowerCase();
-        
-        // Multiple detection methods for Silent Confessions
         final isConfession = 
             content.contains('confession') ||
             content.contains('silent confession') ||
@@ -180,21 +176,23 @@ class PostsNotifier extends AsyncNotifier<List<PostModel>> {
             post.authorName == null ||
             post.authorName == 'Anonymous Scion' ||
             (post.authorName?.toLowerCase().contains('anonymous') ?? false);
-        
-        // Always include confessions regardless of category field
-        if (isConfession) {
-          return true;
-        }
-        
-        // Include all other posts
-        return true;
+        return true; // Include all for now, but keeping the logic structure for future branching
       }).toList();
 
-      _posts.addAll(filteredPosts);
+      // DEDUPLICATION: Ensure no duplicates by ID
+      final Map<String, PostModel> uniqueMap = {
+        for (var p in _posts) p.id: p,
+        for (var p in filteredPosts) p.id: p,
+      };
+      
+      _posts.clear();
+      _posts.addAll(uniqueMap.values.toList());
+      _posts.sort((a, b) => b.createdAt.compareTo(a.createdAt));
+
       _offset += _limit;
       _hasMore = newPosts.length == _limit;
 
-      state = AsyncValue.data(List.from(_posts));
+      state = AsyncValue.data(List<PostModel>.from(_posts));
     } catch (e, stackTrace) {
       if (kDebugMode) {
         debugPrint('Error loading posts: $e');
