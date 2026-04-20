@@ -45,9 +45,15 @@ class OptimizedPostService {
     void Function(double progress)? onProgress,
   }) async {
     onProgress?.call(0.1);
-    final PostModel post = await _postService.createPost(content: content, imageFile: imageFile);
+    final PostModel post = await _postService.createPost(
+      content: content,
+      imageFile: imageFile,
+      category: category,
+      isAnonymous: isAnonymous,
+      extra: extra,
+    );
     onProgress?.call(1.0);
-    return post.copyWith(category: category, isAnonymous: isAnonymous, extra: extra);
+    return post;
   }
 
   Future<PostModel> toggleLike(String postId) => _postService.toggleLike(postId);

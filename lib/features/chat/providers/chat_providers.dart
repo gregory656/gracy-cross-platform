@@ -58,11 +58,11 @@ final chatThreadProvider =
       }
 
       return ref
-          .watch(chatRepositoryProvider)
+          .read(chatRepositoryProvider)
           .resolveThread(
             currentUserId: currentUserId,
             roomId: request.roomId,
-            userId: request.userId,
+            userId: request.userId ?? request.receiverId,
             receiverName: request.receiverName,
             receiverAvatar: request.receiverAvatar,
           );

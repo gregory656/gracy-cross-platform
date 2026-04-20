@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/rendering.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -37,6 +38,8 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
   String _query = '';
   bool _showPosts = true;
   String? _selectedCategory; // null means "All"
+  Timer? _feedChromeTimer;
+  bool _isFeedChromeVisible = true;
 
   @override
   void initState() {
@@ -53,6 +56,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     });
 
     _scrollController.addListener(_onScroll);
+    _scheduleFeedChromeHide();
   }
 
   Future<void> _primeHomeData() async {
@@ -78,6 +82,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
 
   @override
   void dispose() {
+    _feedChromeTimer?.cancel();
     PresenceService.instance.markOffline();
     _searchController.dispose();
     _scrollController.dispose();
@@ -88,6 +93,52 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     if (_scrollController.position.pixels >=
         _scrollController.position.maxScrollExtent - 200) {
       ref.read(postsProvider.notifier).loadMore();
+    }
+
+    if (!_scrollController.hasClients) {
+      return;
+    }
+
+    final ScrollDirection direction =
+        _scrollController.position.userScrollDirection;
+    if (direction == ScrollDirection.forward) {
+      _showFeedChrome();
+    } else if (direction == ScrollDirection.reverse &&
+        _scrollController.position.pixels > 40) {
+      _hideFeedChrome();
+    }
+  }
+
+  void _scheduleFeedChromeHide() {
+    _feedChromeTimer?.cancel();
+    _feedChromeTimer = Timer(const Duration(seconds: 3), () {
+      if (!mounted || !_showPosts) {
+        return;
+      }
+      setState(() {
+        _isFeedChromeVisible = false;
+      });
+    });
+  }
+
+  void _showFeedChrome() {
+    if (!_showPosts) {
+      return;
+    }
+    if (!_isFeedChromeVisible) {
+      setState(() {
+        _isFeedChromeVisible = true;
+      });
+    }
+    _scheduleFeedChromeHide();
+  }
+
+  void _hideFeedChrome() {
+    _feedChromeTimer?.cancel();
+    if (_isFeedChromeVisible) {
+      setState(() {
+        _isFeedChromeVisible = false;
+      });
     }
   }
 
@@ -356,14 +407,18 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
         .where((UserModel user) => user.id != headerUser.id && user.isOnline)
         .toList(growable: false);
 
-    return RefreshIndicator(
-      onRefresh: () async {
-        await ref.read(postsProvider.notifier).refresh();
-      },
-      color: const Color(0xFF00D4FF),
-      child: CustomScrollView(
-        controller: _scrollController,
-        slivers: [
+    return Listener(
+      behavior: HitTestBehavior.translucent,
+      onPointerDown: (_) => _showFeedChrome(),
+      child: RefreshIndicator(
+        onRefresh: () async {
+          _showFeedChrome();
+          await ref.read(postsProvider.notifier).refresh();
+        },
+        color: const Color(0xFF00D4FF),
+        child: CustomScrollView(
+          controller: _scrollController,
+          slivers: [
           SliverPersistentHeader(
             pinned: true,
             delegate: _PinnedHomeHeaderDelegate(
@@ -382,17 +437,35 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                 children: <Widget>[
                   _StoriesRow(currentUser: headerUser, activeUsers: activeUsers),
                   const SizedBox(height: 14),
-                  _CategoryChips(
-                    selectedCategory: _selectedCategory,
-                    onCategorySelected: _onCategorySelected,
+                  AnimatedSlide(
+                    duration: const Duration(milliseconds: 220),
+                    curve: Curves.easeOutCubic,
+                    offset: _isFeedChromeVisible
+                        ? Offset.zero
+                        : const Offset(0, -0.18),
+                    child: AnimatedOpacity(
+                      duration: const Duration(milliseconds: 180),
+                      opacity: _isFeedChromeVisible ? 1 : 0,
+                      child: IgnorePointer(
+                        ignoring: !_isFeedChromeVisible,
+                        child: Column(
+                          children: <Widget>[
+                            _CategoryChips(
+                              selectedCategory: _selectedCategory,
+                              onCategorySelected: _onCategorySelected,
+                            ),
+                            const SizedBox(height: 16),
+                            CreatePostButton(
+                              expanded: true,
+                              promptText:
+                                  "What's on your mind, ${_firstName(headerUser.fullName)}?",
+                            ),
+                            const SizedBox(height: 16),
+                          ],
+                        ),
+                      ),
+                    ),
                   ),
-                  const SizedBox(height: 16),
-                  CreatePostButton(
-                    expanded: true,
-                    promptText:
-                        "What's on your mind, ${_firstName(headerUser.fullName)}?",
-                  ),
-                  const SizedBox(height: 16),
                   if (isUploading) ...<Widget>[
                     ClipRRect(
                       borderRadius: BorderRadius.circular(999),
@@ -524,7 +597,8 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
               );
             },
           ),
-        ],
+          ],
+        ),
       ),
     );
   }

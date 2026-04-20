@@ -120,6 +120,15 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
     });
   }
 
+  void _resetOfflineBannerSoon() {
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) {
+        return;
+      }
+      ref.read(offlineBannerProvider.notifier).resetOfflineCachedContentNotice();
+    });
+  }
+
   @override
   void dispose() {
     _botTypingTimer?.cancel();
@@ -249,15 +258,6 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
         });
       }
     }
-  }
-
-  void _showOfflineCachedNotice() {
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (!mounted) {
-        return;
-      }
-      ref.read(offlineBannerProvider.notifier).showOfflineCachedContentOnce();
-    });
   }
 
   List<MessageModel> _mergeMessages(List<MessageModel> liveMessages) {
@@ -591,13 +591,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
 
                       return messagesAsync.when(
                         data: (LocalFirstData<List<MessageModel>> snapshot) {
-                          if (snapshot.isFromCache) {
-                            _showOfflineCachedNotice();
-                          } else {
-                            ref
-                                .read(offlineBannerProvider.notifier)
-                                .resetOfflineCachedContentNotice();
-                          }
+                          _resetOfflineBannerSoon();
                           final List<MessageModel> messages = _mergeMessages(
                             snapshot.data,
                           );
@@ -966,17 +960,11 @@ class _ChatShell extends ConsumerWidget {
             const SizedBox(height: 14),
             recentChatsAsync.when(
               data: (LocalFirstData<List<ChatModel>> snapshot) {
-                if (snapshot.isFromCache) {
-                  WidgetsBinding.instance.addPostFrameCallback((_) {
-                    ref
-                        .read(offlineBannerProvider.notifier)
-                        .showOfflineCachedContentOnce();
-                  });
-                } else {
+                WidgetsBinding.instance.addPostFrameCallback((_) {
                   ref
                       .read(offlineBannerProvider.notifier)
                       .resetOfflineCachedContentNotice();
-                }
+                });
                 final List<ChatModel> chats = snapshot.data
                     .where(
                       (ChatModel chat) =>
@@ -1522,12 +1510,18 @@ class _ThreadHeader extends StatelessWidget {
                   label: 'New Conversation',
                   color: const Color(0xFF007AFF),
                   onTap: () async {
-                    Navigator.of(context).pop();
+                    final GoRouter router = GoRouter.of(context);
+                    Navigator.of(sheetContext).pop();
                     // Start new conversation with GracyAI
-                    final newRoomId = DateTime.now().millisecondsSinceEpoch.toString();
-                    Navigator.of(context).pushNamedAndRemoveUntil(
-                      '/chat/$newRoomId',
-                      (route) => false,
+                    final String newRoomId =
+                        DateTime.now().millisecondsSinceEpoch.toString();
+                    router.go(
+                      AppRoutePaths.chatByRoom(
+                        chatId: newRoomId,
+                        userId: ChatRepository.botUserId,
+                        receiverName: participant.fullName,
+                        receiverAvatar: participant.avatarUrl,
+                      ),
                     );
                   },
                 ),

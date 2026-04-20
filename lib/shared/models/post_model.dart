@@ -132,6 +132,7 @@ class PostModel extends Equatable {
     bool? isAnonymous,
     Map<String, dynamic>? extra,
   }) {
+    final bool resolvedAnonymous = isAnonymous ?? this.isAnonymous;
     return PostModel(
       id: id ?? this.id,
       authorId: authorId ?? this.authorId,
@@ -142,12 +143,13 @@ class PostModel extends Equatable {
       viewCount: viewCount ?? this.viewCount,
       createdAt: createdAt ?? this.createdAt,
       updatedAt: updatedAt ?? this.updatedAt,
-      authorName: authorName ?? this.authorName,
-      authorAvatar: authorAvatar ?? this.authorAvatar,
+      authorName: resolvedAnonymous ? null : (authorName ?? this.authorName),
+      authorAvatar:
+          resolvedAnonymous ? null : (authorAvatar ?? this.authorAvatar),
       isLikedByCurrentUser: isLikedByCurrentUser ?? this.isLikedByCurrentUser,
       likesVisible: likesVisible ?? this.likesVisible,
       category: category ?? this.category,
-      isAnonymous: isAnonymous ?? this.isAnonymous,
+      isAnonymous: resolvedAnonymous,
       extra: extra ?? this.extra,
     );
   }

@@ -81,6 +81,9 @@ class PostService {
   Future<PostModel> createPost({
     required String content,
     File? imageFile,
+    String category = 'discussions',
+    bool isAnonymous = false,
+    Map<String, dynamic>? extra,
   }) async {
     try {
       final userId = _supabase.auth.currentUser?.id;
@@ -96,16 +99,26 @@ class PostService {
         userId: userId,
         content: content,
         imageUrl: imageUrl,
+        category: category,
+        isAnonymous: isAnonymous,
+        extra: extra,
       );
       final profile = await _getCurrentProfile(userId);
 
       final post = PostModel.fromMap({
         ...postDataWithProfile,
-        'author_name':
-            profile?['username'] as String? ??
-            _supabase.auth.currentUser?.userMetadata?['username']?.toString(),
-        'author_avatar': profile?['avatar_url'] as String?,
+        'author_name': isAnonymous
+            ? null
+            : profile?['username'] as String? ??
+                _supabase.auth.currentUser?.userMetadata?['username']
+                    ?.toString(),
+        'author_avatar': isAnonymous
+            ? null
+            : profile?['avatar_url'] as String?,
         'is_liked_by_current_user': false,
+        'category': postDataWithProfile['category'] ?? category,
+        'is_anonymous': postDataWithProfile['is_anonymous'] ?? isAnonymous,
+        'extra': postDataWithProfile['extra'] ?? extra,
       });
 
       // Check if this is the user's first post and trigger bot like
@@ -175,6 +188,9 @@ class PostService {
     required String userId,
     required String content,
     required String? imageUrl,
+    required String category,
+    required bool isAnonymous,
+    required Map<String, dynamic>? extra,
   }) async {
     final baseData = <String, dynamic>{
       'author_id': userId,
@@ -182,6 +198,9 @@ class PostService {
       'likes_count': 0,
       'comments_count': 0,
       'view_count': 0,
+      'category': category,
+      'is_anonymous': isAnonymous,
+      'extra': extra,
     };
     final trimmedContent = content.trim();
     final candidateColumns = trimmedContent.isEmpty
