@@ -1299,12 +1299,16 @@ class _ThreadView extends StatelessWidget {
       color: Colors.black,
       child: Column(
         children: <Widget>[
-          _ThreadHeader(
-            participant: thread.participant,
-            isVisible: isNavVisible,
-            onBack: onBack,
-            onClose: onClose,
-            onViewProfile: onViewProfile,
+          AnimatedOpacity(
+            opacity: isNavVisible ? 1.0 : 0.0,
+            duration: const Duration(milliseconds: 200),
+            child: _ThreadHeader(
+              participant: thread.participant,
+              isVisible: isNavVisible,
+              onBack: onBack,
+              onClose: onClose,
+              onViewProfile: onViewProfile,
+            ),
           ),
           Expanded(
             child: isGracyAI

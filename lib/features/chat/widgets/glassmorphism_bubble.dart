@@ -117,7 +117,7 @@ class _GlassmorphismBubbleState extends State<GlassmorphismBubble>
                   scale: _scaleAnimation.value,
                   child: Container(
                     constraints: BoxConstraints(
-                      maxWidth: MediaQuery.of(context).size.width * 0.74,
+                      maxWidth: MediaQuery.of(context).size.width * 0.7,
                     ),
                     padding: const EdgeInsets.all(12),
                     decoration: BoxDecoration(
@@ -150,6 +150,7 @@ class _GlassmorphismBubbleState extends State<GlassmorphismBubble>
                       children: [
                         Text(
                           widget.message.text,
+                          softWrap: true,
                           style: Theme.of(context).textTheme.bodyMedium
                               ?.copyWith(
                                 color: Colors.white.withValues(alpha: 0.94),

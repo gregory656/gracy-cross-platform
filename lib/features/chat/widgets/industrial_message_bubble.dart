@@ -140,117 +140,119 @@ class _IndustrialMessageBubbleState extends State<IndustrialMessageBubble>
               builder: (context, child) {
                 return Transform.scale(
                   scale: _scaleAnimation.value,
-                  child: Container(
-                    constraints: BoxConstraints(
-                      maxWidth: MediaQuery.of(context).size.width * 0.74,
-                    ),
-                    padding: const EdgeInsets.fromLTRB(16, 12, 14, 8),
-                    decoration: BoxDecoration(
-                      color: bubbleColor,
-                      borderRadius: BorderRadius.only(
-                        topLeft: const Radius.circular(22),
-                        topRight: const Radius.circular(22),
-                        bottomLeft: Radius.circular(isMe ? 22 : 8),
-                        bottomRight: Radius.circular(isMe ? 8 : 22),
+                  child: Flexible(
+                    child: Container(
+                      constraints: BoxConstraints(
+                        maxWidth: MediaQuery.of(context).size.width * 0.75,
                       ),
-                      border: isAiMessage
-                          ? Border.all(
-                              color: _electricBlue.withValues(alpha: 0.3),
-                              width: 1,
-                            )
-                          : null,
-                      boxShadow: <BoxShadow>[
-                        BoxShadow(
-                          color: Colors.black.withValues(alpha: 0.12),
-                          blurRadius: 14,
-                          offset: const Offset(0, 6),
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        color: bubbleColor,
+                        borderRadius: BorderRadius.only(
+                          topLeft: const Radius.circular(22),
+                          topRight: const Radius.circular(22),
+                          bottomLeft: Radius.circular(isMe ? 22 : 8),
+                          bottomRight: Radius.circular(isMe ? 8 : 22),
                         ),
-                        if (isAiMessage)
+                        border: isAiMessage
+                            ? Border.all(
+                                color: _electricBlue.withValues(alpha: 0.3),
+                                width: 1,
+                              )
+                            : null,
+                        boxShadow: <BoxShadow>[
                           BoxShadow(
-                            color: _electricBlue.withValues(alpha: 0.2),
-                            blurRadius: 8,
-                            spreadRadius: 1,
-                            offset: const Offset(0, 2),
+                            color: Colors.black.withValues(alpha: 0.12),
+                            blurRadius: 14,
+                            offset: const Offset(0, 6),
                           ),
-                      ],
-                    ),
-                    child: Column(
-                      crossAxisAlignment: alignment,
-                      children: [
-                        if (isAiMessage)
-                          MarkdownBody(
-                            data: widget.message.text,
-                            styleSheet: MarkdownStyleSheet(
-                              p: Theme.of(context).textTheme.bodyMedium
+                          if (isAiMessage)
+                            BoxShadow(
+                              color: _electricBlue.withValues(alpha: 0.2),
+                              blurRadius: 8,
+                              spreadRadius: 1,
+                              offset: const Offset(0, 2),
+                            ),
+                        ],
+                      ),
+                      child: Column(
+                        crossAxisAlignment: alignment,
+                        children: [
+                          if (isAiMessage)
+                            MarkdownBody(
+                              data: widget.message.text,
+                              styleSheet: MarkdownStyleSheet(
+                                p: Theme.of(context).textTheme.bodyMedium
+                                    ?.copyWith(
+                                      color: Colors.white,
+                                      fontSize: 15.5,
+                                      height: 1.42,
+                                    ),
+                                code: TextStyle(
+                                  backgroundColor: Colors.grey.withValues(
+                                    alpha: 0.2,
+                                  ),
+                                  color: Colors.cyan,
+                                  fontFamily: 'monospace',
+                                  fontSize: 13,
+                                ),
+                                codeblockDecoration: BoxDecoration(
+                                  color: Colors.grey.withValues(alpha: 0.1),
+                                  borderRadius: BorderRadius.circular(8),
+                                  border: Border.all(
+                                    color: Colors.grey.withValues(alpha: 0.3),
+                                  ),
+                                ),
+                                blockquote: TextStyle(
+                                  color: Colors.white70,
+                                  fontStyle: FontStyle.italic,
+                                ),
+                                blockquoteDecoration: BoxDecoration(
+                                  color: Colors.white.withValues(alpha: 0.05),
+                                  border: Border(
+                                    left: BorderSide(
+                                      color: _electricBlue.withValues(alpha: 0.5),
+                                      width: 3,
+                                    ),
+                                  ),
+                                ),
+                                listBullet: TextStyle(color: _electricBlue),
+                              ),
+                            )
+                          else
+                            Text(
+                              widget.message.text,
+                              style: Theme.of(context).textTheme.bodyMedium
                                   ?.copyWith(
                                     color: Colors.white,
                                     fontSize: 15.5,
                                     height: 1.42,
                                   ),
-                              code: TextStyle(
-                                backgroundColor: Colors.grey.withValues(
-                                  alpha: 0.2,
-                                ),
-                                color: Colors.cyan,
-                                fontFamily: 'monospace',
-                                fontSize: 13,
-                              ),
-                              codeblockDecoration: BoxDecoration(
-                                color: Colors.grey.withValues(alpha: 0.1),
-                                borderRadius: BorderRadius.circular(8),
-                                border: Border.all(
-                                  color: Colors.grey.withValues(alpha: 0.3),
-                                ),
-                              ),
-                              blockquote: TextStyle(
-                                color: Colors.white70,
-                                fontStyle: FontStyle.italic,
-                              ),
-                              blockquoteDecoration: BoxDecoration(
-                                color: Colors.white.withValues(alpha: 0.05),
-                                border: Border(
-                                  left: BorderSide(
-                                    color: _electricBlue.withValues(alpha: 0.5),
-                                    width: 3,
-                                  ),
-                                ),
-                              ),
-                              listBullet: TextStyle(color: _electricBlue),
                             ),
-                          )
-                        else
-                          Text(
-                            widget.message.text,
-                            style: Theme.of(context).textTheme.bodyMedium
-                                ?.copyWith(
-                                  color: Colors.white,
-                                  fontSize: 15.5,
-                                  height: 1.42,
+                          const SizedBox(height: 6),
+                          Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Text(
+                                TimezoneService.formatNairobiTime(
+                                  widget.message.sentAt,
                                 ),
-                          ),
-                        const SizedBox(height: 6),
-                        Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Text(
-                              TimezoneService.formatNairobiTime(
-                                widget.message.sentAt,
+                                style: Theme.of(context).textTheme.bodySmall
+                                    ?.copyWith(
+                                      color: isMe
+                                          ? Colors.white.withValues(alpha: 0.74)
+                                          : Colors.white54,
+                                      fontSize: 11,
+                                    ),
                               ),
-                              style: Theme.of(context).textTheme.bodySmall
-                                  ?.copyWith(
-                                    color: isMe
-                                        ? Colors.white.withValues(alpha: 0.74)
-                                        : Colors.white54,
-                                    fontSize: 11,
-                                  ),
-                            ),
-                            if (isMe) ...[
-                              const SizedBox(width: 6),
-                              _buildStatusTicks(),
+                              if (isMe) ...[
+                                const SizedBox(width: 6),
+                                _buildStatusTicks(),
+                              ],
                             ],
-                          ],
-                        ),
-                      ],
+                          ),
+                        ],
+                      ),
                     ),
                   ),
                 );
