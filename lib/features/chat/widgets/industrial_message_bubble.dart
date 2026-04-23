@@ -148,7 +148,7 @@ class _IndustrialMessageBubbleState extends State<IndustrialMessageBubble>
                     scale: _scaleAnimation.value,
                     child: Container(
                       constraints: BoxConstraints(
-                        maxWidth: MediaQuery.of(context).size.width * 0.72,
+                        maxWidth: MediaQuery.of(context).size.width * 0.75,
                       ),
                       padding: const EdgeInsets.all(12),
                       decoration: BoxDecoration(

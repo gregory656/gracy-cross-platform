@@ -194,108 +194,111 @@ class _NeuralThinkingIndicatorState extends State<NeuralThinkingIndicator>
     return AnimatedBuilder(
       animation: _shimmerAnimation,
       builder: (context, child) {
-        return Container(
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-          decoration: BoxDecoration(
-            color: const Color(0xFF1A1D29).withValues(alpha: 0.8),
-            borderRadius: const BorderRadius.only(
-              topLeft: Radius.circular(22),
-              topRight: Radius.circular(22),
-              bottomLeft: Radius.circular(8),
-              bottomRight: Radius.circular(22),
+        return Transform.scale(
+          scale: _pulseAnimation.value,
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+            decoration: BoxDecoration(
+              color: const Color(0xFF1A1D29).withValues(alpha: 0.8),
+              borderRadius: const BorderRadius.only(
+                topLeft: Radius.circular(22),
+                topRight: Radius.circular(22),
+                bottomLeft: Radius.circular(8),
+                bottomRight: Radius.circular(22),
+              ),
+              border: Border.all(
+                color: _electricBlue.withValues(alpha: 0.2),
+                width: 1,
+              ),
             ),
-            border: Border.all(
-              color: _electricBlue.withValues(alpha: 0.2),
-              width: 1,
-            ),
-          ),
-          child: ClipRRect(
-            borderRadius: const BorderRadius.only(
-              topLeft: Radius.circular(22),
-              topRight: Radius.circular(22),
-              bottomLeft: Radius.circular(8),
-              bottomRight: Radius.circular(22),
-            ),
-            child: Stack(
-              children: [
-                // Base text
-                Container(
-                  width: double.infinity,
-                  padding: const EdgeInsets.only(right: 60),
-                  child: Text(
-                    'GracyAI is thinking',
-                    style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                      color: Colors.white.withValues(alpha: 0.7),
-                      fontSize: 15.5,
+            child: ClipRRect(
+              borderRadius: const BorderRadius.only(
+                topLeft: Radius.circular(22),
+                topRight: Radius.circular(22),
+                bottomLeft: Radius.circular(8),
+                bottomRight: Radius.circular(22),
+              ),
+              child: Stack(
+                children: [
+                  // Base text
+                  Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.only(right: 60),
+                    child: Text(
+                      'GracyAI is thinking',
+                      style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                        color: Colors.white.withValues(alpha: 0.7),
+                        fontSize: 15.5,
+                      ),
                     ),
                   ),
-                ),
-                
-                // Shimmer overlay
-                Positioned.fill(
-                  child: ClipRRect(
-                    borderRadius: const BorderRadius.only(
-                      topLeft: Radius.circular(22),
-                      topRight: Radius.circular(22),
-                      bottomLeft: Radius.circular(8),
-                      bottomRight: Radius.circular(22),
-                    ),
-                    child: ShaderMask(
-                      shaderCallback: (bounds) => LinearGradient(
-                        colors: [
-                          Colors.transparent,
-                          _electricBlue.withValues(alpha: 0.3),
-                          Colors.transparent,
-                        ],
-                        stops: [_shimmerAnimation.value, _shimmerAnimation.value + 0.1, _shimmerAnimation.value + 0.2],
-                      ).createShader(bounds),
-                      child: Container(
-                        decoration: BoxDecoration(
-                          gradient: LinearGradient(
-                            colors: [
-                              Colors.transparent,
-                              _electricBlue.withValues(alpha: 0.1),
-                              Colors.transparent,
-                            ],
+                  
+                  // Shimmer overlay
+                  Positioned.fill(
+                    child: ClipRRect(
+                      borderRadius: const BorderRadius.only(
+                        topLeft: Radius.circular(22),
+                        topRight: Radius.circular(22),
+                        bottomLeft: Radius.circular(8),
+                        bottomRight: Radius.circular(22),
+                      ),
+                      child: ShaderMask(
+                        shaderCallback: (bounds) => LinearGradient(
+                          colors: [
+                            Colors.transparent,
+                            _electricBlue.withValues(alpha: 0.3),
+                            Colors.transparent,
+                          ],
+                          stops: [_shimmerAnimation.value, _shimmerAnimation.value + 0.1, _shimmerAnimation.value + 0.2],
+                        ).createShader(bounds),
+                        child: Container(
+                          decoration: BoxDecoration(
+                            gradient: LinearGradient(
+                              colors: [
+                                Colors.transparent,
+                                _electricBlue.withValues(alpha: 0.1),
+                                Colors.transparent,
+                              ],
+                            ),
                           ),
                         ),
                       ),
                     ),
                   ),
-                ),
-                
-                // Dots animation
-                Positioned(
-                  right: 16,
-                  top: 0,
-                  bottom: 0,
-                  child: Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: List.generate(3, (index) {
-                      return Padding(
-                        padding: const EdgeInsets.only(bottom: 4),
-                        child: AnimatedBuilder(
-                          animation: _pulseController,
-                          builder: (context, child) {
-                            final delay = index * 0.2;
-                            final animationValue = (_pulseController.value + delay) % 1.0;
-                            final opacity = animationValue > 0.3 && animationValue < 0.7 ? 1.0 : 0.3;
-                            
-                            return Container(
-                              width: 6,
-                              height: 6,
-                              decoration: BoxDecoration(
-                                shape: BoxShape.circle,
-                                color: _electricBlue.withValues(alpha: opacity),
-                              ),
-                            );
-                          },
-                        ),
-                      );
-                    }),
+                  
+                  // Dots animation
+                  Positioned(
+                    right: 16,
+                    top: 0,
+                    bottom: 0,
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: List.generate(3, (index) {
+                        return Padding(
+                          padding: const EdgeInsets.only(bottom: 4),
+                          child: AnimatedBuilder(
+                            animation: _pulseController,
+                            builder: (context, child) {
+                              final delay = index * 0.2;
+                              final animationValue = (_pulseController.value + delay) % 1.0;
+                              final opacity = animationValue > 0.3 && animationValue < 0.7 ? 1.0 : 0.3;
+                              
+                              return Container(
+                                width: 6,
+                                height: 6,
+                                decoration: BoxDecoration(
+                                  shape: BoxShape.circle,
+                                  color: _electricBlue.withValues(alpha: opacity),
+                                ),
+                              );
+                            },
+                          ),
+                        );
+                      }),
+                    ),
                   ),
-                ),
-              ],
+                ],
+              ),
             ),
           ),
         );

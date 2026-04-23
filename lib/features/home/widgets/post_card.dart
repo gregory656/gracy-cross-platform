@@ -15,6 +15,7 @@ import 'package:share_plus/share_plus.dart';
 import '../../../core/router/app_router.dart';
 import '../../../core/router/shell_ui_provider.dart';
 import '../../../core/theme/app_colors.dart';
+import '../../../core/theme/app_theme.dart';
 import '../../../core/utils/elite_animations.dart';
 import '../../../shared/models/post_model.dart';
 import '../../../shared/providers/auth_provider.dart';
@@ -559,17 +560,18 @@ class _PostCardState extends ConsumerState<PostCard> {
       return const SizedBox.shrink();
     }
 
-    return Container(
-      margin: const EdgeInsets.only(bottom: 8),
-      decoration: BoxDecoration(
-        color: Colors.black,
-        border: Border(
-          bottom: BorderSide(
-            color: theme.dividerTheme.color ?? const Color(0xFF222222),
-            width: 0.8,
-          ),
+    return GestureDetector(
+      onTap: () {
+        context.push('/post/${widget.post.id}');
+      },
+      child: Container(
+        margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+        decoration: BoxDecoration(
+          color: theme.colorScheme.surface,
+          borderRadius: BorderRadius.circular(12),
+          border: AppTheme.glassBorder,
+          boxShadow: AppTheme.glassmorphismShadow,
         ),
-      ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: <Widget>[
@@ -604,16 +606,21 @@ class _PostCardState extends ConsumerState<PostCard> {
                                         widget.post.authorAvatar!.isNotEmpty
                                     ? ClipRRect(
                                         borderRadius: BorderRadius.circular(20),
-                                        child: CachedNetworkImage(
-                                          imageUrl: widget.post.authorAvatar!,
-                                          fit: BoxFit.cover,
-                                          placeholder: (context, url) => Icon(
-                                            Icons.person,
-                                            color: theme.colorScheme.onSurfaceVariant,
-                                          ),
-                                          errorWidget: (context, url, error) => Icon(
-                                            Icons.person,
-                                            color: theme.colorScheme.onSurfaceVariant,
+                                        child: Hero(
+                                          tag: 'post_avatar_${widget.post.id}',
+                                          child: CachedNetworkImage(
+                                            imageUrl: widget.post.authorAvatar!,
+                                            fit: BoxFit.cover,
+                                            memCacheHeight: 150,
+                                            memCacheWidth: 150,
+                                            placeholder: (context, url) => Icon(
+                                              Icons.person,
+                                              color: theme.colorScheme.onSurfaceVariant,
+                                            ),
+                                            errorWidget: (context, url, error) => Icon(
+                                              Icons.person,
+                                              color: theme.colorScheme.onSurfaceVariant,
+                                            ),
                                           ),
                                         ),
                                       )
@@ -709,42 +716,47 @@ class _PostCardState extends ConsumerState<PostCard> {
               padding: const EdgeInsets.only(top: 12),
               child: Stack(
                 children: [
-                  CachedNetworkImage(
-                    imageUrl: widget.post.optimizedImageUrl,
-                    fit: BoxFit.cover,
-                    width: double.infinity,
-                    height: 300,
-                    placeholder: (context, url) => Container(
+                  Hero(
+                    tag: 'post_image_${widget.post.id}',
+                    child: CachedNetworkImage(
+                      imageUrl: widget.post.optimizedImageUrl,
+                      fit: BoxFit.cover,
+                      width: double.infinity,
                       height: 300,
-                      color: theme.colorScheme.surfaceContainerHighest,
-                      child: Center(
-                        child: CircularProgressIndicator(
-                          valueColor: AlwaysStoppedAnimation<Color>(
-                            theme.colorScheme.primary,
+                      memCacheHeight: 800,
+                      memCacheWidth: 800,
+                      placeholder: (context, url) => Container(
+                        height: 300,
+                        color: theme.colorScheme.surfaceContainerHighest,
+                        child: Center(
+                          child: CircularProgressIndicator(
+                            valueColor: AlwaysStoppedAnimation<Color>(
+                              theme.colorScheme.primary,
+                            ),
                           ),
                         ),
                       ),
-                    ),
-                    errorWidget: (context, url, error) => Container(
-                      height: 300,
-                      color: theme.colorScheme.surfaceContainerHighest,
-                      child: Center(
-                        child: Column(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: <Widget>[
-                            Icon(
-                              Icons.broken_image,
-                              color: theme.colorScheme.onSurfaceVariant,
-                              size: 48,
-                            ),
-                            const SizedBox(height: 8),
-                            Text(
-                              'Image unavailable',
-                              style: theme.textTheme.bodyMedium?.copyWith(
+                      errorWidget: (context, url, error) => Container(
+                        height: 300,
+                        color: theme.colorScheme.surfaceContainerHighest,
+                        child: Center(
+                          child: Column(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: <Widget>[
+                              Icon(
+                                Icons.broken_image,
                                 color: theme.colorScheme.onSurfaceVariant,
+                                size: 48,
                               ),
-                            ),
-                          ],
+                              const SizedBox(height: 8),
+                              Text(
+                                'Image unavailable',
+                                style: theme.textTheme.bodyMedium?.copyWith(
+                                  color: theme.colorScheme.onSurfaceVariant,
+                                ),
+                              ),
+                            ],
+                          ),
                         ),
                       ),
                     ),
@@ -853,6 +865,7 @@ class _PostCardState extends ConsumerState<PostCard> {
             ),
           ),
         ],
+      ),
       ),
     );
   }

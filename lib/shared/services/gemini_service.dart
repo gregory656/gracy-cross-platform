@@ -69,7 +69,7 @@ $effectivePrompt
       return text;
     } catch (e) {
       // Robust fallback UI as requested
-      return "GracyAI is taking a quick break. Live replies coming soon!";
+      return "GracyAI is recharging. Live replies back in a moment!";
     }
   }
 

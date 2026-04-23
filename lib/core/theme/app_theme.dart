@@ -11,6 +11,20 @@ class AppTheme {
     return normalized == 'light' || normalized == 'classic';
   }
 
+  static List<BoxShadow> get glassmorphismShadow => [
+        BoxShadow(
+          color: Colors.black.withValues(alpha: 0.1),
+          blurRadius: 10,
+          spreadRadius: 0,
+          offset: const Offset(0, 4),
+        )
+      ];
+
+  static Border get glassBorder => Border.all(
+        color: AppColors.borderGray.withValues(alpha: 0.1),
+        width: 1,
+      );
+
   static ThemeData resolveTheme(String themeName) {
     switch (themeName.toLowerCase()) {
       case 'light':

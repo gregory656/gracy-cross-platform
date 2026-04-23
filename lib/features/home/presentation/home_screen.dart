@@ -426,7 +426,11 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                 color: Colors.black,
                 padding: const EdgeInsets.fromLTRB(20, 8, 20, 8),
                 alignment: Alignment.bottomCenter,
-                child: HomeHeader(user: headerUser),
+                child: AnimatedOpacity(
+                  opacity: _isFeedChromeVisible ? 1.0 : 0.0,
+                  duration: const Duration(milliseconds: 300),
+                  child: HomeHeader(user: headerUser),
+                ),
               ),
             ),
           ),
@@ -585,7 +589,75 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
         ),
       ),
     );
+    Widget _buildSkeletonPost(BuildContext context) {
+    return Container(
+      margin: const EdgeInsets.only(bottom: 16),
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Theme.of(context).colorScheme.surface,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(
+          color: Colors.white.withValues(alpha: 0.05),
+        ),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Container(
+                width: 40,
+                height: 40,
+                decoration: BoxDecoration(
+                  color: Colors.white.withValues(alpha: 0.1),
+                  shape: BoxShape.circle,
+                ),
+              ),
+              const SizedBox(width: 12),
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Container(
+                    width: 120,
+                    height: 14,
+                    color: Colors.white.withValues(alpha: 0.1),
+                  ),
+                  const SizedBox(height: 6),
+                  Container(
+                    width: 80,
+                    height: 10,
+                    color: Colors.white.withValues(alpha: 0.1),
+                  ),
+                ],
+              ),
+            ],
+          ),
+          const SizedBox(height: 16),
+          Container(
+            width: double.infinity,
+            height: 12,
+            color: Colors.white.withValues(alpha: 0.1),
+          ),
+          const SizedBox(height: 8),
+          Container(
+            width: 200,
+            height: 12,
+            color: Colors.white.withValues(alpha: 0.1),
+          ),
+          const SizedBox(height: 16),
+          Container(
+            width: double.infinity,
+            height: 200,
+            decoration: BoxDecoration(
+              color: Colors.white.withValues(alpha: 0.1),
+              borderRadius: BorderRadius.circular(8),
+            ),
+          ),
+        ],
+      ),
+    );
   }
+}
 }
 
 class _ViewToggle extends StatelessWidget {
