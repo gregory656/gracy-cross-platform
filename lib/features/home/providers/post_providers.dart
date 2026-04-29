@@ -52,6 +52,7 @@ class PostsNotifier extends AsyncNotifier<List<PostModel>> {
   late final OptimizedPostService _postService;
   final List<PostModel> _posts = [];
   bool _hasMore = true;
+  bool _isLoadingMore = false;
   int _offset = 0;
   static const int _limit = 10;
 
@@ -136,10 +137,15 @@ class PostsNotifier extends AsyncNotifier<List<PostModel>> {
   }
 
   // Getters for progress tracking
+  bool get hasMore => _hasMore;
   double get progress => _currentProgress;
   String get status => _currentStatus;
 
   Future<void> _loadPosts({bool refresh = false}) async {
+    if (_isLoadingMore) {
+      return;
+    }
+
     if (refresh) {
       _offset = 0;
       _hasMore = true;
@@ -151,6 +157,8 @@ class PostsNotifier extends AsyncNotifier<List<PostModel>> {
     if (_posts.isEmpty) {
       state = const AsyncValue.loading();
     }
+
+    _isLoadingMore = true;
 
     try {
       final newPosts = await _postService.getPosts(
@@ -194,6 +202,8 @@ class PostsNotifier extends AsyncNotifier<List<PostModel>> {
         return;
       }
       state = AsyncValue.error(e, stackTrace);
+    } finally {
+      _isLoadingMore = false;
     }
   }
 
@@ -202,7 +212,7 @@ class PostsNotifier extends AsyncNotifier<List<PostModel>> {
   }
 
   Future<void> loadMore() async {
-    if (!state.isLoading && _hasMore) {
+    if (!state.isLoading && !_isLoadingMore && _hasMore) {
       await _loadPosts();
     }
   }

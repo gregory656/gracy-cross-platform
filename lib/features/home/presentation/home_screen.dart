@@ -1,5 +1,3 @@
-import 'dart:async';
-
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
@@ -38,8 +36,6 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
   String _query = '';
   bool _showPosts = true;
   String? _selectedCategory; // null means "All"
-  Timer? _feedChromeTimer;
-  bool _isFeedChromeVisible = true;
 
   @override
   void initState() {
@@ -56,7 +52,6 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     });
 
     _scrollController.addListener(_onScroll);
-    _scheduleFeedChromeHide();
   }
 
   Future<void> _primeHomeData() async {
@@ -82,7 +77,6 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
 
   @override
   void dispose() {
-    _feedChromeTimer?.cancel();
     PresenceService.instance.markOffline();
     _searchController.dispose();
     _scrollController.dispose();
@@ -90,55 +84,19 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
   }
 
   void _onScroll() {
+    if (!_scrollController.hasClients) {
+      return;
+    }
+
     if (_scrollController.position.pixels >=
         _scrollController.position.maxScrollExtent - 200) {
       ref.read(postsProvider.notifier).loadMore();
     }
 
-    if (!_scrollController.hasClients) {
-      return;
-    }
-
     final ScrollDirection direction =
         _scrollController.position.userScrollDirection;
-    if (direction == ScrollDirection.forward) {
-      _showFeedChrome();
-    } else if (direction == ScrollDirection.reverse &&
-        _scrollController.position.pixels > 40) {
-      _hideFeedChrome();
-    }
-  }
-
-  void _scheduleFeedChromeHide() {
-    _feedChromeTimer?.cancel();
-    _feedChromeTimer = Timer(const Duration(seconds: 3), () {
-      if (!mounted || !_showPosts) {
-        return;
-      }
-      setState(() {
-        _isFeedChromeVisible = false;
-      });
-    });
-  }
-
-  void _showFeedChrome() {
-    if (!_showPosts) {
+    if (direction == ScrollDirection.idle) {
       return;
-    }
-    if (!_isFeedChromeVisible) {
-      setState(() {
-        _isFeedChromeVisible = true;
-      });
-    }
-    _scheduleFeedChromeHide();
-  }
-
-  void _hideFeedChrome() {
-    _feedChromeTimer?.cancel();
-    if (_isFeedChromeVisible) {
-      setState(() {
-        _isFeedChromeVisible = false;
-      });
     }
   }
 
@@ -401,6 +359,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     List<UserModel> users,
   ) {
     final postsNotifier = ref.read(postsProvider.notifier);
+    final hasMorePosts = postsNotifier.hasMore;
     final uploadProgress = postsNotifier.progress;
     final uploadStatus = postsNotifier.status;
     final isUploading = uploadProgress > 0 && uploadProgress < 1;
@@ -410,10 +369,8 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
 
     return Listener(
       behavior: HitTestBehavior.translucent,
-      onPointerDown: (_) => _showFeedChrome(),
       child: RefreshIndicator(
         onRefresh: () async {
-          _showFeedChrome();
           await ref.read(postsProvider.notifier).refresh();
         },
         color: const Color(0xFF00D4FF),
@@ -424,11 +381,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
               child: Container(
                 color: Theme.of(context).colorScheme.surface,
                 padding: const EdgeInsets.fromLTRB(20, 12, 20, 8),
-                child: AnimatedOpacity(
-                  opacity: _isFeedChromeVisible ? 1.0 : 0.0,
-                  duration: const Duration(milliseconds: 300),
-                  child: HomeHeader(user: headerUser),
-                ),
+                child: HomeHeader(user: headerUser),
               ),
             ),
             SliverPadding(
@@ -595,7 +548,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                       }
                       return PostCard(post: posts[index]);
                     },
-                    childCount: posts.length + 1,
+                    childCount: posts.length + (hasMorePosts ? 1 : 0),
                     addAutomaticKeepAlives: true,
                     addRepaintBoundaries: true,
                   ),
