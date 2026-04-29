@@ -263,8 +263,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
             .sendMessage(
               roomId: thread.roomId,
               senderId: ChatRepository.officialBotUserId,
-              content:
-                  'Sorry, I\'m having trouble connecting right now. Please try again in a moment.',
+              content: GeminiService.offlineMaintenanceMessage,
               fallbackToCacheOnRemoteFailure: true,
             );
         ref.invalidate(messagesProvider(thread.roomId));
@@ -1030,7 +1029,7 @@ class _ChatShell extends ConsumerWidget {
                     return const _CenteredMessage(
                       title: 'No chats yet',
                       subtitle:
-                          'Use a Gracy code above to create the first room.',
+                          'Use a Gracy code above to create the first chat.',
                     );
                   }
                 }
@@ -1048,7 +1047,7 @@ class _ChatShell extends ConsumerWidget {
                           role: UserRole.staff,
                           courses: const <String>[],
                           bio:
-                              'The Official Brain of Gracy. Powered by Gemini 1.5 Pro.',
+                              'The Official Brain of Gracy. Powered by NexaGen.',
                           isOnline: true,
                           location: 'Digital Campus',
                           avatarSeed: 'GracyAI',
@@ -1059,7 +1058,7 @@ class _ChatShell extends ConsumerWidget {
                         final ChatModel gracyAiChat = ChatModel(
                           id: 'gracy-ai-chat',
                           participantId: ChatRepository.officialBotUserId,
-                          lastMessage: 'GracyAI: The Official Brain of Gracy ⚡',
+                          lastMessage: 'GracyAI: The Official Brain of Gracy ',
                           lastMessageAt: DateTime.now(),
                           unreadCount: 0,
                           roomHash: '',
@@ -1750,10 +1749,7 @@ class _ThreadHeader extends StatelessWidget {
           ),
           IconButton(
             onPressed: () => _showThreadMenu(context),
-            icon: const Icon(
-              Icons.more_vert_rounded,
-              color: Colors.white70,
-            ),
+            icon: const Icon(Icons.more_vert_rounded, color: Colors.white70),
           ),
           Consumer(
             builder: (context, ref, child) {
@@ -1761,8 +1757,7 @@ class _ThreadHeader extends StatelessWidget {
                 onPressed: () {
                   showDialog<void>(
                     context: context,
-                    builder: (context) =>
-                        const DisappearingMessagesDialog(),
+                    builder: (context) => const DisappearingMessagesDialog(),
                   );
                 },
                 icon: const Icon(Icons.timer_outlined),
@@ -1827,7 +1822,7 @@ class _TypingIndicator extends StatelessWidget {
             isOnline: true,
             location: 'Virtual',
             avatarSeed: 'bot',
-            year: '2024',
+            year: '2026',
           ),
           size: 32,
           fontSize: 12,

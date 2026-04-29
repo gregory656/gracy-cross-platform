@@ -144,11 +144,11 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
 
   Future<void> _onCategorySelected(String? category) async {
     if (_selectedCategory == category) return;
-    
+
     setState(() {
       _selectedCategory = category;
     });
-    
+
     await ref.read(postsProvider.notifier).setFeedCategory(category);
   }
 
@@ -178,10 +178,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
           ),
           title: const Text(
             'Leaving Gracy?',
-            style: TextStyle(
-              color: Colors.white,
-              fontWeight: FontWeight.w900,
-            ),
+            style: TextStyle(color: Colors.white, fontWeight: FontWeight.w900),
           ),
           content: const Text(
             'Are you sure?',
@@ -190,10 +187,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
           actions: <Widget>[
             TextButton(
               onPressed: () => Navigator.of(dialogContext).pop(false),
-              child: const Text(
-                'No',
-                style: TextStyle(color: Colors.white70),
-              ),
+              child: const Text('No', style: TextStyle(color: Colors.white70)),
             ),
             FilledButton(
               onPressed: () => Navigator.of(dialogContext).pop(true),
@@ -230,10 +224,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
 
     return PopScope(
       canPop: false,
-      onPopInvokedWithResult: (
-        bool didPop,
-        Object? result,
-      ) async {
+      onPopInvokedWithResult: (bool didPop, Object? result) async {
         if (didPop) {
           return;
         }
@@ -249,9 +240,19 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                   profilesAsync.asData?.value ?? fallbackUsers,
                 )
               : profilesAsync.when(
-                  loading: () => _buildDirectory(context, fallbackUsers, headerUser, query),
+                  loading: () => _buildDirectory(
+                    context,
+                    fallbackUsers,
+                    headerUser,
+                    query,
+                  ),
                   error: (Object error, StackTrace stackTrace) =>
-                      _buildDirectory(context, fallbackUsers, headerUser, query),
+                      _buildDirectory(
+                        context,
+                        fallbackUsers,
+                        headerUser,
+                        query,
+                      ),
                   data: (List<UserModel> users) =>
                       _buildDirectory(context, users, headerUser, query),
                 ),
@@ -373,7 +374,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
           ...filteredUsers.map((UserModel user) {
             return Padding(
               padding: const EdgeInsets.only(bottom: 16),
-                child: ProfileCard(
+              child: ProfileCard(
                 user: user,
                 onTap: () {
                   context.push('${AppRoutePaths.profile}?userId=${user.id}');
@@ -419,13 +420,10 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
         child: CustomScrollView(
           controller: _scrollController,
           slivers: [
-          SliverPersistentHeader(
-            pinned: true,
-            delegate: _PinnedHomeHeaderDelegate(
+            SliverToBoxAdapter(
               child: Container(
-                color: Colors.black,
-                padding: const EdgeInsets.fromLTRB(20, 8, 20, 8),
-                alignment: Alignment.bottomCenter,
+                color: Theme.of(context).colorScheme.surface,
+                padding: const EdgeInsets.fromLTRB(20, 12, 20, 8),
                 child: AnimatedOpacity(
                   opacity: _isFeedChromeVisible ? 1.0 : 0.0,
                   duration: const Duration(milliseconds: 300),
@@ -433,241 +431,189 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                 ),
               ),
             ),
-          ),
-          SliverPadding(
-            padding: const EdgeInsets.fromLTRB(20, 8, 20, 0),
-            sliver: SliverToBoxAdapter(
-              child: Column(
-                children: <Widget>[
-                  _StoriesRow(currentUser: headerUser, activeUsers: activeUsers),
-                  const SizedBox(height: 14),
-                  _CategoryChips(
-                    selectedCategory: _selectedCategory,
-                    onCategorySelected: _onCategorySelected,
-                  ),
-                  const SizedBox(height: 16),
-                  CreatePostButton(
-                    expanded: true,
-                    promptText:
-                        "What's on your mind, ${_firstName(headerUser.fullName)}?",
-                  ),
-                  const SizedBox(height: 16),
-                  if (isUploading) ...<Widget>[
-                    ClipRRect(
-                      borderRadius: BorderRadius.circular(999),
-                      child: LinearProgressIndicator(
-                        value: uploadProgress <= 0 ? null : uploadProgress,
-                        minHeight: 6,
-                        backgroundColor: AppColors.textSecondary.withValues(alpha: 0.2),
-                        valueColor: const AlwaysStoppedAnimation<Color>(Color(0xFF007AFF)),
-                      ),
+            SliverPadding(
+              padding: const EdgeInsets.fromLTRB(20, 8, 20, 0),
+              sliver: SliverToBoxAdapter(
+                child: Column(
+                  children: <Widget>[
+                    _StoriesRow(
+                      currentUser: headerUser,
+                      activeUsers: activeUsers,
                     ),
-                    const SizedBox(height: 8),
-                    Align(
-                      alignment: Alignment.centerLeft,
-                      child: Text(
-                        uploadStatus.isEmpty ? 'Posting...' : uploadStatus,
-                        style: Theme.of(context).textTheme.labelMedium?.copyWith(
-                          color: AppColors.textSecondary,
-                          fontWeight: FontWeight.w700,
-                        ),
-                      ),
+                    const SizedBox(height: 14),
+                    _CategoryChips(
+                      selectedCategory: _selectedCategory,
+                      onCategorySelected: _onCategorySelected,
                     ),
                     const SizedBox(height: 16),
-                  ],
-                ],
-              ),
-            ),
-          ),
-          postsAsync.when(
-            loading: () => const SliverToBoxAdapter(
-              child: Padding(
-                padding: EdgeInsets.all(32),
-                child: Center(
-                  child: CircularProgressIndicator(),
-                ),
-              ),
-            ),
-            error: (error, stackTrace) => SliverToBoxAdapter(
-              child: Padding(
-                padding: const EdgeInsets.all(32),
-                child: Center(
-                  child: Column(
-                    children: [
-                      Icon(
-                        Icons.error_outline,
-                        color: Theme.of(context).colorScheme.error,
-                        size: 48,
-                      ),
-                      const SizedBox(height: 16),
-                      Text(
-                        'Failed to load posts',
-                        style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                          color: Theme.of(context).colorScheme.onSurface,
+                    CreatePostButton(
+                      expanded: true,
+                      promptText:
+                          "What's on your mind, ${_firstName(headerUser.fullName)}?",
+                    ),
+                    const SizedBox(height: 16),
+                    if (isUploading) ...<Widget>[
+                      ClipRRect(
+                        borderRadius: BorderRadius.circular(999),
+                        child: LinearProgressIndicator(
+                          value: uploadProgress <= 0 ? null : uploadProgress,
+                          minHeight: 6,
+                          backgroundColor: AppColors.textSecondary.withValues(
+                            alpha: 0.2,
+                          ),
+                          valueColor: const AlwaysStoppedAnimation<Color>(
+                            Color(0xFF007AFF),
+                          ),
                         ),
                       ),
                       const SizedBox(height: 8),
-                      Text(
-                        error.toString(),
-                        style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                          color: Theme.of(context).colorScheme.onSurfaceVariant,
+                      Align(
+                        alignment: Alignment.centerLeft,
+                        child: Text(
+                          uploadStatus.isEmpty ? 'Posting...' : uploadStatus,
+                          style: Theme.of(context).textTheme.labelMedium
+                              ?.copyWith(
+                                color: AppColors.textSecondary,
+                                fontWeight: FontWeight.w700,
+                              ),
                         ),
-                        textAlign: TextAlign.center,
                       ),
                       const SizedBox(height: 16),
-                      ElevatedButton(
-                        onPressed: () {
-                          ref.read(postsProvider.notifier).refresh();
-                        },
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: Theme.of(context).colorScheme.primary,
-                          foregroundColor: Theme.of(context).colorScheme.onPrimary,
-                        ),
-                        child: const Text('Retry'),
-                      ),
                     ],
-                  ),
+                  ],
                 ),
               ),
             ),
-            data: (posts) {
-              if (posts.isEmpty) {
-                return SliverToBoxAdapter(
-                  child: Padding(
-                    padding: const EdgeInsets.all(32),
-                    child: Center(
-                      child: Column(
-                        children: [
-                          Icon(
-                            Icons.feed_outlined,
-                            color: Theme.of(context).colorScheme.onSurfaceVariant,
-                            size: 64,
+            postsAsync.when(
+              loading: () => const SliverToBoxAdapter(
+                child: Padding(
+                  padding: EdgeInsets.all(32),
+                  child: Center(child: CircularProgressIndicator()),
+                ),
+              ),
+              error: (error, stackTrace) => SliverToBoxAdapter(
+                child: Padding(
+                  padding: const EdgeInsets.all(32),
+                  child: Center(
+                    child: Column(
+                      children: [
+                        Icon(
+                          Icons.error_outline,
+                          color: Theme.of(context).colorScheme.error,
+                          size: 48,
+                        ),
+                        const SizedBox(height: 16),
+                        Text(
+                          'Failed to load posts',
+                          style: Theme.of(context).textTheme.titleMedium
+                              ?.copyWith(
+                                color: Theme.of(context).colorScheme.onSurface,
+                              ),
+                        ),
+                        const SizedBox(height: 8),
+                        Text(
+                          error.toString(),
+                          style: Theme.of(context).textTheme.bodyMedium
+                              ?.copyWith(
+                                color: Theme.of(
+                                  context,
+                                ).colorScheme.onSurfaceVariant,
+                              ),
+                          textAlign: TextAlign.center,
+                        ),
+                        const SizedBox(height: 16),
+                        ElevatedButton(
+                          onPressed: () {
+                            ref.read(postsProvider.notifier).refresh();
+                          },
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: Theme.of(
+                              context,
+                            ).colorScheme.primary,
+                            foregroundColor: Theme.of(
+                              context,
+                            ).colorScheme.onPrimary,
                           ),
-                          const SizedBox(height: 16),
-                          Text(
-                            'No posts yet',
-                            style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                              color: Theme.of(context).colorScheme.onSurface,
-                              fontWeight: FontWeight.w600,
-                            ),
-                          ),
-                          const SizedBox(height: 8),
-                          Text(
-                            'Be the first to create a post!',
-                            style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                              color: Theme.of(context).colorScheme.onSurfaceVariant,
-                            ),
-                          ),
-                        ],
-                      ),
+                          child: const Text('Retry'),
+                        ),
+                      ],
                     ),
                   ),
-                );
-              }
-
-              return SliverList(
-                delegate: SliverChildBuilderDelegate(
-                  (context, index) {
-                    if (index == posts.length) {
-                      return const Padding(
-                        padding: EdgeInsets.all(32),
-                        child: Center(
-                          child: CircularProgressIndicator(),
-                        ),
-                      );
-                    }
-                    return PostCard(post: posts[index]);
-                  },
-                  childCount: posts.length + 1,
-                  addAutomaticKeepAlives: true,
-                  addRepaintBoundaries: true,
                 ),
-              );
-            },
-          ),
+              ),
+              data: (posts) {
+                if (posts.isEmpty) {
+                  return SliverToBoxAdapter(
+                    child: Padding(
+                      padding: const EdgeInsets.all(32),
+                      child: Center(
+                        child: Column(
+                          children: [
+                            Icon(
+                              Icons.feed_outlined,
+                              color: Theme.of(
+                                context,
+                              ).colorScheme.onSurfaceVariant,
+                              size: 64,
+                            ),
+                            const SizedBox(height: 16),
+                            Text(
+                              'No posts yet',
+                              style: Theme.of(context).textTheme.titleLarge
+                                  ?.copyWith(
+                                    color: Theme.of(
+                                      context,
+                                    ).colorScheme.onSurface,
+                                    fontWeight: FontWeight.w600,
+                                  ),
+                            ),
+                            const SizedBox(height: 8),
+                            Text(
+                              'Be the first to create a post!',
+                              style: Theme.of(context).textTheme.bodyMedium
+                                  ?.copyWith(
+                                    color: Theme.of(
+                                      context,
+                                    ).colorScheme.onSurfaceVariant,
+                                  ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  );
+                }
+
+                return SliverList(
+                  delegate: SliverChildBuilderDelegate(
+                    (context, index) {
+                      if (index == posts.length) {
+                        return const Padding(
+                          padding: EdgeInsets.all(32),
+                          child: Center(child: CircularProgressIndicator()),
+                        );
+                      }
+                      return PostCard(post: posts[index]);
+                    },
+                    childCount: posts.length + 1,
+                    addAutomaticKeepAlives: true,
+                    addRepaintBoundaries: true,
+                  ),
+                );
+              },
+            ),
           ],
         ),
       ),
     );
-    Widget _buildSkeletonPost(BuildContext context) {
-    return Container(
-      margin: const EdgeInsets.only(bottom: 16),
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: Theme.of(context).colorScheme.surface,
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(
-          color: Colors.white.withValues(alpha: 0.05),
-        ),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              Container(
-                width: 40,
-                height: 40,
-                decoration: BoxDecoration(
-                  color: Colors.white.withValues(alpha: 0.1),
-                  shape: BoxShape.circle,
-                ),
-              ),
-              const SizedBox(width: 12),
-              Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Container(
-                    width: 120,
-                    height: 14,
-                    color: Colors.white.withValues(alpha: 0.1),
-                  ),
-                  const SizedBox(height: 6),
-                  Container(
-                    width: 80,
-                    height: 10,
-                    color: Colors.white.withValues(alpha: 0.1),
-                  ),
-                ],
-              ),
-            ],
-          ),
-          const SizedBox(height: 16),
-          Container(
-            width: double.infinity,
-            height: 12,
-            color: Colors.white.withValues(alpha: 0.1),
-          ),
-          const SizedBox(height: 8),
-          Container(
-            width: 200,
-            height: 12,
-            color: Colors.white.withValues(alpha: 0.1),
-          ),
-          const SizedBox(height: 16),
-          Container(
-            width: double.infinity,
-            height: 200,
-            decoration: BoxDecoration(
-              color: Colors.white.withValues(alpha: 0.1),
-              borderRadius: BorderRadius.circular(8),
-            ),
-          ),
-        ],
-      ),
-    );
   }
-}
 }
 
 class _ViewToggle extends StatelessWidget {
   final bool showPosts;
   final VoidCallback onToggle;
 
-  const _ViewToggle({
-    required this.showPosts,
-    required this.onToggle,
-  });
+  const _ViewToggle({required this.showPosts, required this.onToggle});
 
   @override
   Widget build(BuildContext context) {
@@ -720,10 +666,7 @@ class _ViewToggle extends StatelessWidget {
 }
 
 class _StoriesRow extends StatelessWidget {
-  const _StoriesRow({
-    required this.currentUser,
-    required this.activeUsers,
-  });
+  const _StoriesRow({required this.currentUser, required this.activeUsers});
 
   final UserModel currentUser;
   final List<UserModel> activeUsers;
@@ -801,21 +744,17 @@ class _StoryAvatar extends StatelessWidget {
                   right: -1,
                   bottom: -1,
                   child: Container(
-                      width: 18,
-                      height: 18,
-                      decoration: BoxDecoration(
-                        color: isCreateStory
-                            ? AppColors.electricBlue
-                            : const Color(0xFF4CAF50),
-                        shape: BoxShape.circle,
-                        border: Border.all(color: Colors.black, width: 2),
-                      ),
+                    width: 18,
+                    height: 18,
+                    decoration: BoxDecoration(
+                      color: isCreateStory
+                          ? AppColors.electricBlue
+                          : const Color(0xFF4CAF50),
+                      shape: BoxShape.circle,
+                      border: Border.all(color: Colors.black, width: 2),
+                    ),
                     child: isCreateStory
-                        ? const Icon(
-                            Icons.add,
-                            size: 10,
-                            color: Colors.white,
-                          )
+                        ? const Icon(Icons.add, size: 10, color: Colors.white)
                         : null,
                   ),
                 ),
@@ -842,32 +781,6 @@ class _StoryAvatar extends StatelessWidget {
 String _firstName(String fullName) {
   final List<String> parts = fullName.trim().split(RegExp(r'\s+'));
   return parts.isEmpty || parts.first.isEmpty ? 'you' : parts.first;
-}
-
-class _PinnedHomeHeaderDelegate extends SliverPersistentHeaderDelegate {
-  const _PinnedHomeHeaderDelegate({required this.child});
-
-  final Widget child;
-
-  @override
-  Widget build(
-    BuildContext context,
-    double shrinkOffset,
-    bool overlapsContent,
-  ) {
-    return child;
-  }
-
-  @override
-  double get maxExtent => 92;
-
-  @override
-  double get minExtent => 92;
-
-  @override
-  bool shouldRebuild(covariant _PinnedHomeHeaderDelegate oldDelegate) {
-    return oldDelegate.child != child;
-  }
 }
 
 class _QuickStats extends StatelessWidget {
@@ -964,18 +877,20 @@ class _CategoryChips extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return SizedBox(
-      height: 40,
+      height: 44,
       child: ListView.separated(
         scrollDirection: Axis.horizontal,
+        physics: const BouncingScrollPhysics(),
+        padding: const EdgeInsets.symmetric(horizontal: 4),
         itemCount: kFeedCategoryChips.length + 1, // +1 for "All"
-        separatorBuilder: (_, _) => const SizedBox(width: 8),
+        separatorBuilder: (_, _) => const SizedBox(width: 10),
         itemBuilder: (context, index) {
-          // "All" chip
           if (index == 0) {
             final isSelected = selectedCategory == null;
             return CategoryChip(
-              label: 'All',
-              icon: Icons.apps,
+              label: 'General',
+              icon: Icons.auto_awesome_mosaic_rounded,
+              color: AppColors.electricBlue,
               isSelected: isSelected,
               onTap: () => onCategorySelected(null),
             );
@@ -983,10 +898,11 @@ class _CategoryChips extends StatelessWidget {
 
           final category = kFeedCategoryChips[index - 1];
           final isSelected = selectedCategory == category.slug;
-          
+
           return CategoryChip(
             label: category.label,
             icon: category.icon,
+            color: category.color,
             isSelected: isSelected,
             onTap: () => onCategorySelected(category.slug),
           );
@@ -1001,12 +917,14 @@ class CategoryChip extends StatelessWidget {
     super.key,
     required this.label,
     required this.icon,
+    required this.color,
     required this.isSelected,
     required this.onTap,
   });
 
   final String label;
   final IconData icon;
+  final Color color;
   final bool isSelected;
   final VoidCallback onTap;
 
@@ -1015,32 +933,40 @@ class CategoryChip extends StatelessWidget {
     return GestureDetector(
       onTap: onTap,
       child: AnimatedContainer(
-        duration: const Duration(milliseconds: 200),
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+        duration: const Duration(milliseconds: 300),
+        curve: Curves.easeOutCubic,
+        padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 0),
         decoration: BoxDecoration(
-          color: isSelected ? AppColors.electricBlue : const Color(0xFF1A1A1A),
-          borderRadius: BorderRadius.circular(20),
+          color: isSelected
+              ? color.withValues(alpha: 0.15)
+              : const Color(0xFF13161A),
+          borderRadius: BorderRadius.circular(22),
           border: Border.all(
-            color: isSelected 
-                ? AppColors.electricBlue 
-                : Colors.white.withValues(alpha: 0.2),
+            color: isSelected ? color : Colors.white.withValues(alpha: 0.08),
+            width: isSelected ? 1.8 : 1.0,
           ),
+          boxShadow: isSelected
+              ? [
+                  BoxShadow(
+                    color: color.withValues(alpha: 0.2),
+                    blurRadius: 12,
+                    offset: const Offset(0, 4),
+                  ),
+                ]
+              : null,
         ),
         child: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(
-              icon,
-              size: 16,
-              color: isSelected ? Colors.black : Colors.white70,
-            ),
-            const SizedBox(width: 6),
+            Icon(icon, size: 18, color: isSelected ? color : Colors.white60),
+            const SizedBox(width: 8),
             Text(
               label,
               style: TextStyle(
-                color: isSelected ? Colors.black : Colors.white70,
-                fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500,
-                fontSize: 13,
+                color: isSelected ? Colors.white : Colors.white60,
+                fontWeight: isSelected ? FontWeight.w900 : FontWeight.w600,
+                fontSize: 14,
+                letterSpacing: 0.3,
               ),
             ),
           ],

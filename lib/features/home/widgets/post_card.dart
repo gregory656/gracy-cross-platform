@@ -18,6 +18,7 @@ import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/utils/elite_animations.dart';
 import '../../../shared/models/post_model.dart';
+import '../../../shared/models/feed_category.dart';
 import '../../../shared/providers/auth_provider.dart';
 import '../../../shared/services/nairobi_timezone_service.dart';
 import '../../../shared/utils/post_share_text.dart';
@@ -572,7 +573,7 @@ class _PostCardState extends ConsumerState<PostCard> {
           border: AppTheme.glassBorder,
           boxShadow: AppTheme.glassmorphismShadow,
         ),
-      child: Column(
+        child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: <Widget>[
           Padding(
@@ -692,23 +693,33 @@ class _PostCardState extends ConsumerState<PostCard> {
           // Category tag
           Padding(
             padding: const EdgeInsets.fromLTRB(12, 8, 12, 0),
-            child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-              decoration: BoxDecoration(
-                color: AppColors.electricBlue.withValues(alpha: 0.1),
-                borderRadius: BorderRadius.circular(12),
-                border: Border.all(
-                  color: AppColors.electricBlue.withValues(alpha: 0.3),
+            child: (() {
+              final chip = kFeedCategoryChips.firstWhere(
+                (c) => c.slug == widget.post.category,
+                orElse: () => kFeedCategoryChips.first,
+              );
+              final color = chip.color;
+              
+              return Container(
+                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                decoration: BoxDecoration(
+                  color: color.withValues(alpha: 0.12),
+                  borderRadius: BorderRadius.circular(14),
+                  border: Border.all(
+                    color: color.withValues(alpha: 0.3),
+                    width: 1,
+                  ),
                 ),
-              ),
-              child: Text(
-                widget.post.categoryFeedTag,
-                style: theme.textTheme.labelSmall?.copyWith(
-                  color: AppColors.electricBlue,
-                  fontWeight: FontWeight.w600,
+                child: Text(
+                  widget.post.categoryFeedTag,
+                  style: theme.textTheme.labelSmall?.copyWith(
+                    color: color,
+                    fontWeight: FontWeight.w800,
+                    letterSpacing: 0.5,
+                  ),
                 ),
-              ),
-            ),
+              );
+            })(),
           ),
 
           if (widget.post.imageUrl != null && widget.post.imageUrl!.isNotEmpty)

@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -20,6 +21,37 @@ class PostDetailScreen extends ConsumerStatefulWidget {
 }
 
 class _PostDetailScreenState extends ConsumerState<PostDetailScreen> {
+  Timer? _navTimer;
+  bool _navVisible = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _startNavTimer();
+  }
+
+  @override
+  void dispose() {
+    _navTimer?.cancel();
+    super.dispose();
+  }
+
+  void _startNavTimer() {
+    _navTimer?.cancel();
+    _navTimer = Timer(const Duration(seconds: 4), () {
+      if (mounted) {
+        setState(() => _navVisible = false);
+      }
+    });
+  }
+
+  void _onActivity() {
+    if (!_navVisible) {
+      setState(() => _navVisible = true);
+    }
+    _startNavTimer();
+  }
+
   Future<void> _reloadPost() async {
     ref.invalidate(postByIdProvider(widget.postId));
     await ref.read(postByIdProvider(widget.postId).future);
@@ -67,44 +99,60 @@ class _PostDetailScreenState extends ConsumerState<PostDetailScreen> {
       data: (post) {
         return Scaffold(
           backgroundColor: AppColors.onyx,
-          appBar: AppBar(
-            backgroundColor: AppColors.onyx,
-            foregroundColor: AppColors.pureWhite,
-            title: const Text('Shared Post'),
-            actions: <Widget>[
-              IconButton(
-                tooltip: 'Share',
-                onPressed: () {
-                  SharePlus.instance.share(
-                    ShareParams(text: buildPostShareText(post)),
-                  );
-                },
-                icon: const Icon(Icons.share_outlined),
+          extendBodyBehindAppBar: true,
+          appBar: PreferredSize(
+            preferredSize: const Size.fromHeight(kToolbarHeight),
+            child: AnimatedOpacity(
+              opacity: _navVisible ? 1.0 : 0.0,
+              duration: const Duration(milliseconds: 400),
+              child: IgnorePointer(
+                ignoring: !_navVisible,
+                child: AppBar(
+                  backgroundColor: Colors.black.withValues(alpha: 0.5),
+                  elevation: 0,
+                  foregroundColor: AppColors.pureWhite,
+                  title: const Text('Shared Post', style: TextStyle(fontWeight: FontWeight.w800)),
+                  actions: <Widget>[
+                    IconButton(
+                      tooltip: 'Share',
+                      onPressed: () {
+                        SharePlus.instance.share(
+                          ShareParams(text: buildPostShareText(post)),
+                        );
+                      },
+                      icon: const Icon(Icons.share_outlined),
+                    ),
+                  ],
+                ),
               ),
-            ],
+            ),
           ),
-          body: RefreshIndicator(
-            color: AppColors.electricBlue,
-            backgroundColor: AppColors.onyx,
-            onRefresh: _reloadPost,
-            child: ListView(
-              physics: const AlwaysScrollableScrollPhysics(),
-              padding: const EdgeInsets.fromLTRB(20, 12, 20, 32),
-              children: <Widget>[
-                const _SharedPostHeader(),
-                const SizedBox(height: 16),
-                PostCard(
-                  post: post,
-                  onPostChanged: _reloadPost,
-                  onPostDeleted: _handlePostDeleted,
-                ),
-                _JoinNetworkCard(
-                  title: _networkCardTitle(authState),
-                  description: _networkCardDescription(authState),
-                  buttonLabel: _primaryActionLabel(authState),
-                  onPressed: () => context.go(_primaryRouteFor(authState)),
-                ),
-              ],
+          body: GestureDetector(
+            onTap: _onActivity,
+            onPanDown: (_) => _onActivity(),
+            child: RefreshIndicator(
+              color: AppColors.electricBlue,
+              backgroundColor: AppColors.onyx,
+              onRefresh: _reloadPost,
+              child: ListView(
+                physics: const AlwaysScrollableScrollPhysics(),
+                padding: const EdgeInsets.fromLTRB(20, kToolbarHeight + 20, 20, 32),
+                children: <Widget>[
+                  const _SharedPostHeader(),
+                  const SizedBox(height: 16),
+                  PostCard(
+                    post: post,
+                    onPostChanged: _reloadPost,
+                    onPostDeleted: _handlePostDeleted,
+                  ),
+                  _JoinNetworkCard(
+                    title: _networkCardTitle(authState),
+                    description: _networkCardDescription(authState),
+                    buttonLabel: _primaryActionLabel(authState),
+                    onPressed: () => context.go(_primaryRouteFor(authState)),
+                  ),
+                ],
+              ),
             ),
           ),
         );

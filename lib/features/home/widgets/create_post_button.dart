@@ -6,11 +6,7 @@ import '../providers/post_providers.dart';
 import '../../../shared/models/feed_category.dart';
 
 class CreatePostButton extends ConsumerStatefulWidget {
-  const CreatePostButton({
-    super.key,
-    this.expanded = false,
-    this.promptText,
-  });
+  const CreatePostButton({super.key, this.expanded = false, this.promptText});
 
   final bool expanded;
   final String? promptText;
@@ -28,7 +24,7 @@ class _CreatePostButtonState extends ConsumerState<CreatePostButton> {
   bool _isUploading = false;
   String _selectedCategory = FeedCategories.discussions;
   bool _isAnonymous = false;
-  
+
   // Marketplace fields
   final TextEditingController _itemNameController = TextEditingController();
   final TextEditingController _priceController = TextEditingController();
@@ -36,11 +32,12 @@ class _CreatePostButtonState extends ConsumerState<CreatePostButton> {
   final TextEditingController _contactController = TextEditingController();
   final TextEditingController _locationController = TextEditingController();
   final TextEditingController _universityController = TextEditingController();
-  
+
   // Housing fields
   final TextEditingController _hostelNameController = TextEditingController();
   final TextEditingController _distanceController = TextEditingController();
-  final TextEditingController _pricePerSemesterController = TextEditingController();
+  final TextEditingController _pricePerSemesterController =
+      TextEditingController();
   bool _hasWifi = false;
   bool _hasWater = false;
 
@@ -142,7 +139,7 @@ class _CreatePostButtonState extends ConsumerState<CreatePostButton> {
 
     try {
       Map<String, dynamic>? extra;
-      
+
       if (_selectedCategory == FeedCategories.marketplace) {
         extra = {
           'item_name': _itemNameController.text.trim(),
@@ -157,20 +154,19 @@ class _CreatePostButtonState extends ConsumerState<CreatePostButton> {
           'hostel_name': _hostelNameController.text.trim(),
           'distance_from_campus': _distanceController.text.trim(),
           'price_per_semester': _pricePerSemesterController.text.trim(),
-          'amenities': {
-            'wifi': _hasWifi,
-            'water': _hasWater,
-          },
+          'amenities': {'wifi': _hasWifi, 'water': _hasWater},
         };
       }
-      
-      await ref.read(postsProvider.notifier).createPost(
-        content: content,
-        imageFile: imageToUpload,
-        category: _selectedCategory,
-        isAnonymous: _isAnonymous,
-        extra: extra,
-      );
+
+      await ref
+          .read(postsProvider.notifier)
+          .createPost(
+            content: content,
+            imageFile: imageToUpload,
+            category: _selectedCategory,
+            isAnonymous: _isAnonymous,
+            extra: extra,
+          );
 
       if (mounted) {
         messenger.clearSnackBars();
@@ -190,7 +186,7 @@ class _CreatePostButtonState extends ConsumerState<CreatePostButton> {
         if (errorMessage.trim().isEmpty) {
           errorMessage = 'Failed to create post';
         }
-        
+
         if (e.toString().contains('timeout')) {
           errorMessage = 'Upload timed out. Check your connection.';
         } else if (e.toString().contains('compression')) {
@@ -198,12 +194,9 @@ class _CreatePostButtonState extends ConsumerState<CreatePostButton> {
         } else if (e.toString().contains('upload')) {
           errorMessage = 'Upload failed. Please try again.';
         }
-        
+
         messenger.showSnackBar(
-          SnackBar(
-            content: Text(errorMessage),
-            backgroundColor: Colors.red,
-          ),
+          SnackBar(content: Text(errorMessage), backgroundColor: Colors.red),
         );
       }
     } finally {
@@ -298,323 +291,343 @@ class _CreatePostButtonState extends ConsumerState<CreatePostButton> {
     await _flushQueuedImages();
   }
 
-  void _showCategorySelector() {
-    showDialog(
+  void _showCategorySheet() {
+    showModalBottomSheet(
       context: context,
-      builder: (dialogContext) => Dialog(
-        backgroundColor: const Color(0xFF1A1A1A),
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(16),
-          side: const BorderSide(color: Color(0xFF333333)),
+      backgroundColor: Colors.transparent,
+      builder: (dialogContext) => Container(
+        padding: const EdgeInsets.fromLTRB(20, 12, 20, 24),
+        decoration: const BoxDecoration(
+          color: Color(0xFF0B0D10),
+          borderRadius: BorderRadius.vertical(top: Radius.circular(32)),
+          border: Border(top: BorderSide(color: Color(0xFF1E2228))),
         ),
-        child: Container(
-          width: MediaQuery.of(dialogContext).size.width * 0.85,
-          padding: const EdgeInsets.all(16),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              // Header
-              Row(
-                children: [
-                  Expanded(
-                    child: Text(
-                      'What are you sharing today?',
-                      style: Theme.of(dialogContext).textTheme.titleLarge?.copyWith(
-                        color: Colors.white,
-                        fontWeight: FontWeight.w600,
-                      ),
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                  ),
-                  const SizedBox(width: 8),
-                  IconButton(
-                    onPressed: () => Navigator.of(dialogContext).pop(),
-                    icon: const Icon(Icons.close, color: Colors.white),
-                  ),
-                ],
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Container(
+              width: 40,
+              height: 4,
+              decoration: BoxDecoration(
+                color: Colors.white.withValues(alpha: 0.1),
+                borderRadius: BorderRadius.circular(2),
               ),
-              const SizedBox(height: 20),
-              
-              // Category options
-              ...kFeedCategoryChips.map((category) => Padding(
-                padding: const EdgeInsets.only(bottom: 12),
-                child: _CategoryOption(
-                  category: category,
-                  onTap: () {
-                    Navigator.of(dialogContext).pop();
-                    setState(() {
-                      _selectedCategory = category.slug;
-                      _isAnonymous = category.slug == FeedCategories.silentConfessions;
-                    });
-                    _showCreatePostDialog();
-                  },
-                ),
-              )),
-            ],
-          ),
+            ),
+            const SizedBox(height: 24),
+            const Text(
+              'Share with Gracy',
+              style: TextStyle(
+                color: Colors.white,
+                fontSize: 22,
+                fontWeight: FontWeight.w900,
+                letterSpacing: -0.5,
+              ),
+            ),
+            const SizedBox(height: 8),
+            const Text(
+              'Select a category to reach the right people.',
+              style: TextStyle(color: Colors.white38, fontSize: 14),
+            ),
+            const SizedBox(height: 32),
+            Flexible(
+              child: GridView.count(
+                crossAxisCount: 2,
+                shrinkWrap: true,
+                mainAxisSpacing: 12,
+                crossAxisSpacing: 12,
+                childAspectRatio: 2.2,
+                children: kFeedCategoryChips
+                    .map(
+                      (category) => Material(
+                        color: Colors.white.withValues(alpha: 0.03),
+                        borderRadius: BorderRadius.circular(20),
+                        child: InkWell(
+                          borderRadius: BorderRadius.circular(20),
+                          onTap: () {
+                            Navigator.of(dialogContext).pop();
+                            setState(() {
+                              _selectedCategory = category.slug;
+                              _isAnonymous =
+                                  category.slug ==
+                                  FeedCategories.silentConfessions;
+                            });
+                            _showCreatePostSheet();
+                          },
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 16),
+                            decoration: BoxDecoration(
+                              border: Border.all(
+                                color: Colors.white.withValues(alpha: 0.05),
+                              ),
+                              borderRadius: BorderRadius.circular(20),
+                            ),
+                            child: Row(
+                              children: [
+                                Icon(
+                                  category.icon,
+                                  color: category.color,
+                                  size: 24,
+                                ),
+                                const SizedBox(width: 12),
+                                Expanded(
+                                  child: Text(
+                                    category.label,
+                                    style: const TextStyle(
+                                      color: Colors.white,
+                                      fontWeight: FontWeight.w700,
+                                      fontSize: 13,
+                                    ),
+                                    overflow: TextOverflow.ellipsis,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                      ),
+                    )
+                    .toList(),
+              ),
+            ),
+          ],
         ),
       ),
     );
   }
 
-  void _showCreatePostDialog() {
-    showDialog(
+  void _showCreatePostSheet() {
+    showModalBottomSheet(
       context: context,
-      barrierDismissible: false, // Prevent accidental dismissal during upload
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
       builder: (dialogContext) => StatefulBuilder(
         builder: (dialogContext, dialogSetState) {
           _dialogSetState = dialogSetState;
+          final keyboardHeight = MediaQuery.of(dialogContext).viewInsets.bottom;
+          final totalHeight = MediaQuery.of(dialogContext).size.height;
+          final sheetHeight = totalHeight * 0.9;
 
-          return Dialog(
-            backgroundColor: const Color(0xFF1A1A1A),
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(16),
-              side: const BorderSide(color: Color(0xFF333333)),
+          return Container(
+            height: sheetHeight,
+            decoration: const BoxDecoration(
+              color: Color(0xFF0B0D10),
+              borderRadius: BorderRadius.vertical(top: Radius.circular(32)),
+              border: Border(top: BorderSide(color: Color(0xFF1E2228))),
             ),
-            child: SingleChildScrollView(
-              child: Container(
-                width: MediaQuery.of(dialogContext).size.width * 0.85,
-                padding: const EdgeInsets.all(12),
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    // Header
-                    Row(
-                      children: [
-                        Expanded(
-                          child: Text(
-                            'Create ${feedCategoryLabelForSlug(_selectedCategory)}',
-                            style: Theme.of(dialogContext).textTheme.titleLarge?.copyWith(
-                              color: Colors.white,
-                              fontWeight: FontWeight.w600,
-                            ),
-                            overflow: TextOverflow.ellipsis,
-                          ),
-                        ),
-                        const SizedBox(width: 8),
-                        IconButton(
-                          onPressed: _isUploading
-                              ? null
-                              : () => _discardDraft(dialogContext),
-                          icon: const Icon(Icons.close, color: Colors.white),
-                        ),
-                      ],
-                    ),
-                    
-                    const SizedBox(height: 12),
-                    
-                    // Content Input
-                    TextField(
-                      controller: _contentController,
-                      style: const TextStyle(color: Colors.white),
-                      decoration: InputDecoration(
-                        hintText: _isAnonymous ? 'Share your confession anonymously...' : 'What\'s on your mind?',
-                        hintStyle: TextStyle(color: Colors.grey[400]),
-                        border: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(12),
-                          borderSide: const BorderSide(color: Color(0xFF333333)),
-                        ),
-                        enabledBorder: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(12),
-                          borderSide: const BorderSide(color: Color(0xFF333333)),
-                        ),
-                        focusedBorder: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(12),
-                          borderSide: const BorderSide(color: Color(0xFF444444)),
-                        ),
-                        contentPadding: const EdgeInsets.all(16),
-                      ),
-                      maxLines: 5,
-                      minLines: 3,
-                      readOnly: _isUploading, // Disable input during upload
-                    ),
-                    
-                    const SizedBox(height: 12),
-                    
-                    // Category-specific fields
-                    if (_selectedCategory == FeedCategories.marketplace) ...[
-                      _MarketplaceForm(
-                        itemNameController: _itemNameController,
-                        priceController: _priceController,
-                        conditionController: _conditionController,
-                        contactController: _contactController,
-                        locationController: _locationController,
-                        universityController: _universityController,
-                      ),
-                      const SizedBox(height: 12),
-                    ] else if (_selectedCategory == FeedCategories.housing) ...[
-                      _HousingForm(
-                        hostelNameController: _hostelNameController,
-                        distanceController: _distanceController,
-                        pricePerSemesterController: _pricePerSemesterController,
-                        hasWifi: _hasWifi,
-                        hasWater: _hasWater,
-                        onWifiChanged: (value) => setState(() => _hasWifi = value),
-                        onWaterChanged: (value) => setState(() => _hasWater = value),
-                      ),
-                      const SizedBox(height: 12),
-                    ],
-                    
-                    // Image Preview / Picker
-                    if (_selectedImage != null)
-                      Container(
-                        height: 150,
-                        width: double.infinity,
-                        decoration: BoxDecoration(
-                          borderRadius: BorderRadius.circular(12),
-                          border: Border.all(color: const Color(0xFF333333)),
-                        ),
-                        child: Stack(
-                          children: [
-                            ClipRRect(
-                              borderRadius: BorderRadius.circular(12),
-                              child: Image.file(
-                                _selectedImage!,
-                                fit: BoxFit.cover,
-                                width: double.infinity,
-                                height: double.infinity,
-                                cacheWidth: 1080,
-                                filterQuality: FilterQuality.low,
-                              ),
-                            ),
-                            Positioned(
-                              top: 8,
-                              right: 8,
-                              child: GestureDetector(
-                                onTap: _isUploading
-                                    ? null
-                                    : () async {
-                                        final previous = _selectedImage;
-                                        setState(() {
-                                          _selectedImage = null;
-                                        });
-                                        _refreshDialog();
-                                        _queueTemporaryImage(previous);
-                                      },
-                                child: Container(
-                                  width: 32,
-                                  height: 32,
-                                  decoration: const BoxDecoration(
-                                    color: Colors.black54,
-                                    shape: BoxShape.circle,
-                                  ),
-                                  child: const Icon(
-                                    Icons.close,
-                                    color: Colors.white,
-                                    size: 18,
-                                  ),
-                                ),
-                              ),
-                            ),
-                          ],
-                        ),
-                      )
-                    else
-                      GestureDetector(
-                        onTap: _isUploading ? null : _pickImage,
-                        child: Container(
-                          height: 100,
-                          width: double.infinity,
-                          decoration: BoxDecoration(
-                            color: const Color(0xFF0A0A0A),
-                            borderRadius: BorderRadius.circular(12),
-                            border: Border.all(
-                              color: const Color(0xFF333333),
-                              style: BorderStyle.solid,
-                            ),
-                          ),
-                      child: Column(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          Icon(
-                            Icons.add_photo_alternate_outlined,
-                            size: 40,
-                            color: _isUploading ? Colors.grey[600] : Colors.grey[400],
-                          ),
-                          const SizedBox(height: 8),
-                          Text(
-                            'Add Photo',
-                            style: TextStyle(
-                              color: _isUploading ? Colors.grey[600] : Colors.grey[400],
-                              fontSize: 16,
-                            ),
-                          ),
-                          const SizedBox(height: 4),
-                          Text(
-                            'Tap to attach',
-                            style: TextStyle(
-                              color: _isUploading ? Colors.grey[700] : Colors.grey[500],
-                              fontSize: 12,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ),
-                
+            child: Column(
+              children: [
+                // Minimal Handle
                 const SizedBox(height: 12),
-                
-                // Action Buttons
-                Row(
-                  children: [
-                    Expanded(
-                      child: OutlinedButton(
+                Container(
+                  width: 40,
+                  height: 4,
+                  decoration: BoxDecoration(
+                    color: Colors.white.withValues(alpha: 0.1),
+                    borderRadius: BorderRadius.circular(2),
+                  ),
+                ),
+
+                // Header Actions
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      TextButton(
                         onPressed: _isUploading
                             ? null
                             : () => _discardDraft(dialogContext),
-                        style: OutlinedButton.styleFrom(
-                          side: const BorderSide(color: Color(0xFF333333)),
-                          padding: const EdgeInsets.symmetric(vertical: 16),
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(12),
-                          ),
-                        ),
-                        child: Text(
+                        child: const Text(
                           'Cancel',
-                          style: TextStyle(
-                            color: _isUploading ? Colors.grey[600] : Colors.grey[400],
-                            fontWeight: FontWeight.w600,
-                          ),
+                          style: TextStyle(color: Colors.white70),
                         ),
                       ),
-                    ),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: ElevatedButton(
+                      Text(
+                        'New ${feedCategoryLabelForSlug(_selectedCategory)}',
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 17,
+                          fontWeight: FontWeight.w800,
+                        ),
+                      ),
+                      ElevatedButton(
                         onPressed: _isUploading
                             ? null
                             : () => _createPost(dialogContext),
                         style: ElevatedButton.styleFrom(
                           backgroundColor: _fabColor,
-                          foregroundColor: Colors.black,
-                          padding: const EdgeInsets.symmetric(vertical: 16),
+                          foregroundColor: Colors.white,
+                          elevation: 0,
                           shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(12),
+                            borderRadius: BorderRadius.circular(20),
                           ),
-                          disabledBackgroundColor: Colors.grey[600],
+                          padding: const EdgeInsets.symmetric(horizontal: 24),
                         ),
                         child: _isUploading
                             ? const SizedBox(
-                                width: 20,
-                                height: 20,
+                                width: 16,
+                                height: 16,
                                 child: CircularProgressIndicator(
                                   strokeWidth: 2,
-                                  valueColor: AlwaysStoppedAnimation<Color>(Colors.black),
+                                  color: Colors.white,
                                 ),
                               )
                             : const Text(
                                 'Post',
-                                style: TextStyle(
-                                  fontWeight: FontWeight.w600,
-                                ),
+                                style: TextStyle(fontWeight: FontWeight.w900),
                               ),
                       ),
+                    ],
+                  ),
+                ),
+
+                Expanded(
+                  child: SingleChildScrollView(
+                    keyboardDismissBehavior:
+                        ScrollViewKeyboardDismissBehavior.onDrag,
+                    padding: const EdgeInsets.all(20),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        // Caption takes ~60% of focus
+                        TextField(
+                          controller: _contentController,
+                          maxLines: null,
+                          autofocus: true,
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 18,
+                            height: 1.5,
+                          ),
+                          decoration: InputDecoration(
+                            hintText: _isAnonymous
+                                ? 'Speak your mind anonymously...'
+                                : 'What\'s on your mind?',
+                            hintStyle: TextStyle(
+                              color: Colors.white.withValues(alpha: 0.3),
+                            ),
+                            border: InputBorder.none,
+                          ),
+                          readOnly: _isUploading,
+                        ),
+
+                        const SizedBox(height: 24),
+
+                        // Form Metadata if applicable
+                        if (_selectedCategory ==
+                            FeedCategories.marketplace) ...[
+                          _MarketplaceForm(
+                            itemNameController: _itemNameController,
+                            priceController: _priceController,
+                            conditionController: _conditionController,
+                            contactController: _contactController,
+                            locationController: _locationController,
+                            universityController: _universityController,
+                          ),
+                        ] else if (_selectedCategory ==
+                            FeedCategories.housing) ...[
+                          _HousingForm(
+                            hostelNameController: _hostelNameController,
+                            distanceController: _distanceController,
+                            pricePerSemesterController:
+                                _pricePerSemesterController,
+                            hasWifi: _hasWifi,
+                            hasWater: _hasWater,
+                            onWifiChanged: (value) =>
+                                setState(() => _hasWifi = value),
+                            onWaterChanged: (value) =>
+                                setState(() => _hasWater = value),
+                          ),
+                        ],
+
+                        const SizedBox(height: 20),
+
+                        // Large Image Preview (30% vertical weight)
+                        if (_selectedImage != null)
+                          ClipRRect(
+                            borderRadius: BorderRadius.circular(24),
+                            child: Stack(
+                              children: [
+                                AspectRatio(
+                                  aspectRatio: 4 / 3,
+                                  child: Image.file(
+                                    _selectedImage!,
+                                    fit: BoxFit.cover,
+                                  ),
+                                ),
+                                Positioned(
+                                  top: 12,
+                                  right: 12,
+                                  child: GestureDetector(
+                                    onTap: _isUploading
+                                        ? null
+                                        : () {
+                                            final previous = _selectedImage;
+                                            setState(
+                                              () => _selectedImage = null,
+                                            );
+                                            _refreshDialog();
+                                            _queueTemporaryImage(previous);
+                                          },
+                                    child: Container(
+                                      padding: const EdgeInsets.all(6),
+                                      decoration: const BoxDecoration(
+                                        color: Colors.black54,
+                                        shape: BoxShape.circle,
+                                      ),
+                                      child: const Icon(
+                                        Icons.close,
+                                        color: Colors.white,
+                                        size: 20,
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          )
+                        else
+                          GestureDetector(
+                            onTap: _isUploading ? null : _pickImage,
+                            child: Container(
+                              height: keyboardHeight > 0 ? 100 : 200,
+                              width: double.infinity,
+                              decoration: BoxDecoration(
+                                color: Colors.white.withValues(alpha: 0.03),
+                                borderRadius: BorderRadius.circular(24),
+                                border: Border.all(
+                                  color: Colors.white.withValues(alpha: 0.08),
+                                  width: 2,
+                                  style: BorderStyle.solid,
+                                ),
+                              ),
+                              child: Column(
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                children: [
+                                  Icon(
+                                    Icons.add_photo_alternate_rounded,
+                                    size: 48,
+                                    color: _fabColor.withValues(alpha: 0.8),
+                                  ),
+                                  const SizedBox(height: 12),
+                                  const Text(
+                                    'Enhance with Photo',
+                                    style: TextStyle(
+                                      color: Colors.white70,
+                                      fontWeight: FontWeight.bold,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ),
+
+                        SizedBox(height: keyboardHeight + 20),
+                      ],
                     ),
-                  ],
+                  ),
                 ),
-                  ],
-                ),
-              ),
+              ],
             ),
           );
         },
@@ -627,14 +640,15 @@ class _CreatePostButtonState extends ConsumerState<CreatePostButton> {
   @override
   Widget build(BuildContext context) {
     final postsAsync = ref.watch(postsProvider);
-    final isUploading = postsAsync is AsyncLoading ||
+    final isUploading =
+        postsAsync is AsyncLoading ||
         (postsAsync.hasValue && ref.read(postsProvider.notifier).progress > 0);
 
     if (widget.expanded) {
       return Material(
         color: Colors.transparent,
         child: InkWell(
-          onTap: isUploading ? null : _showCategorySelector,
+          onTap: isUploading ? null : _showCategorySheet,
           borderRadius: BorderRadius.circular(28),
           child: Container(
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
@@ -680,7 +694,7 @@ class _CreatePostButtonState extends ConsumerState<CreatePostButton> {
     return Material(
       color: Colors.transparent,
       child: IconButton(
-        onPressed: isUploading ? null : _showCreatePostDialog,
+        onPressed: isUploading ? null : _showCategorySheet,
         tooltip: 'Create post',
         style: IconButton.styleFrom(
           backgroundColor: Colors.transparent,
@@ -688,80 +702,7 @@ class _CreatePostButtonState extends ConsumerState<CreatePostButton> {
           disabledForegroundColor: Colors.grey[600],
           minimumSize: const Size(48, 48),
         ),
-        icon: const Icon(
-          Icons.attach_file,
-          size: 26,
-        ),
-      ),
-    );
-  }
-}
-
-class _CategoryOption extends StatelessWidget {
-  const _CategoryOption({
-    required this.category,
-    required this.onTap,
-  });
-
-  final FeedCategoryChip category;
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    return GestureDetector(
-      onTap: onTap,
-      child: Container(
-        padding: const EdgeInsets.all(16),
-        decoration: BoxDecoration(
-          color: const Color(0xFF2D2D2D),
-          borderRadius: BorderRadius.circular(12),
-          border: Border.all(color: Colors.white.withValues(alpha: 0.1)),
-        ),
-        child: Row(
-          children: [
-            Container(
-              padding: const EdgeInsets.all(8),
-              decoration: BoxDecoration(
-                color: const Color(0xFF007AFF).withValues(alpha: 0.1),
-                borderRadius: BorderRadius.circular(8),
-              ),
-              child: Icon(
-                category.icon,
-                color: const Color(0xFF007AFF),
-                size: 20,
-              ),
-            ),
-            const SizedBox(width: 12),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    category.label,
-                    style: const TextStyle(
-                      color: Colors.white,
-                      fontWeight: FontWeight.w600,
-                      fontSize: 16,
-                    ),
-                  ),
-                  const SizedBox(height: 2),
-                  Text(
-                    category.tag,
-                    style: TextStyle(
-                      color: Colors.grey[400],
-                      fontSize: 12,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-            Icon(
-              Icons.arrow_forward_ios,
-              color: Colors.grey[400],
-              size: 16,
-            ),
-          ],
-        ),
+        icon: const Icon(Icons.attach_file, size: 26),
       ),
     );
   }
@@ -798,7 +739,7 @@ class _MarketplaceForm extends StatelessWidget {
           ),
         ),
         const SizedBox(height: 12),
-        
+
         // Item Name
         TextField(
           controller: itemNameController,
@@ -824,7 +765,7 @@ class _MarketplaceForm extends StatelessWidget {
           ),
         ),
         const SizedBox(height: 12),
-        
+
         // Price
         TextField(
           controller: priceController,
@@ -850,7 +791,7 @@ class _MarketplaceForm extends StatelessWidget {
           ),
         ),
         const SizedBox(height: 12),
-        
+
         // Condition
         TextField(
           controller: conditionController,
@@ -876,7 +817,7 @@ class _MarketplaceForm extends StatelessWidget {
           ),
         ),
         const SizedBox(height: 12),
-        
+
         // Contact
         TextField(
           controller: contactController,
@@ -902,7 +843,7 @@ class _MarketplaceForm extends StatelessWidget {
           ),
         ),
         const SizedBox(height: 12),
-        
+
         // Location
         TextField(
           controller: locationController,
@@ -928,7 +869,7 @@ class _MarketplaceForm extends StatelessWidget {
           ),
         ),
         const SizedBox(height: 12),
-        
+
         // University
         TextField(
           controller: universityController,
@@ -991,7 +932,7 @@ class _HousingForm extends StatelessWidget {
           ),
         ),
         const SizedBox(height: 12),
-        
+
         // Hostel Name
         TextField(
           controller: hostelNameController,
@@ -1017,7 +958,7 @@ class _HousingForm extends StatelessWidget {
           ),
         ),
         const SizedBox(height: 12),
-        
+
         // Distance from Campus
         TextField(
           controller: distanceController,
@@ -1043,7 +984,7 @@ class _HousingForm extends StatelessWidget {
           ),
         ),
         const SizedBox(height: 12),
-        
+
         // Price per Semester
         TextField(
           controller: pricePerSemesterController,
@@ -1069,7 +1010,7 @@ class _HousingForm extends StatelessWidget {
           ),
         ),
         const SizedBox(height: 12),
-        
+
         // Amenities
         Text(
           'Amenities',
@@ -1080,7 +1021,7 @@ class _HousingForm extends StatelessWidget {
           ),
         ),
         const SizedBox(height: 8),
-        
+
         Row(
           children: [
             Expanded(

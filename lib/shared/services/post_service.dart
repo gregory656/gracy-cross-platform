@@ -1,9 +1,10 @@
 import 'dart:io';
-
 import 'package:cloudinary_public/cloudinary_public.dart';
 import 'package:flutter/foundation.dart';
+import 'package:flutter_image_compress/flutter_image_compress.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:path_provider/path_provider.dart';
 import '../models/post_model.dart';
 import '../../core/secrets.dart';
 
@@ -676,14 +677,31 @@ class PostService {
     try {
       final XFile? pickedFile = await _imagePicker.pickImage(
         source: ImageSource.gallery,
-        maxWidth: 1920,
-        maxHeight: 1080,
-        imageQuality: 85,
       );
 
       return pickedFile != null ? File(pickedFile.path) : null;
     } catch (e) {
       throw Exception('Failed to pick image: $e');
+    }
+  }
+
+  Future<File?> compressSelectedImage(File file) async {
+    try {
+      final String filePath = file.absolute.path;
+      final String outPath =
+          '${(await getTemporaryDirectory()).path}/${DateTime.now().millisecondsSinceEpoch}.webp';
+
+      final XFile? result = await FlutterImageCompress.compressAndGetFile(
+        filePath,
+        outPath,
+        quality: 95,
+        format: CompressFormat.webp,
+      );
+
+      return result != null ? File(result.path) : null;
+    } catch (e) {
+      debugPrint('Compression error: $e');
+      return file; // Fallback to original
     }
   }
 

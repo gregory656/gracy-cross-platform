@@ -12,7 +12,6 @@ import '../../../shared/providers/offline_banner_provider.dart';
 import '../../../shared/services/post_service.dart';
 import '../../../shared/services/optimized_post_service.dart';
 
-
 final postServiceProvider = Provider<PostService>((ref) {
   return PostService();
 });
@@ -28,12 +27,10 @@ final postByIdProvider = FutureProvider.autoDispose.family<PostModel, String>((
   return ref.read(optimizedPostServiceProvider).getPostById(postId);
 });
 
-final userPostsProvider = FutureProvider.autoDispose.family<List<PostModel>, String>((
-  ref,
-  String userId,
-) {
-  return ref.read(optimizedPostServiceProvider).getPostsByAuthor(userId);
-});
+final userPostsProvider = FutureProvider.autoDispose
+    .family<List<PostModel>, String>((ref, String userId) {
+      return ref.read(optimizedPostServiceProvider).getPostsByAuthor(userId);
+    });
 
 final totalReachProvider = FutureProvider.autoDispose.family<int, String>((
   ref,
@@ -88,14 +85,16 @@ class PostsNotifier extends AsyncNotifier<List<PostModel>> {
     _detachRealtime();
     final SupabaseClient client = Supabase.instance.client;
     _postsChannel = client.channel('home_feed_${_feedCategory ?? 'all'}');
-    _postsChannel!.onPostgresChanges(
-      event: PostgresChangeEvent.insert,
-      schema: 'public',
-      table: 'posts',
-      callback: (PostgresChangePayload payload) {
-        unawaited(_onRealtimeInsert(payload));
-      },
-    ).subscribe();
+    _postsChannel!
+        .onPostgresChanges(
+          event: PostgresChangeEvent.insert,
+          schema: 'public',
+          table: 'posts',
+          callback: (PostgresChangePayload payload) {
+            unawaited(_onRealtimeInsert(payload));
+          },
+        )
+        .subscribe();
   }
 
   Future<void> _onRealtimeInsert(PostgresChangePayload payload) async {
@@ -110,7 +109,7 @@ class PostsNotifier extends AsyncNotifier<List<PostModel>> {
     if (_posts.any((PostModel p) => p.id == id)) {
       return;
     }
-    
+
     // Additional check: if this is the current user's own post, don't add it again
     final String? currentUserId = Supabase.instance.client.auth.currentUser?.id;
     if (currentUserId != null && record['author_id'] == currentUserId) {
@@ -159,32 +158,23 @@ class PostsNotifier extends AsyncNotifier<List<PostModel>> {
         offset: _offset,
         categoryFilter: _feedCategory,
       );
-      
-      ref.read(offlineBannerProvider.notifier).resetOfflineCachedContentNotice();
+
+      ref
+          .read(offlineBannerProvider.notifier)
+          .resetOfflineCachedContentNotice();
 
       if (refresh) {
         _posts.clear();
       }
 
-      // WORKAROUND: Handle ANY database schema gracefully
-      final filteredPosts = newPosts.where((post) {
-        final content = post.content.toLowerCase();
-        final isConfession = 
-            content.contains('confession') ||
-            content.contains('silent confession') ||
-            content.contains('anonymous confession') ||
-            post.authorName == null ||
-            post.authorName == 'Anonymous Scion' ||
-            (post.authorName?.toLowerCase().contains('anonymous') ?? false);
-        return true; // Include all for now, but keeping the logic structure for future branching
-      }).toList();
+      final List<PostModel> filteredPosts = List<PostModel>.from(newPosts);
 
       // DEDUPLICATION: Ensure no duplicates by ID
       final Map<String, PostModel> uniqueMap = {
         for (var p in _posts) p.id: p,
         for (var p in filteredPosts) p.id: p,
       };
-      
+
       _posts.clear();
       _posts.addAll(uniqueMap.values.toList());
       _posts.sort((a, b) => b.createdAt.compareTo(a.createdAt));
@@ -197,7 +187,7 @@ class PostsNotifier extends AsyncNotifier<List<PostModel>> {
       if (kDebugMode) {
         debugPrint('Error loading posts: $e');
       }
-      
+
       if (_posts.isNotEmpty) {
         ref.read(offlineBannerProvider.notifier).showOfflineCachedContentOnce();
         state = AsyncValue.data(List<PostModel>.from(_posts));
@@ -314,7 +304,9 @@ class PostsNotifier extends AsyncNotifier<List<PostModel>> {
 
     if (index != -1) {
       originalPost = _posts[index];
-      _posts[index] = originalPost.copyWith(viewCount: originalPost.viewCount + 1);
+      _posts[index] = originalPost.copyWith(
+        viewCount: originalPost.viewCount + 1,
+      );
       state = AsyncValue.data(List<PostModel>.from(_posts));
     }
 

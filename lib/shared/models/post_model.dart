@@ -173,11 +173,12 @@ class PostModel extends Equatable {
   bool get isProjectsCategory => category == FeedCategories.projects;
 
   String get optimizedImageUrl {
-    if (imageUrl == null) return '';
+    if (imageUrl == null || imageUrl!.isEmpty) return '';
     if (imageUrl!.contains('cloudinary.com')) {
       return '$imageUrl?q_auto,f_auto,w_1080';
     }
-    return imageUrl!;
+    // High-resolution view modifier for flagship experience as requested
+    return '$imageUrl?width=1000&quality=90';
   }
 
   @override

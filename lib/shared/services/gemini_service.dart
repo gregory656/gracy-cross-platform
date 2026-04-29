@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:google_generative_ai/google_generative_ai.dart';
 
 import '../../core/constants_local.dart';
@@ -19,13 +20,17 @@ class GeminiService {
   factory GeminiService() => instance;
 
   static GeminiService get instance => _instance ??= GeminiService._();
+  static const String offlineMaintenanceMessage =
+      'AI is offline for maintenance. Please try again shortly.';
 
   String get _apiKey {
-    // PRIMARY KEY: Hardcoded for guaranteed activation as per Gracy specs
-    return 'AIzaSyA99NwmH93VvC3_9yBQjbb8tdejAgGaPqw';
+    if (_dartDefineApiKey.trim().isNotEmpty) {
+      return _dartDefineApiKey.trim();
+    }
+    return SupabaseLocalConfig.geminiApiKey.trim();
   }
 
-  bool get isConfigured => true;
+  bool get isConfigured => _apiKey.isNotEmpty;
 
   Future<String> generateResponse(
     String prompt, {
@@ -37,23 +42,39 @@ class GeminiService {
       return 'I am here. Send me a message and I will jump in.';
     }
 
+    if (!isConfigured) {
+      return offlineMaintenanceMessage;
+    }
+
     try {
       final GenerativeModel model = GenerativeModel(
-        model: 'gemini-1.5-flash',
+        model: _defaultModel,
         apiKey: _apiKey,
+        generationConfig: GenerationConfig(
+          temperature: 0.7,
+          topP: 0.95,
+          topK: 40,
+          maxOutputTokens: 2048,
+        ),
       );
 
       final String history = _serializeHistory(conversationHistory);
-      final String composedPrompt = '''
-You are GracyAI, the official assistant inside the Gracy app.
-Keep replies helpful, warm, and concise by default.
-If the user asks an academic question, answer it directly and clearly, and include one simple example when useful.
-Do not narrate your internal process.
+      final String composedPrompt =
+          '''
+You are GracyAI, the elite campus super-app intelligence. 
+PERSONALITY: Warm, highly technical when needed, and deeply helpful to students.
+CAPABILITIES: Academic tutoring, campus life planning, marketplace advice, and social hub navigation.
 
+RESPONSE STYLE:
+1. Use Markdown for richness: **bold** for emphasis, `code` for technical terms or lists, and bullet points.
+2. If the user asks a technical/academic question, explain it clearly with an example.
+3. Keep it premium—no robotic narration.
+
+CONTEXT:
 Conversation so far:
 $history
 
-Latest user message:
+LATEST USER REQUEST:
 $effectivePrompt
 ''';
 
@@ -63,13 +84,13 @@ $effectivePrompt
 
       final String text = response.text?.trim() ?? '';
       if (text.isEmpty) {
-        return 'I am thinking, but I could not turn that into a full reply. Please try again.';
+        return 'I am processing your request. Could you rephrase that?';
       }
 
       return text;
     } catch (e) {
-      // Robust fallback UI as requested
-      return "GracyAI is recharging. Live replies back in a moment!";
+      debugPrint('Gemini Error: $e');
+      return offlineMaintenanceMessage;
     }
   }
 

@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
+import 'package:flutter_markdown/flutter_markdown.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../../../core/router/app_router.dart';
@@ -14,10 +15,7 @@ import '../widgets/gracy_ai_logo.dart';
 import '../widgets/neural_thinking_indicator.dart';
 
 class GracyAIScreen extends ConsumerStatefulWidget {
-  const GracyAIScreen({
-    super.key,
-    this.chatId,
-  });
+  const GracyAIScreen({super.key, this.chatId});
 
   final String? chatId;
 
@@ -27,12 +25,16 @@ class GracyAIScreen extends ConsumerStatefulWidget {
 
 class _GracyAIScreenState extends ConsumerState<GracyAIScreen>
     with TickerProviderStateMixin {
+  static const String _localChatId = 'gracy-ai-local';
+  static const String _assistantId = 'gracy-ai';
+  static const String _assistantName = 'GracyAI';
   final _messageController = TextEditingController();
   final _scrollController = ScrollController();
   late AnimationController _composerAnimationController;
-  
+
   bool _isAiThinking = false;
   Timer? _thinkingTimer;
+  final List<MessageModel> _messages = [];
 
   @override
   void initState() {
@@ -40,6 +42,19 @@ class _GracyAIScreenState extends ConsumerState<GracyAIScreen>
     _composerAnimationController = AnimationController(
       duration: const Duration(milliseconds: 300),
       vsync: this,
+    );
+    // Add welcome message
+    _messages.add(
+      MessageModel(
+        id: 'welcome',
+        chatId: widget.chatId ?? _localChatId,
+        senderId: _assistantId,
+        text:
+            "Hello! I am GracyAI, your campus intelligence. How can I help you dominate your studies or campus life today?",
+        sentAt: DateTime.now(),
+        isMe: false,
+        senderName: _assistantName,
+      ),
     );
   }
 
@@ -67,9 +82,19 @@ class _GracyAIScreenState extends ConsumerState<GracyAIScreen>
   Future<void> _handleSendMessage() async {
     final text = _messageController.text.trim();
     if (text.isEmpty) return;
+    final authState = ref.read(authNotifierProvider);
+    final currentUserId = authState.userId;
+    if (currentUserId == null) {
+      return;
+    }
+    final String currentUserName = authState.fullName?.trim().isNotEmpty == true
+        ? authState.fullName!.trim()
+        : authState.username?.trim().isNotEmpty == true
+        ? authState.username!.trim()
+        : 'You';
 
     EliteHaptics.mediumImpact();
-    
+
     setState(() {
       _isAiThinking = true;
     });
@@ -87,15 +112,43 @@ class _GracyAIScreenState extends ConsumerState<GracyAIScreen>
     });
 
     try {
+      // Add user message to list
+      final userMsg = MessageModel(
+        id: DateTime.now().millisecondsSinceEpoch.toString(),
+        chatId: widget.chatId ?? _localChatId,
+        senderId: currentUserId,
+        text: text,
+        sentAt: DateTime.now(),
+        isMe: true,
+        senderName: currentUserName,
+      );
+
+      setState(() {
+        _messages.add(userMsg);
+        _isAiThinking = true;
+      });
+      _scrollToBottom();
+
       // Generate AI response
-      await GeminiService().generateResponse(
+      final responseText = await GeminiService().generateResponse(
         text,
         userMessage: text,
-        conversationHistory: [], // For fresh start, we don't need history
+        conversationHistory: _messages,
       );
 
       if (mounted) {
         setState(() {
+          _messages.add(
+            MessageModel(
+              id: DateTime.now().millisecondsSinceEpoch.toString(),
+              chatId: widget.chatId ?? _localChatId,
+              senderId: _assistantId,
+              text: responseText,
+              sentAt: DateTime.now(),
+              isMe: false,
+              senderName: _assistantName,
+            ),
+          );
           _isAiThinking = false;
         });
         _scrollToBottom();
@@ -104,8 +157,20 @@ class _GracyAIScreenState extends ConsumerState<GracyAIScreen>
       debugPrint('AI response error: $error');
       if (mounted) {
         setState(() {
+          _messages.add(
+            MessageModel(
+              id: 'offline-${DateTime.now().millisecondsSinceEpoch}',
+              chatId: widget.chatId ?? _localChatId,
+              senderId: _assistantId,
+              text: GeminiService.offlineMaintenanceMessage,
+              sentAt: DateTime.now(),
+              isMe: false,
+              senderName: _assistantName,
+            ),
+          );
           _isAiThinking = false;
         });
+        _scrollToBottom();
       }
     }
   }
@@ -138,21 +203,20 @@ class _GracyAIScreenState extends ConsumerState<GracyAIScreen>
 
   Widget _buildGlassmorphismMessage(MessageModel message) {
     final isUser = message.isMe;
-    
+
     return Container(
       margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
       child: Row(
-        mainAxisAlignment: isUser ? MainAxisAlignment.end : MainAxisAlignment.start,
+        mainAxisAlignment: isUser
+            ? MainAxisAlignment.end
+            : MainAxisAlignment.start,
         children: [
           if (!isUser) ...[
             Container(
               width: 32,
               height: 32,
               margin: const EdgeInsets.only(right: 12),
-              child: const GracyAILogo(
-                size: 32,
-                glowing: true,
-              ),
+              child: const GracyAILogo(size: 32, glowing: true),
             ),
           ],
           Flexible(
@@ -183,16 +247,25 @@ class _GracyAIScreenState extends ConsumerState<GracyAIScreen>
                 ],
               ),
               child: Column(
+                mainAxisSize: MainAxisSize.min,
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(
-                    message.text,
-                    style: TextStyle(
-                      fontSize: 16,
-                      fontWeight: FontWeight.w400,
-                      color: isUser ? AppColors.electricBlue : Colors.white,
-                      height: 1.4,
-                      letterSpacing: 0.2,
+                  MarkdownBody(
+                    data: message.text,
+                    selectable: true,
+                    styleSheet: MarkdownStyleSheet(
+                      p: TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.w400,
+                        color: isUser ? AppColors.electricBlue : Colors.white,
+                        height: 1.4,
+                      ),
+                      strong: const TextStyle(fontWeight: FontWeight.w900),
+                      code: TextStyle(
+                        backgroundColor: Colors.white.withValues(alpha: 0.1),
+                        fontFamily: 'monospace',
+                        color: AppColors.electricBlue,
+                      ),
                     ),
                   ),
                   const SizedBox(height: 4),
@@ -260,10 +333,11 @@ class _GracyAIScreenState extends ConsumerState<GracyAIScreen>
 
     // For now, we'll use a mock messages list
     // In a real implementation, this would come from a provider
-    final messages = <MessageModel>[];
+    final messages = _messages;
 
     return Scaffold(
       backgroundColor: Colors.black,
+      resizeToAvoidBottomInset: true,
       appBar: AppBar(
         backgroundColor: Colors.black,
         elevation: 0,
@@ -284,10 +358,7 @@ class _GracyAIScreenState extends ConsumerState<GracyAIScreen>
         ),
         title: Row(
           children: [
-            const GracyAILogo(
-              size: 32,
-              glowing: true,
-            ),
+            const GracyAILogo(size: 32, glowing: true),
             const SizedBox(width: 12),
             Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -319,10 +390,7 @@ class _GracyAIScreenState extends ConsumerState<GracyAIScreen>
               EliteHaptics.lightImpact();
               // Show AI settings or options
             },
-            icon: const Icon(
-              Icons.more_vert,
-              color: Colors.white,
-            ),
+            icon: const Icon(Icons.more_vert, color: Colors.white),
           ),
         ],
       ),
@@ -341,12 +409,10 @@ class _GracyAIScreenState extends ConsumerState<GracyAIScreen>
               ),
             ),
           ),
-          
+
           // Messages or Gemini Interface
-          Expanded(
-            child: _buildMessageList(messages),
-          ),
-          
+          Expanded(child: _buildMessageList(messages)),
+
           // Message Composer
           Container(
             padding: const EdgeInsets.all(16),
