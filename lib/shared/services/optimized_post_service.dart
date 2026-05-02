@@ -77,7 +77,10 @@ class OptimizedPostService {
   Future<File?> pickImage() => _postService.pickImage();
 
   Future<File?> compressSelectedImage(File? image) async {
-    return image;
+    if (image == null) {
+      return null;
+    }
+    return _postService.compressSelectedImage(image);
   }
 
   Future<String?> uploadProfileImage(File image) async => image.path;

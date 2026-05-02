@@ -1,5 +1,8 @@
+import 'dart:io';
+
 import 'package:flutter/foundation.dart';
 import 'package:google_generative_ai/google_generative_ai.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../../core/constants_local.dart';
 import '../models/message_model.dart';
@@ -91,6 +94,78 @@ $effectivePrompt
     } catch (e) {
       debugPrint('Gemini Error: $e');
       return offlineMaintenanceMessage;
+    }
+  }
+
+  Future<List<String>> generateCampusImageCaptions(File imageFile) async {
+    if (!isConfigured) {
+      return const <String>[
+        'Campus energy, main character edition.',
+        'Proof that student life has range.',
+        'Somewhere between deadline mode and good vibes.',
+      ];
+    }
+
+    try {
+      final GenerativeModel model = GenerativeModel(
+        model: _defaultModel,
+        apiKey: _apiKey,
+        generationConfig: GenerationConfig(
+          temperature: 0.85,
+          topP: 0.95,
+          maxOutputTokens: 220,
+        ),
+      );
+      final Uint8List bytes = await imageFile.readAsBytes();
+      final GenerateContentResponse response = await model.generateContent(
+        <Content>[
+          Content.multi(<Part>[
+            TextPart(
+              'Analyze this image and write exactly 3 short, witty campus-vibe captions. Return one caption per line with no numbering.',
+            ),
+            DataPart('image/webp', bytes),
+          ]),
+        ],
+      );
+
+      final List<String> captions = (response.text ?? '')
+          .split('\n')
+          .map((String line) => line.replaceFirst(RegExp(r'^\s*[-*\d.]+\s*'), '').trim())
+          .where((String line) => line.isNotEmpty)
+          .take(3)
+          .toList(growable: false);
+      final List<String> resolvedCaptions = captions.length == 3
+          ? captions
+          : const <String>[
+              'Campus energy, main character edition.',
+              'Proof that student life has range.',
+              'Somewhere between deadline mode and good vibes.',
+            ];
+      await _persistAiResponse(resolvedCaptions.join('\n'));
+      return resolvedCaptions;
+    } catch (e) {
+      debugPrint('Gemini image caption error: $e');
+      return const <String>[
+        'Campus energy, main character edition.',
+        'Proof that student life has range.',
+        'Somewhere between deadline mode and good vibes.',
+      ];
+    }
+  }
+
+  Future<void> _persistAiResponse(String content) async {
+    try {
+      final SupabaseClient client = Supabase.instance.client;
+      if (client.auth.currentUser == null) {
+        return;
+      }
+      await client.from('messages').insert(<String, dynamic>{
+        'room_id': 'gracy_ai_caption_lab',
+        'sender_id': 'gracy_ai_official',
+        'content': content,
+      });
+    } catch (e) {
+      debugPrint('Failed to persist AI caption response: $e');
     }
   }
 

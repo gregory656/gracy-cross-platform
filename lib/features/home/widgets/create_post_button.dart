@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../providers/post_providers.dart';
 import '../../../shared/models/feed_category.dart';
+import '../../../shared/services/gemini_service.dart';
 
 class CreatePostButton extends ConsumerStatefulWidget {
   const CreatePostButton({super.key, this.expanded = false, this.promptText});
@@ -22,6 +23,8 @@ class _CreatePostButtonState extends ConsumerState<CreatePostButton> {
   StateSetter? _dialogSetState;
   File? _selectedImage;
   bool _isUploading = false;
+  bool _isGeneratingCaptions = false;
+  List<String> _captionSuggestions = <String>[];
   String _selectedCategory = FeedCategories.discussions;
   bool _isAnonymous = false;
 
@@ -219,6 +222,7 @@ class _CreatePostButtonState extends ConsumerState<CreatePostButton> {
           _pricePerSemesterController.clear();
           _hasWifi = false;
           _hasWater = false;
+          _captionSuggestions = <String>[];
           _selectedCategory = FeedCategories.discussions;
           _isAnonymous = false;
         });
@@ -237,6 +241,46 @@ class _CreatePostButtonState extends ConsumerState<CreatePostButton> {
         await image.delete();
       }
     } catch (_) {}
+  }
+
+  Future<void> _generateCaptionIdeas() async {
+    final File? image = _selectedImage;
+    if (image == null || _isGeneratingCaptions) {
+      return;
+    }
+
+    setState(() {
+      _isGeneratingCaptions = true;
+    });
+    _refreshDialog();
+
+    try {
+      final List<String> captions =
+          await GeminiService.instance.generateCampusImageCaptions(image);
+      if (!mounted) {
+        return;
+      }
+      setState(() {
+        _captionSuggestions = captions;
+      });
+      _refreshDialog();
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Failed to generate captions: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isGeneratingCaptions = false;
+        });
+        _refreshDialog();
+      }
+    }
   }
 
   void _queueTemporaryImage(File? image) {
@@ -278,6 +322,7 @@ class _CreatePostButtonState extends ConsumerState<CreatePostButton> {
         _pricePerSemesterController.clear();
         _hasWifi = false;
         _hasWater = false;
+        _captionSuggestions = <String>[];
         _selectedCategory = FeedCategories.discussions;
         _isAnonymous = false;
       });
@@ -492,6 +537,7 @@ class _CreatePostButtonState extends ConsumerState<CreatePostButton> {
                         // Caption takes ~60% of focus
                         TextField(
                           controller: _contentController,
+                          minLines: keyboardHeight > 0 ? 5 : 8,
                           maxLines: null,
                           autofocus: true,
                           style: const TextStyle(
@@ -510,6 +556,31 @@ class _CreatePostButtonState extends ConsumerState<CreatePostButton> {
                           ),
                           readOnly: _isUploading,
                         ),
+                        if (_captionSuggestions.isNotEmpty) ...<Widget>[
+                          const SizedBox(height: 12),
+                          Wrap(
+                            spacing: 8,
+                            runSpacing: 8,
+                            children: _captionSuggestions
+                                .map(
+                                  (String caption) => ActionChip(
+                                    label: Text(
+                                      caption,
+                                      maxLines: 2,
+                                      overflow: TextOverflow.ellipsis,
+                                    ),
+                                    onPressed: () {
+                                      _contentController.text = caption;
+                                      _contentController.selection =
+                                          TextSelection.collapsed(
+                                        offset: caption.length,
+                                      );
+                                    },
+                                  ),
+                                )
+                                .toList(),
+                          ),
+                        ],
 
                         const SizedBox(height: 24),
 
@@ -548,11 +619,39 @@ class _CreatePostButtonState extends ConsumerState<CreatePostButton> {
                             borderRadius: BorderRadius.circular(24),
                             child: Stack(
                               children: [
-                                AspectRatio(
-                                  aspectRatio: 4 / 3,
+                                SizedBox(
+                                  height: sheetHeight * 0.3,
+                                  width: double.infinity,
                                   child: Image.file(
                                     _selectedImage!,
                                     fit: BoxFit.cover,
+                                  ),
+                                ),
+                                Positioned(
+                                  top: 12,
+                                  left: 12,
+                                  child: IconButton.filled(
+                                    tooltip: 'Generate captions',
+                                    onPressed:
+                                        _isUploading || _isGeneratingCaptions
+                                        ? null
+                                        : _generateCaptionIdeas,
+                                    style: IconButton.styleFrom(
+                                      backgroundColor: Colors.black54,
+                                      foregroundColor: Colors.white,
+                                    ),
+                                    icon: _isGeneratingCaptions
+                                        ? const SizedBox(
+                                            width: 18,
+                                            height: 18,
+                                            child: CircularProgressIndicator(
+                                              strokeWidth: 2,
+                                              color: Colors.white,
+                                            ),
+                                          )
+                                        : const Icon(
+                                            Icons.auto_fix_high_rounded,
+                                          ),
                                   ),
                                 ),
                                 Positioned(

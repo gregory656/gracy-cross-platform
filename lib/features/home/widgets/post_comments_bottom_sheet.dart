@@ -512,15 +512,29 @@ class _PostCommentsBottomSheetState
   Widget build(BuildContext context) {
     final ThemeData theme = Theme.of(context);
     final List<PostCommentModel> roots = _childrenOf(null);
+    final double keyboardInset = MediaQuery.of(context).viewInsets.bottom;
+    final double screenHeight = MediaQuery.of(context).size.height;
+    final double visibleHeight = screenHeight - keyboardInset - 36;
+    final double safeVisibleHeight = visibleHeight < 220 ? 220 : visibleHeight;
+    final double sheetHeight = (screenHeight * 0.82)
+        .clamp(220.0, safeVisibleHeight)
+        .toDouble();
 
-    return Container(
-      height: MediaQuery.of(context).size.height * 0.82,
-      decoration: BoxDecoration(
-        color: theme.colorScheme.surface,
-        borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
-      ),
-      child: Column(
-        children: <Widget>[
+    return Scaffold(
+      resizeToAvoidBottomInset: true,
+      backgroundColor: Colors.transparent,
+      body: Align(
+        alignment: Alignment.topCenter,
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 180),
+          curve: Curves.easeOutCubic,
+          height: sheetHeight,
+          decoration: BoxDecoration(
+            color: theme.colorScheme.surface,
+            borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
+          ),
+          child: Column(
+            children: <Widget>[
           Container(
             width: 44,
             height: 4,
@@ -588,10 +602,10 @@ class _PostCommentsBottomSheetState
                   : 'Replying to ${_replyTarget?.userName ?? 'comment'}',
               onCancel: _clearComposerMode,
             ),
-          SafeArea(
-            top: false,
-            child: Padding(
-              padding: const EdgeInsets.fromLTRB(16, 12, 16, 16),
+              SafeArea(
+                top: false,
+                child: Padding(
+                  padding: const EdgeInsets.fromLTRB(16, 12, 16, 16),
               child: Row(
                 children: <Widget>[
                   Expanded(
@@ -658,9 +672,11 @@ class _PostCommentsBottomSheetState
                   ),
                 ],
               ),
-            ),
+                ),
+              ),
+            ],
           ),
-        ],
+        ),
       ),
     );
   }
@@ -779,13 +795,14 @@ class _ThreadedCommentBranch extends StatelessWidget {
         ),
         for (final PostCommentModel child in children)
           Padding(
-            padding: const EdgeInsets.only(left: 16),
-            child: Row(
+            padding: const EdgeInsets.only(left: 20),
+            child: IntrinsicHeight(
+              child: Row(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: <Widget>[
                 Container(
                   width: 1,
-                  margin: const EdgeInsets.only(right: 12),
+                  margin: const EdgeInsets.only(right: 12, bottom: 16),
                   color: Colors.grey.withValues(alpha: 0.3),
                 ),
                 Expanded(
@@ -801,6 +818,7 @@ class _ThreadedCommentBranch extends StatelessWidget {
                   ),
                 ),
               ],
+              ),
             ),
           ),
       ],

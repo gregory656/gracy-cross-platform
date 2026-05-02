@@ -178,7 +178,7 @@ class PostModel extends Equatable {
       return '$imageUrl?q_auto,f_auto,w_1080';
     }
     // High-resolution view modifier for flagship experience as requested
-    return '$imageUrl?width=1000&quality=90';
+    return '$imageUrl?width=1000&quality=95';
   }
 
   @override

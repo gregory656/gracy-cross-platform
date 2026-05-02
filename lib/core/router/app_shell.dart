@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../shared/models/notification_model.dart';
+import '../../shared/providers/social_providers.dart';
 import '../theme/app_colors.dart';
 import 'app_router.dart';
 import 'shell_ui_provider.dart';
@@ -47,6 +49,71 @@ class AppShellScaffold extends ConsumerWidget {
     final bool showNavigation = ref.watch(shellNavigationVisibleProvider);
     final shellNavigationController = ref.read(
       shellNavigationVisibleProvider.notifier,
+    );
+
+    ref.listen<AsyncValue<List<NotificationModel>>>(
+      notificationsStreamProvider,
+      (AsyncValue<List<NotificationModel>>? previous,
+          AsyncValue<List<NotificationModel>> next) {
+        final List<NotificationModel>? previousNotifications =
+            previous?.maybeWhen(
+          data: (List<NotificationModel> notifications) => notifications,
+          orElse: () => null,
+        );
+        final List<NotificationModel>? nextNotifications = next.maybeWhen(
+          data: (List<NotificationModel> notifications) => notifications,
+          orElse: () => null,
+        );
+        if (previousNotifications == null ||
+            nextNotifications == null ||
+            nextNotifications.isEmpty) {
+          return;
+        }
+
+        final Set<int> previousIds = previousNotifications
+            .map((NotificationModel notification) => notification.id)
+            .toSet();
+        final NotificationModel newest = nextNotifications.first;
+        if (previousIds.contains(newest.id) || newest.isRead) {
+          return;
+        }
+
+        final String message = newest.content ??
+            (newest.type == 'mention'
+                ? 'Someone mentioned you'
+                : 'Someone replied to your comment');
+        final ScaffoldMessengerState messenger = ScaffoldMessenger.of(context);
+        messenger.hideCurrentMaterialBanner();
+        messenger.showMaterialBanner(
+          MaterialBanner(
+            backgroundColor: AppColors.electricBlue,
+            elevation: 8,
+            leading: const Icon(
+              Icons.notifications_active_rounded,
+              color: Colors.white,
+            ),
+            content: Text(
+              message,
+              style: const TextStyle(
+                color: Colors.white,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+            actions: <Widget>[
+              TextButton(
+                onPressed: messenger.hideCurrentMaterialBanner,
+                child: const Text(
+                  'Dismiss',
+                  style: TextStyle(color: Colors.white),
+                ),
+              ),
+            ],
+          ),
+        );
+        Future<void>.delayed(const Duration(seconds: 3), () {
+          messenger.hideCurrentMaterialBanner();
+        });
+      },
     );
 
     return Scaffold(

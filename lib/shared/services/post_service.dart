@@ -480,6 +480,12 @@ class PostService {
         response,
       );
       final profile = commentData['profiles'] as Map<String, dynamic>?;
+      await _insertCommentNotifications(
+        postId: postId,
+        senderId: userId,
+        content: content,
+        parentId: parentId,
+      );
 
       return PostCommentModel.fromMap({
         ...commentData,
@@ -488,6 +494,78 @@ class PostService {
       });
     } catch (e) {
       throw Exception('Failed to add comment: $e');
+    }
+  }
+
+  Future<void> _insertCommentNotifications({
+    required String postId,
+    required String senderId,
+    required String content,
+    String? parentId,
+  }) async {
+    try {
+      final Map<String, String> recipientsByType = <String, String>{};
+
+      if (parentId != null) {
+        final Map<String, dynamic>? parent = await _supabase
+            .from('post_comments')
+            .select('author_id')
+            .eq('id', parentId)
+            .maybeSingle();
+        final String? parentAuthorId = parent?['author_id'] as String?;
+        if (parentAuthorId != null && parentAuthorId != senderId) {
+          recipientsByType[parentAuthorId] = 'comment_reply';
+        }
+      }
+
+      final Set<String> mentionedUsernames = RegExp(r'@([A-Za-z0-9_\.]{2,32})')
+          .allMatches(content)
+          .map((RegExpMatch match) => match.group(1)?.toLowerCase())
+          .whereType<String>()
+          .toSet();
+
+      if (mentionedUsernames.isNotEmpty) {
+        final List<dynamic> profiles = await _supabase
+            .from('profiles')
+            .select('id, username')
+            .inFilter('username', mentionedUsernames.toList());
+        for (final dynamic row in profiles) {
+          final Map<String, dynamic> profile = Map<String, dynamic>.from(
+            row as Map,
+          );
+          final String? receiverId = profile['id'] as String?;
+          if (receiverId != null && receiverId != senderId) {
+            recipientsByType[receiverId] = 'mention';
+          }
+        }
+      }
+
+      if (recipientsByType.isEmpty) {
+        return;
+      }
+
+      final Map<String, dynamic>? senderProfile = await _getCurrentProfile(
+        senderId,
+      );
+      final String senderName =
+          senderProfile?['username'] as String? ?? 'Someone';
+
+      await _supabase.from('notifications').insert(
+        recipientsByType.entries.map((MapEntry<String, String> entry) {
+          final bool isMention = entry.value == 'mention';
+          return <String, dynamic>{
+            'receiver_id': entry.key,
+            'sender_id': senderId,
+            'type': entry.value,
+            'content': isMention
+                ? '$senderName mentioned you'
+                : '$senderName replied to your comment',
+            'is_read': false,
+          };
+        }).toList(),
+      );
+    } catch (e) {
+      debugPrint('Failed to create comment notifications: $e');
     }
   }
 
